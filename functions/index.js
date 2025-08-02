@@ -4,8 +4,9 @@ import process from "process";
 import functions from "firebase-functions";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
-import { gemini15Pro, googleAI } from "@genkit-ai/googleai";
+import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
+const gemini25Pro = gemini("gemini-2.5-pro");
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 
 // Initialize Firebase Admin (if not already initialized)
@@ -28,8 +29,8 @@ const transporter = nodemailer.createTransport({
   port: 465,
   secure: true, // Use SSL
   auth: {
-    user: "jonny@thoughtify.training",
-    pass: "Y9G1mJyVSFk9",
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
 });
 
@@ -105,7 +106,7 @@ export const generateTrainingPlan = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini15Pro,
+        model: gemini25Pro,
       });
 
       const trainingPlanFlow = ai.defineFlow(
@@ -153,7 +154,7 @@ export const generateStudyMaterial = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini15Pro,
+        model: gemini25Pro,
       });
 
       const promptTemplate = `Create a comprehensive study guide on "${topic}" for high school or college students.  Include the following:
@@ -215,7 +216,7 @@ export const generateCourseOutline = onCall(
       // Initialize GenKit instance with the Google AI plugin using the secret API key.
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini15Pro,
+        model: gemini25Pro,
       });
 
       // Build the prompt template using the provided topic.
@@ -278,7 +279,7 @@ export const generateAssessment = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini15Pro,
+        model: gemini25Pro,
       });
 
       const promptTemplate = `Create an assessment and answer key/rubric on the topic of "${topic}".  The assessment should evaluate understanding of the key concepts related to this topic.
@@ -331,7 +332,7 @@ export const generateLessonContent = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini15Pro, // Or your preferred model
+        model: gemini25Pro, // Or your preferred model
       });
 
       const promptTemplate = `Create comprehensive lesson content on the topic: "${topic}".
@@ -392,7 +393,7 @@ export const generateStoryboard = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini15Pro, 
+        model: gemini25Pro,
       });
 
       const promptTemplate = `Create a detailed and engaging e-learning storyboard on the topic: "${topic}".

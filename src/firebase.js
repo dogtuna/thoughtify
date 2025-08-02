@@ -5,13 +5,13 @@ import { getFunctions } from "firebase/functions";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyBuF0ODjI_-s0qEKA4prbwVMAiyiDYTj6U",
-    authDomain: "thoughtify-web-bb1ea.firebaseapp.com",
-    projectId: "thoughtify-web-bb1ea",
-    storageBucket: "thoughtify-web-bb1ea.firebasestorage.app",
-    messagingSenderId: "314305883722",
-    appId: "1:314305883722:web:c904fc406a458c84df80b3",
-    measurementId: "G-18M1BPL5F3"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
   };
 
 const app = initializeApp(firebaseConfig);

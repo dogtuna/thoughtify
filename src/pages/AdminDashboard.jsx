@@ -10,6 +10,8 @@ import TaskQueue from "../components/TaskQueue";
 import Inquiries from "../components/Inquiries";
 import "./admin.css";
 
+const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
+
 export default function AdminDashboard({ user }) {
   const functionsInstance = getFunctions();
 
@@ -173,7 +175,7 @@ Thoughtify Training Team`;
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIInvitation),
       });
@@ -257,7 +259,7 @@ Thoughtify Training Team`;
           headers: {
             "Content-Type": "application/json",
             "X-Experience-API-Version": "1.0.3",
-            Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+            Authorization: LRS_AUTH,
           },
           body: JSON.stringify(xAPIBlast),
         });
@@ -326,7 +328,7 @@ Thoughtify Training Team`;
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIReplyTask),
       });
@@ -371,7 +373,7 @@ Thoughtify Training Team`;
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPICompleteTask),
       });
@@ -420,7 +422,7 @@ Thoughtify Training Team`;
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIDeleteTask),
       });
@@ -483,7 +485,7 @@ Thoughtify Training Team`;
           headers: {
             "Content-Type": "application/json",
             "X-Experience-API-Version": "1.0.3",
-            Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+            Authorization: LRS_AUTH,
           },
           body: JSON.stringify(xAPIReplyInquiry),
         });
