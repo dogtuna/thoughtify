@@ -1,4 +1,4 @@
-// src/StudyMaterialGenerator.jsx
+// src/components/StudyMaterialGenerator.jsx
 
 import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
