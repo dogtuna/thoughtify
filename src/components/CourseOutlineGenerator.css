@@ -1,0 +1,90 @@
+/* CourseOutlineGenerator.css */
+
+/* Container styling */
+.course-outline-generator {
+    padding: 1rem;
+    margin-top: 50px;
+    text-align: center;
+    background: #1a1a2e; /* Dark background */
+    min-height: 100vh;
+    color: white;
+    font-family: sans-serif;
+  }
+  
+  /* Header styling */
+  .course-outline-generator h2 {
+    margin-bottom: 20px;
+    font-size: 2rem;
+  }
+  
+  /* Form styling */
+  .course-outline-generator form {
+    margin-bottom: 20px;
+  }
+  
+  .course-outline-generator input[type="text"] {
+    display: block;
+    width: 300px;
+    margin: 10px auto;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 16px;
+  }
+  
+  .course-outline-generator button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background-color: #8C259E;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 16px;
+  }
+  
+  .course-outline-generator button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* Error message styling */
+  .course-outline-generator .error {
+    color: #E64A78;
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+  
+  /* Outline result container */
+  .course-outline-generator .outline-result {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    margin: 20px auto;
+    max-width: 800px;
+    overflow-y: auto;
+    max-height: 750px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-align: left;
+  }
+  
+  /* Outline result heading */
+  .course-outline-generator .outline-result h3 {
+    margin-top: 0;
+    font-size: 1.75rem;
+    color: #FB852A;
+    text-align: center;
+  }
+  
+  /* Preformatted text styling */
+  .course-outline-generator .outline-result pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  

@@ -1,0 +1,99 @@
+/* src/AIToolsGenerators.css */
+
+/* Common container for generator components */
+.generator-container {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    margin: 20px auto;
+    max-width: 800px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    color: white;
+  }
+  
+  /* Form styling */
+  .generator-form {
+    margin-bottom: 1rem;
+  }
+  
+  .generator-input {
+    display: block;
+    width: 100%;
+    max-width: 500px;
+    padding: 10px;
+    margin: 10px auto;
+    border-radius: 6px;
+    border: 1px solid #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 16px;
+  }
+  
+  .generator-button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #8C259E;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .generator-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* Error message styling */
+  .generator-error {
+    color: #E64A78;
+    font-size: 16px;
+    margin-top: 10px;
+  }
+  
+  /* Result container styling */
+  .generator-result {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+    max-height: 750px;
+    overflow-y: auto;
+    text-align: left;
+  }
+  
+  .generator-result h3 {
+    text-align: center;
+    color: #FB852A;
+    margin-top: 0;
+    font-size: 1.75rem;
+  }
+  
+  .generator-result pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  
+  /* Spinner styling */
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #8C259E; /* Matches your accent color */
+  animation: spin 1s ease-in-out infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,283 @@
+/* Admin Page Styling */
+.admin-container, .admin-dashboard {
+    text-align: center;
+    margin-top: 50px;
+  }
+  
+  .admin-container input {
+    display: block;
+    width: 300px;
+    margin: 10px auto;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.329);
+  }
+  
+  .admin-container button, .logout-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background-color: #8C259E;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  .logout-button {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+  }
+  
+  .card {
+    margin: 20px auto;
+    width: 80%;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .email-count {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #FB852A;
+  }
+  
+  .inquiry-list {
+    text-align: left;
+    margin-top: 10px;
+    padding: 0;
+    list-style-type: none;
+  }
+  
+  .inquiry-list li {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .inquiry-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .inquiry-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  
+  .task-button {
+    background-color: #FB852A;
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  
+  .task-button:hover {
+    background-color: #e66f20;
+  }
+  
+  .delete-button {
+    background-color: #E64A78;
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  
+  .delete-button:hover {
+    background-color: #c03e5e;
+  }
+
+  .task-list {
+    text-align: left;
+    padding: 0;
+    list-style-type: none;
+  }
+  
+  .task-item {
+    margin: 10px 0;
+  }
+  
+  .task-item button {
+    background-color: #FB852A;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  
+  .task-item button:hover {
+    background-color: #e66f20;
+  }
+  
+/* Full-screen overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6); /* Dark transparent overlay */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  /* Modal box centered on screen */
+  .task-modal {
+    background: #1a1a2e;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 400px;
+    max-width: 90%;
+    z-index: 1001;
+    text-align: center;
+  }
+  
+  /* Close button */
+  .close-button {
+    background-color: #E64A78;
+    padding: 8px;
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+    border-radius: 5px;
+  }
+  
+  .close-button:hover {
+    background-color: #c03e5e;
+  }
+  
+  
+  .close-button {
+    background-color: #E64A78;
+    padding: 8px;
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  /* Layout for Admin Dashboard */
+.dashboard-container {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    background: #f5f5f58f;
+    max-width: 1200px;
+  }
+  
+  .column {
+    width: 45%;
+  }
+  
+  /* Task Modal Buttons */
+  .modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  
+  .complete-button {
+    background-color: #64ffda;
+    color: black;
+    padding: 8px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .complete-button:hover {
+    background-color: #4de0b0;
+  }
+  
+  .delete-button {
+    background-color: #E64A78;
+    padding: 8px;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  
+  .delete-button:hover {
+    background-color: #c03e5e;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .modal {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 400px;
+    max-width: 90%;
+    z-index: 1001;
+    text-align: center;
+  }
+  
+  .modal input,
+  .modal textarea {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px;
+    border: 1px solid #ddd;
+  }
+
+  .modalInv {
+    color: black;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 400px;
+    max-width: 90%;
+    z-index: 1001;
+    text-align: center;
+  }
+  
+  .reply-button {
+    background-color: #8C259E;
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .reply-button:hover {
+    background-color: #FB852A;
+  }

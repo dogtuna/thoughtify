@@ -1,0 +1,29 @@
+/* src/components/ui/input.css */
+.input, .textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(62, 59, 59, 0.1);
+    color: white;
+    font-size: 1rem;
+    transition: border 0.3s ease-in-out;
+  }
+
+  .form-label {
+    color:rgb(243, 179, 2);
+  }
+
+  .input::placeholder,
+  .textarea::placeholder {
+  color: #EDE0DE;  /* Soft beige from the brand palette */
+  opacity: 0.7; /* Slightly transparent */
+  font-weight: 300;
+}
+  
+  .input:focus, .textarea:focus {
+    border: 1px solid #FB852A;
+    outline: none;
+    box-shadow: 0 0 8px rgba(251, 133, 42, 0.6);
+  }
+  
