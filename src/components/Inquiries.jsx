@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import "../pages/admin.css";
-import { 
-  collection, deleteDoc, doc, getDocs, addDoc, serverTimestamp,  
+import {
+  collection, deleteDoc, doc, getDocs, addDoc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+
+const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
 
 export default function NewInquiries({ user, openReplyModal }) {
   const [selectedItem, setSelectedItem] = useState(null);
@@ -75,7 +77,7 @@ export default function NewInquiries({ user, openReplyModal }) {
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIDeleteInquiry),
       });
@@ -131,7 +133,7 @@ export default function NewInquiries({ user, openReplyModal }) {
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIMoveInquiry),
       });

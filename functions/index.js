@@ -28,8 +28,8 @@ const transporter = nodemailer.createTransport({
   port: 465,
   secure: true, // Use SSL
   auth: {
-    user: "jonny@thoughtify.training",
-    pass: "Y9G1mJyVSFk9",
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
 });
 
