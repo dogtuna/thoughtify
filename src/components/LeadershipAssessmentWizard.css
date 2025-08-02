@@ -1,0 +1,126 @@
+/* LeadershipAssessmentWizard.css */
+
+/* Overall container for the wizard */
+.wizard-container {
+    display: flex;
+    max-width: 1200px;  /* Set a fixed maximum width */
+    width: 1200px;
+    margin: 0 auto; 
+    margin-top: 50px;    /* Center the container horizontally */
+    min-height: 100vh;
+    background: #1a1a2e; /* Dark background */
+    color: white;
+    font-family: sans-serif;
+    box-sizing: border-box;
+  }
+  
+  /* Sidebar styling */
+  .wizard-sidebar {
+    width: 25%;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  
+  .wizard-sidebar h3 {
+    margin-top: 0;
+    color: #FB852A;
+    font-size: 1.5rem;
+  }
+  
+  .wizard-sidebar ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .wizard-sidebar li {
+    margin-bottom: 15px;
+  }
+  
+  .wizard-sidebar li a {
+    color: white;
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+  
+  .wizard-sidebar li.active a,
+  .wizard-sidebar li a:hover {
+    color: #8C259E;
+  }
+  
+  /* Main content styling */
+  .wizard-main {
+    flex-grow: 1;
+    width: 75%;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  
+  /* Wizard content (the form area) */
+  .wizard-content {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    margin: 0 auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    box-sizing: border-box;
+  }
+  
+  /* Navigation buttons */
+  .wizard-navigation {
+    text-align: center;
+    margin-top: 20px;
+  }
+  
+  .wizard-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background-color: #8C259E;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 10px;
+    font-size: 16px;
+  }
+  
+  .wizard-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* Input styles */
+  .wizard-input {
+    padding: 10px;
+    width: 300px;
+    margin: 10px auto;
+    border-radius: 6px;
+    border: 1px solid #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    display: block;
+    font-size: 16px;
+  }
+  
+  /* Login container for password prompt */
+  .login-container {
+    margin: auto;
+    text-align: center;
+  }
+  
+  /* Review summary styling (final step) */
+  .review-summary {
+    margin-top: 20px;
+    text-align: left;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  

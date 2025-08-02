@@ -1,0 +1,32 @@
+.dashboard-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f568;
+    border-radius: 8px;
+    text-align: center;
+  }
+  
+  .todo-list {
+    margin-top: 20px;
+  }
+  
+  .todo-list ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .todo-list li {
+    background: #8c259e;
+    color: #fff;
+    padding: 10px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.3s;
+  }
+  
+  .todo-list li:hover {
+    background: #a742b2;
+  }
+  
