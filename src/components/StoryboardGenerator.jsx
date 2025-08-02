@@ -1,33 +1,40 @@
 // src/StoryboardGenerator.jsx
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
+import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 
 const StoryboardGenerator = () => {
-  const [topic, setTopic] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
-  const [storyboard, setStoryboard] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const { selectedModule, storyboard, setStoryboard } = useProject();
+  const navigate = useNavigate();
 
   // Initialize Firebase Functions
   const functionsInstance = getFunctions(app);
   // Create a callable reference to the "generateStoryboard" function.
-  const generateStoryboard = httpsCallable(functionsInstance, "generateStoryboard");
+  const generateStoryboard = httpsCallable(
+    functionsInstance,
+    "generateStoryboard"
+  );
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!topic.trim()) return; // Ensure topic is provided
+  const handleGenerate = async () => {
+    if (!selectedModule) return;
 
     setLoading(true);
     setError("");
     setStoryboard("");
 
     try {
-      // Call the Cloud Function with topic and optional targetAudience.
-      const result = await generateStoryboard({ topic, targetAudience });
+      const result = await generateStoryboard({
+        topic: selectedModule,
+        targetAudience,
+      });
       setStoryboard(result.data.storyboard);
     } catch (err) {
       console.error("Error generating storyboard:", err);
@@ -40,25 +47,21 @@ const StoryboardGenerator = () => {
   return (
     <div className="generator-container">
       <h2>Storyboard Generator</h2>
-      <form onSubmit={handleSubmit} className="generator-form">
-        <input
-          type="text"
-          placeholder="Enter a topic, e.g., 'The History of Film'"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          className="generator-input"
-        />
-        <input
-          type="text"
-          placeholder="Optional: Enter target audience, e.g., 'undergraduate students'"
-          value={targetAudience}
-          onChange={(e) => setTargetAudience(e.target.value)}
-          className="generator-input"
-        />
-        <button type="submit" disabled={loading} className="generator-button">
-          {loading ? "Generating..." : "Generate Storyboard"}
-        </button>
-      </form>
+      <p>Module: {selectedModule || "No module selected"}</p>
+      <input
+        type="text"
+        placeholder="Optional: Enter target audience, e.g., 'undergraduate students'"
+        value={targetAudience}
+        onChange={(e) => setTargetAudience(e.target.value)}
+        className="generator-input"
+      />
+      <button
+        onClick={handleGenerate}
+        disabled={loading || !selectedModule}
+        className="generator-button"
+      >
+        {loading ? "Generating..." : "Generate Storyboard"}
+      </button>
       {error && <p className="generator-error">{error}</p>}
       {loading && <div className="spinner"></div>}
       {storyboard && (
@@ -66,6 +69,14 @@ const StoryboardGenerator = () => {
           <h3>Generated Storyboard</h3>
           <pre>{storyboard}</pre>
         </div>
+      )}
+      {storyboard && (
+        <button
+          className="generator-button"
+          onClick={() => navigate("/ai-tools/assessment")}
+        >
+          Next: Assessment
+        </button>
       )}
     </div>
   );
