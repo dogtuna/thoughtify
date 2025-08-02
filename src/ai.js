@@ -1,12 +1,12 @@
 // src/ai.js
 import { genkit } from 'genkit';
-import { gemini15Flash, googleAI } from '@genkit-ai/googleai';
+import { gemini, googleAI } from '@genkit-ai/googleai';
 
 // The googleAI plugin should automatically pick up your API key from your environment.
 // (Ensure your .env file contains REACT_APP_GOOGLE_GENAI_API_KEY if using Create React App.)
 const ai = genkit({
   plugins: [googleAI()],
-  model: gemini15Flash, // set the default model
+  model: gemini('gemini-2.5-pro'), // set the default model
 });
 
 // Define a flow for generating a course outline.
