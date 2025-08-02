@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import "../App.css"; // Ensure styling is still applied
 
 export default function ComingSoonPage() {
+  const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
   // Using one form hook for the email subscription form.
   const {
     register: registerSubscription,
@@ -68,7 +69,7 @@ export default function ComingSoonPage() {
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIStatement),
       });
@@ -124,7 +125,7 @@ export default function ComingSoonPage() {
         headers: {
           "Content-Type": "application/json",
           "X-Experience-API-Version": "1.0.3",
-          Authorization: "Basic " + btoa("BguUPI-KxfvojpuYNc8:9W0aA91P9rwA1Wi3Pgg"),
+          Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIStatement),
       });
