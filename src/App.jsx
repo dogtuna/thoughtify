@@ -50,7 +50,8 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<ComingSoonPage />} />
+
         <Route
           path="/admin-login"
           element={
