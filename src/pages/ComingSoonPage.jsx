@@ -13,11 +13,10 @@ import "../App.css"; // Ensure styling is still applied
 
 export default function ComingSoonPage() {
   const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
-  // Using one form hook for the email subscription form.
   const {
-    register: registerSubscription,
-    handleSubmit: handleSubscriptionSubmit,
-    reset: resetSubscription,
+    register: registerSignup,
+    handleSubmit: handleSignupSubmit,
+    reset: resetSignup,
   } = useForm();
 
   // Separate hook for the inquiry form.
@@ -31,11 +30,9 @@ export default function ComingSoonPage() {
 
   const onEmailSubmit = async (data) => {
     try {
-      // Save the subscription data to the "emailList" collection.
       await addDoc(collection(db, "emailList"), data);
       setSubmitted(true);
 
-      // Extract and default values from the data
       const name = data.name || "Unknown Name";
       const email = data.email || "unknown@example.com";
       const businessName = data.businessName || "Unknown Business";
@@ -82,7 +79,7 @@ export default function ComingSoonPage() {
         throw new Error(`Failed to send xAPI statement: ${JSON.stringify(lrsResponseData)}`);
       }
       
-      resetSubscription();
+      resetSignup();
     } catch (error) {
       console.error("Error adding email: ", error);
     }
@@ -152,40 +149,6 @@ export default function ComingSoonPage() {
         Our AI-fueled tools and assessments help organizations of any size design impactful, future-ready learning and development initiatives.
       </p>
       
-      {/* Email Subscription */}
-      <Card className="glass-card">
-        <CardContent>
-          {submitted ? (
-            <p className="success-message">Thank you for signing up! We&apos;ll keep you updated.</p>
-          ) : (
-            <form onSubmit={handleSubscriptionSubmit(onEmailSubmit)} className="form">
-              <label className="form-label">Join our mailing list:</label>
-              <Input
-                type="text"
-                placeholder="Your Name"
-                {...registerSubscription("name", { required: true })}
-                className="input"
-              />
-              <Input
-                type="text"
-                placeholder="Business Name"
-                {...registerSubscription("businessName", { required: true })}
-                className="input"
-              />
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                {...registerSubscription("email", { required: true })}
-                className="input"
-              />
-              <Button type="submit" className="button">Subscribe</Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-
-      <br /><br />
-
       {/* Inquiry Form */}
       <Card className="glass-card">
         <CardContent>
@@ -279,6 +242,31 @@ export default function ComingSoonPage() {
           </div>
         </CardContent>
       </Card>
+
+      {submitted && (
+        <p className="success-message">Thank you for signing up! We&apos;ll keep you updated.</p>
+      )}
+
+      <form
+        onSubmit={handleSignupSubmit(onEmailSubmit)}
+        className="signup-bar"
+      >
+        <Input
+          type="text"
+          placeholder="Your Name"
+          {...registerSignup("name", { required: true })}
+          className="input signup-input"
+        />
+        <Input
+          type="email"
+          placeholder="Your Email"
+          {...registerSignup("email", { required: true })}
+          className="input signup-input"
+        />
+        <Button type="submit" className="signup-button">
+          Sign Up
+        </Button>
+      </form>
     </div>
   );
 }
