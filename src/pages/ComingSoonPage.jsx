@@ -15,9 +15,7 @@ import "../App.css";
 import "../coreBenefits.css";
 
 export default function ComingSoonPage({ openSignupModal }) {
-  console.log("VITE_XAPI_BASIC_AUTH raw:", import.meta.env.VITE_XAPI_BASIC_AUTH);
-const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
-console.log("LRS_AUTH header:", LRS_AUTH);
+  const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
   const {
     register: registerSignup,
     handleSubmit: handleSignupSubmit,
@@ -34,6 +32,35 @@ console.log("LRS_AUTH header:", LRS_AUTH);
   const [submitted, setSubmitted] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
+
+  const sliderItems = [
+    {
+      title: "Course Outline Generator",
+      description:
+        "Instantly craft a pedagogically sound outline for any topic.",
+      image: "https://placehold.co/800x400?text=Outline+Generator",
+    },
+    {
+      title: "Lesson Content Creator",
+      description:
+        "Transform outlines into rich lesson content with a single click.",
+      image: "https://placehold.co/800x400?text=Content+Creator",
+    },
+    {
+      title: "Assessment Builder",
+      description:
+        "Automatically generate objective-based questions from your content.",
+      image: "https://placehold.co/800x400?text=Assessment+Builder",
+    },
+  ];
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const nextSlide = () =>
+    setCurrentSlide((prev) => (prev + 1) % sliderItems.length);
+
+  const prevSlide = () =>
+    setCurrentSlide((prev) => (prev - 1 + sliderItems.length) % sliderItems.length);
 
   useEffect(() => {
     const analytics = getAnalytics(app);
@@ -111,7 +138,6 @@ const onEmailSubmit = async (data) => {
     } else {
       lrsResponseData = await lrsResponse.text();
     }
-    console.log("xAPI raw response:", lrsResponseData);
 
     // 5) Handle HTTP errors
     if (!lrsResponse.ok) {
@@ -170,7 +196,6 @@ const onEmailSubmit = async (data) => {
       });
 
       const lrsResponseData = await lrsResponse.json();
-      console.log("xAPI Response:", lrsResponseData);
 
       if (!lrsResponse.ok) {
         console.error("SCORM Cloud LRS Error:", lrsResponseData);
@@ -276,6 +301,39 @@ const onEmailSubmit = async (data) => {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="info-slider">
+        <div
+          className="slider-track"
+          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+        >
+          {sliderItems.map((item, index) => (
+            <div className="slide" key={index}>
+              <img
+                src={item.image}
+                alt={item.title}
+                className="slide-image"
+              />
+              <h3 className="slide-title">{item.title}</h3>
+              <p className="slide-description">{item.description}</p>
+            </div>
+          ))}
+        </div>
+        <button
+          className="slider-button prev"
+          onClick={prevSlide}
+          aria-label="Previous"
+        >
+          ‹
+        </button>
+        <button
+          className="slider-button next"
+          onClick={nextSlide}
+          aria-label="Next"
+        >
+          ›
+        </button>
       </section>
 
       <div className="page-container">
