@@ -9,6 +9,33 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.3) 2px, transparent 3px) 0 0/60px 60px,
+    radial-gradient(circle, rgba(255, 255, 255, 0.15) 2px, transparent 3px) 30px 30px/60px 60px;
+  animation: nodesMove 25s linear infinite;
+  opacity: 0.3;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes nodesMove {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-60px);
+  }
 }
 
 .page-container {
@@ -33,4 +60,30 @@ body {
 .success-message {
   color: #64ffda;
   font-weight: 500;
+}
+
+.signup-bar {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 40px auto 0;
+  max-width: 600px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+.signup-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.signup-button {
+  background-color: #8C259E !important;
+  font-weight: bold;
+}
+
+.signup-button:hover {
+  background-color: #FB852A !important;
 }
