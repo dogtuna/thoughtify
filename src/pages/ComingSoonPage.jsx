@@ -15,7 +15,9 @@ import "../App.css";
 import "../coreBenefits.css";
 
 export default function ComingSoonPage({ openSignupModal }) {
-  const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
+  console.log("VITE_XAPI_BASIC_AUTH raw:", import.meta.env.VITE_XAPI_BASIC_AUTH);
+const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
+console.log("LRS_AUTH header:", LRS_AUTH);
   const {
     register: registerSignup,
     handleSubmit: handleSignupSubmit,
