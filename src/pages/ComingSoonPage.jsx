@@ -244,6 +244,40 @@ const onEmailSubmit = async (data) => {
         </div>
       </section>
 
+      <section className="benefits-section">
+        <h2 className="benefits-headline">Reclaim Your Time. Amplify Your Genius.</h2>
+        <div className="benefits-grid">
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="clock">⏰</span>
+            <h3 className="benefit-title">Slash Development Time</h3>
+            <p className="benefit-description">
+              Cut down on the manual labor of writing and structuring content. Ship projects faster.
+            </p>
+          </div>
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="lightbulb">💡</span>
+            <h3 className="benefit-title">Eliminate Writer&apos;s Block</h3>
+            <p className="benefit-description">
+              Instantly generate creative ideas, examples, and scenarios so you can start with a powerful draft, not a blank page.
+            </p>
+          </div>
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="target">🎯</span>
+            <h3 className="benefit-title">Ensure Instructional Soundness</h3>
+            <p className="benefit-description">
+              Build on outlines and content grounded in solid learning principles, ensuring consistency and quality.
+            </p>
+          </div>
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="upward arrow">⬆️</span>
+            <h3 className="benefit-title">Focus on High-Value Work</h3>
+            <p className="benefit-description">
+              Automate the tedious tasks and free yourself to focus on learning strategy, creative design, and stakeholder management.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <div className="page-container">
         {/* Inquiry Form */}
         <Card className="glass-card">
