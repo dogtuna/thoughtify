@@ -53,40 +53,44 @@ export default function ComingSoonPage({ openSignupModal }) {
       ? "Stay ahead with Thoughtify updates"
       : "Join Thoughtify's learning revolution";
 
-  const onEmailSubmit = async (data) => {
-    try {
-      await addDoc(collection(db, "emailList"), data);
-      setSubmitted(true);
+const onEmailSubmit = async (data) => {
+  try {
+    // 1) Save to Firestore
+    await addDoc(collection(db, "emailList"), data);
+    setSubmitted(true);
 
-      const name = data.name || "Unknown Name";
-      const email = data.email || "unknown@example.com";
-      const businessName = data.businessName || "Unknown Business";
+    // 2) Build xAPI statement
+    const name = data.name || "Unknown Name";
+    const email = data.email || "unknown@example.com";
+    const businessName = data.businessName || "Unknown Business";
 
-      const xAPIStatement = {
-        actor: {
-          objectType: "Agent",
-          name: name,
-          mbox: `mailto:${email}`,
-        },
-        verb: {
-          id: "http://adlnet.gov/expapi/verbs/subscribed",
-          display: { "en-US": "subscribed" },
-        },
-        object: {
-          id: `https://thoughtify.training/subscribed/email_list`,
-          definition: {
-            name: { "en-US": "Subscribed to email list" },
-            description: {
-              "en-US": `User ${name} - ${email} from ${businessName} has subscribed to the email list.`,
-            },
+    const xAPIStatement = {
+      actor: {
+        objectType: "Agent",
+        name,
+        mbox: `mailto:${email}`,
+      },
+      verb: {
+        id: "http://adlnet.gov/expapi/verbs/subscribed",
+        display: { "en-US": "subscribed" },
+      },
+      object: {
+        id: `https://thoughtify.training/subscribed/email_list`,
+        definition: {
+          name: { "en-US": "Subscribed to email list" },
+          description: {
+            "en-US": `User ${name} - ${email} from ${businessName} has subscribed to the email list.`,
           },
-          objectType: "Activity",
         },
-        timestamp: new Date().toISOString(),
-      };
+        objectType: "Activity",
+      },
+      timestamp: new Date().toISOString(),
+    };
 
-      // Send xAPI statement to SCORM Cloud LRS
-      const lrsResponse = await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
+    // 3) Send to SCORM Cloud LRS
+    const lrsResponse = await fetch(
+      "https://cloud.scorm.com/lrs/8FKK4XRIED/statements",
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -94,22 +98,33 @@ export default function ComingSoonPage({ openSignupModal }) {
           Authorization: LRS_AUTH,
         },
         body: JSON.stringify(xAPIStatement),
-      });
-
-      const lrsResponseData = await lrsResponse.json();
-      console.log("xAPI Response:", lrsResponseData);
-
-      if (!lrsResponse.ok) {
-        console.error("SCORM Cloud LRS Error:", lrsResponseData);
-        throw new Error(`Failed to send xAPI statement: ${JSON.stringify(lrsResponseData)}`);
       }
-      
-      resetSignup();
-    } catch (error) {
-      console.error("Error adding email: ", error);
-    }
-  };
+    );
 
+    // 4) Safely parse the response (JSON or plain text)
+    let lrsResponseData;
+    const contentType = lrsResponse.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      lrsResponseData = await lrsResponse.json();
+    } else {
+      lrsResponseData = await lrsResponse.text();
+    }
+    console.log("xAPI raw response:", lrsResponseData);
+
+    // 5) Handle HTTP errors
+    if (!lrsResponse.ok) {
+      console.error("SCORM Cloud LRS Error:", lrsResponseData);
+      throw new Error(
+        `Failed to send xAPI statement: ${lrsResponseData}`
+      );
+    }
+
+    // 6) Clear the form
+    resetSignup();
+  } catch (error) {
+    console.error("Error adding email or sending xAPI:", error);
+  }
+};
   const onInquirySubmit = async (data) => {
     try {
       const inquiryData = {
