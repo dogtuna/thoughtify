@@ -201,6 +201,23 @@ const onEmailSubmit = async (data) => {
         />
       </section>
 
+      <section className="cta-section">
+        <a href="#workflow-video" className="cta-primary">
+          Watch the 2-Minute Workflow
+        </a>
+        <Link to="/ai-tools" className="cta-secondary">
+          Or, start building now →
+        </Link>
+      </section>
+
+      <section id="workflow-video" className="video-section">
+        <img
+          src="https://placehold.co/800x450?text=Workflow+Video"
+          alt="Workflow video placeholder"
+          className="video-placeholder"
+        />
+      </section>
+
       <div className="page-container">
         {/* Inquiry Form */}
         <Card className="glass-card">
