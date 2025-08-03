@@ -36,21 +36,30 @@ export default function ComingSoonPage({ openSignupModal }) {
   const sliderItems = [
     {
       title: "Course Outline Generator",
-      description:
-        "Instantly craft a pedagogically sound outline for any topic.",
-      image: "https://placehold.co/800x400?text=Outline+Generator",
+      description: "Lays the foundation for your entire project.",
+      image: "https://placehold.co/800x400?text=Course+Outline+Generator",
     },
     {
-      title: "Lesson Content Creator",
-      description:
-        "Transform outlines into rich lesson content with a single click.",
-      image: "https://placehold.co/800x400?text=Content+Creator",
+      title: "Lesson Content Generator",
+      description: "Builds upon your outline to create engaging material.",
+      image: "https://placehold.co/800x400?text=Lesson+Content+Generator",
     },
     {
-      title: "Assessment Builder",
+      title: "Study Material Generator",
+      description: "Creates reinforcement assets from your core content.",
+      image: "https://placehold.co/800x400?text=Study+Material+Generator",
+    },
+    {
+      title: "E-Learning Storyboard Generator",
       description:
-        "Automatically generate objective-based questions from your content.",
-      image: "https://placehold.co/800x400?text=Assessment+Builder",
+        "Translates your lessons into a visual plan for development.",
+      image: "https://placehold.co/800x400?text=Storyboard+Generator",
+    },
+    {
+      title: "Assessment Generator",
+      description:
+        "Checks for understanding by creating questions tied directly to your learning objectives.",
+      image: "https://placehold.co/800x400?text=Assessment+Generator",
     },
   ];
 
