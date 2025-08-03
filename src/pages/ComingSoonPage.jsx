@@ -1,8 +1,10 @@
 // src/ComingSoonPage.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import { useForm } from "react-hook-form";
 import { addDoc, collection } from "firebase/firestore";
-import { db } from "../firebase";
+import { getAnalytics, logEvent } from "firebase/analytics";
+import { app, db } from "../firebase";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -10,8 +12,9 @@ import { Textarea } from "../components/ui/textarea";
 import { Link } from "react-router-dom";
 
 import "../App.css"; // Ensure styling is still applied
+import "../coreBenefits.css";
 
-export default function ComingSoonPage() {
+export default function ComingSoonPage({ openSignupModal }) {
   const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
   const {
     register: registerSignup,
@@ -27,6 +30,25 @@ export default function ComingSoonPage() {
   } = useForm();
 
   const [submitted, setSubmitted] = useState(false);
+  const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
+
+  useEffect(() => {
+    const analytics = getAnalytics(app);
+    logEvent(analytics, "headline_variant_view", { variant });
+  }, [variant]);
+
+  const handleJoinClick = () => {
+    const analytics = getAnalytics(app);
+    logEvent(analytics, "join_mailing_list_click", { variant });
+    if (openSignupModal) {
+      openSignupModal();
+    }
+  };
+
+  const headline =
+    variant === "A"
+      ? "Stay ahead with Thoughtify updates"
+      : "Join Thoughtify's learning revolution";
 
   const onEmailSubmit = async (data) => {
     try {
@@ -243,6 +265,14 @@ export default function ComingSoonPage() {
         </CardContent>
       </Card>
 
+      <div className="core-benefits-cta">
+        <h2>{headline}</h2>
+        <p>Get exclusive insights and be the first to know when we launch.</p>
+        <button className="join-mailing-button" onClick={handleJoinClick}>
+          Join our mailing list
+        </button>
+      </div>
+
       {submitted && (
         <p className="success-message">Thank you for signing up! We&apos;ll keep you updated.</p>
       )}
@@ -270,3 +300,7 @@ export default function ComingSoonPage() {
     </div>
   );
 }
+
+ComingSoonPage.propTypes = {
+  openSignupModal: PropTypes.func,
+};
