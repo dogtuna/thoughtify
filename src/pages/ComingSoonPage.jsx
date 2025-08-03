@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Link } from "react-router-dom";
+import PropTypes from "prop-types";
 
 import "../App.css"; // Ensure styling is still applied
 import "../coreBenefits.css";
@@ -41,6 +42,9 @@ export default function ComingSoonPage({ openSignupModal }) {
     const analytics = getAnalytics(app);
     logEvent(analytics, "join_mailing_list_click", { variant });
     setSubmitted(false);
+    if (openSignupModal) {
+      openSignupModal();
+    }
     setShowModal(true);
   };
 
