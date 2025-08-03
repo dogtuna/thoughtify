@@ -1,8 +1,9 @@
 // src/ComingSoonPage.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { addDoc, collection } from "firebase/firestore";
-import { db } from "../firebase";
+import { getAnalytics, logEvent } from "firebase/analytics";
+import { app, db } from "../firebase";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -10,6 +11,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Link } from "react-router-dom";
 
 import "../App.css"; // Ensure styling is still applied
+import "../coreBenefits.css";
 
 export default function ComingSoonPage() {
   const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
@@ -27,6 +29,25 @@ export default function ComingSoonPage() {
   } = useForm();
 
   const [submitted, setSubmitted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
+
+  useEffect(() => {
+    const analytics = getAnalytics(app);
+    logEvent(analytics, "headline_variant_view", { variant });
+  }, [variant]);
+
+  const handleJoinClick = () => {
+    const analytics = getAnalytics(app);
+    logEvent(analytics, "join_mailing_list_click", { variant });
+    setSubmitted(false);
+    setShowModal(true);
+  };
+
+  const headline =
+    variant === "A"
+      ? "Stay ahead with Thoughtify updates"
+      : "Join Thoughtify's learning revolution";
 
   const onEmailSubmit = async (data) => {
     try {
@@ -243,30 +264,53 @@ export default function ComingSoonPage() {
         </CardContent>
       </Card>
 
-      {submitted && (
-        <p className="success-message">Thank you for signing up! We&apos;ll keep you updated.</p>
-      )}
-
-      <form
-        onSubmit={handleSignupSubmit(onEmailSubmit)}
-        className="signup-bar"
-      >
-        <Input
-          type="text"
-          placeholder="Your Name"
-          {...registerSignup("name", { required: true })}
-          className="input signup-input"
-        />
-        <Input
-          type="email"
-          placeholder="Your Email"
-          {...registerSignup("email", { required: true })}
-          className="input signup-input"
-        />
-        <Button type="submit" className="signup-button">
-          Sign Up
+      <div className="core-benefits-cta">
+        <h2>{headline}</h2>
+        <p>Get exclusive insights and be the first to know when we launch.</p>
+        <Button className="join-mailing-button" onClick={handleJoinClick}>
+          Join our mailing list
         </Button>
-      </form>
+      </div>
+
+      {showModal && (
+        <div className="signup-overlay" onClick={() => setShowModal(false)}>
+          <div className="signup-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="close-button"
+              onClick={() => setShowModal(false)}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            {submitted ? (
+              <p className="success-message">
+                Thank you for signing up! We&apos;ll keep you updated.
+              </p>
+            ) : (
+              <form
+                onSubmit={handleSignupSubmit(onEmailSubmit)}
+                className="signup-form"
+              >
+                <Input
+                  type="text"
+                  placeholder="Your Name"
+                  {...registerSignup("name", { required: true })}
+                  className="input signup-input"
+                />
+                <Input
+                  type="email"
+                  placeholder="Your Email"
+                  {...registerSignup("email", { required: true })}
+                  className="input signup-input"
+                />
+                <Button type="submit" className="signup-button">
+                  Sign Up
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
