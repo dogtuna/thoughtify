@@ -52,7 +52,6 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />
-
         <Route
           path="/admin-login"
           element={

@@ -6,11 +6,8 @@ body {
   font-family: "Poppins", sans-serif;
   background: linear-gradient(135deg, #522C81, #FB852A);
   color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 body::before {
@@ -42,6 +39,7 @@ body::before {
   text-align: center;
   width: 90%;
   max-width: 600px;
+  margin: 0 auto;
 }
 
 .main-title {
