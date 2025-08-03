@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
 import AIToolsLayout from "./components/AIToolsLayout";
-import ComingSoonPage from "./pages/ComingSoonPage";
+import LandingPage from "./pages/LandingPage";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import CourseOutlineGenerator from "./components/CourseOutlineGenerator";
@@ -50,7 +50,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<ComingSoonPage />} />
+        <Route path="/" element={<LandingPage />} />
         <Route
           path="/admin-login"
           element={
