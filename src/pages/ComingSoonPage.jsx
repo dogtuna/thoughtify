@@ -13,7 +13,7 @@ import { Link } from "react-router-dom";
 import "../App.css"; // Ensure styling is still applied
 import "../coreBenefits.css";
 
-export default function ComingSoonPage() {
+export default function ComingSoonPage({ openSignupModal }) {
   const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
   const {
     register: registerSignup,
@@ -314,3 +314,7 @@ export default function ComingSoonPage() {
     </div>
   );
 }
+
+ComingSoonPage.propTypes = {
+  openSignupModal: PropTypes.func,
+};

@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
 import AIToolsLayout from "./components/AIToolsLayout";
-import ComingSoonPage from "./pages/ComingSoonPage";
+import LandingPage from "./pages/LandingPage";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import CourseOutlineGenerator from "./components/CourseOutlineGenerator";
@@ -15,6 +15,7 @@ import LessonContentGenerator from "./components/LessonContentGenerator";
 import StoryboardGenerator from "./components/StoryboardGenerator";
 import LeadershipAssessmentWizard from "./components/LeadershipAssessmentWizard";
 import CustomDashboard from "./components/CustomDashboard";
+import ComingSoonPage from "./pages/ComingSoonPage";
 import Login from "./components/Login";
 import "./App.css";
 
