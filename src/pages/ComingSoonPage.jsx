@@ -184,17 +184,71 @@ const onEmailSubmit = async (data) => {
   };
 
   return (
-    <div className="page-container">
-      <h1 className="main-title">Thoughtify Training</h1>
-      <h1 className="main-title">Coming Soon</h1>
-      <p className="subtitle">
-        Our AI-fueled tools and assessments help organizations of any size design impactful, future-ready learning and development initiatives.
-      </p>
-      
-      {/* Inquiry Form */}
-      <Card className="glass-card">
-        <CardContent>
-          <form onSubmit={handleInquirySubmit(onInquirySubmit)} className="form">
+    <>
+      <section className="hero">
+        <div className="hero-content">
+          <h1 className="hero-title">
+            Stop Drowning in Content. Start Designing with Impact.
+          </h1>
+          <p className="hero-subtitle">
+            Thoughtify.Training is your AI partner for instructional design. Our integrated suite automates the repetitive tasks, freeing you to focus on the strategic and creative work you love.
+          </p>
+        </div>
+        <img
+          src="https://placehold.co/600x400?text=Thoughtify"
+          alt="Thoughtify Training illustration"
+          className="hero-image"
+        />
+      </section>
+
+      <section className="cta-section">
+        <a href="#workflow-video" className="cta-primary">
+          Watch the 2-Minute Workflow
+        </a>
+        <Link to="/ai-tools" className="cta-secondary">
+          Or, start building now →
+        </Link>
+      </section>
+
+      <section id="workflow-video" className="workflow-section">
+        <h2 className="workflow-headline">
+          Go from Idea to Assessment in Minutes, Not Weeks.
+        </h2>
+        <img
+          src="https://placehold.co/800x450?text=Workflow+Video"
+          alt="Workflow demo placeholder"
+          className="workflow-video"
+        />
+        <div className="workflow-steps">
+          <div className="workflow-step">
+            <div className="step-number">1</div>
+            <h3 className="step-title">Define Your Outline</h3>
+            <p className="step-description">
+              Instantly generate a pedagogically sound structure for any topic.
+            </p>
+          </div>
+          <div className="workflow-step">
+            <div className="step-number">2</div>
+            <h3 className="step-title">Generate Your Content</h3>
+            <p className="step-description">
+              Transform your outline into rich lesson content, study materials, and storyboards with a single click.
+            </p>
+          </div>
+          <div className="workflow-step">
+            <div className="step-number">3</div>
+            <h3 className="step-title">Create Your Assessments</h3>
+            <p className="step-description">
+              Automatically create relevant, objective-based questions from your generated content.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="page-container">
+        {/* Inquiry Form */}
+        <Card className="glass-card">
+          <CardContent>
+            <form onSubmit={handleInquirySubmit(onInquirySubmit)} className="form">
             <label className="form-label">Have a question? Reach out to us:</label>
             <Input
               type="text"
@@ -333,6 +387,7 @@ const onEmailSubmit = async (data) => {
         </div>
       )}
     </div>
+  </>
   );
 }
 
