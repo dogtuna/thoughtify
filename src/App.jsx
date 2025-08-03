@@ -15,6 +15,7 @@ import LessonContentGenerator from "./components/LessonContentGenerator";
 import StoryboardGenerator from "./components/StoryboardGenerator";
 import LeadershipAssessmentWizard from "./components/LeadershipAssessmentWizard";
 import CustomDashboard from "./components/CustomDashboard";
+import ComingSoonPage from "./components/ComingSoonPage";
 import Login from "./components/Login";
 import "./App.css";
 
