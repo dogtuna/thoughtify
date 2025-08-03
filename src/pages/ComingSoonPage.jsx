@@ -210,12 +210,38 @@ const onEmailSubmit = async (data) => {
         </Link>
       </section>
 
-      <section id="workflow-video" className="video-section">
+      <section id="workflow-video" className="workflow-section">
+        <h2 className="workflow-headline">
+          Go from Idea to Assessment in Minutes, Not Weeks.
+        </h2>
         <img
           src="https://placehold.co/800x450?text=Workflow+Video"
-          alt="Workflow video placeholder"
-          className="video-placeholder"
+          alt="Workflow demo placeholder"
+          className="workflow-video"
         />
+        <div className="workflow-steps">
+          <div className="workflow-step">
+            <div className="step-number">1</div>
+            <h3 className="step-title">Define Your Outline</h3>
+            <p className="step-description">
+              Instantly generate a pedagogically sound structure for any topic.
+            </p>
+          </div>
+          <div className="workflow-step">
+            <div className="step-number">2</div>
+            <h3 className="step-title">Generate Your Content</h3>
+            <p className="step-description">
+              Transform your outline into rich lesson content, study materials, and storyboards with a single click.
+            </p>
+          </div>
+          <div className="workflow-step">
+            <div className="step-number">3</div>
+            <h3 className="step-title">Create Your Assessments</h3>
+            <p className="step-description">
+              Automatically create relevant, objective-based questions from your generated content.
+            </p>
+          </div>
+        </div>
       </section>
 
       <div className="page-container">
