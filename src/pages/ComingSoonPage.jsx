@@ -1,6 +1,5 @@
 // src/ComingSoonPage.jsx
 import { useState, useEffect } from "react";
-import PropTypes from "prop-types";
 import { useForm } from "react-hook-form";
 import { addDoc, collection } from "firebase/firestore";
 import { getAnalytics, logEvent } from "firebase/analytics";
@@ -30,6 +29,7 @@ export default function ComingSoonPage({ openSignupModal }) {
   } = useForm();
 
   const [submitted, setSubmitted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
 
   useEffect(() => {
@@ -40,9 +40,8 @@ export default function ComingSoonPage({ openSignupModal }) {
   const handleJoinClick = () => {
     const analytics = getAnalytics(app);
     logEvent(analytics, "join_mailing_list_click", { variant });
-    if (openSignupModal) {
-      openSignupModal();
-    }
+    setSubmitted(false);
+    setShowModal(true);
   };
 
   const headline =
@@ -268,35 +267,50 @@ export default function ComingSoonPage({ openSignupModal }) {
       <div className="core-benefits-cta">
         <h2>{headline}</h2>
         <p>Get exclusive insights and be the first to know when we launch.</p>
-        <button className="join-mailing-button" onClick={handleJoinClick}>
+        <Button className="join-mailing-button" onClick={handleJoinClick}>
           Join our mailing list
-        </button>
+        </Button>
       </div>
 
-      {submitted && (
-        <p className="success-message">Thank you for signing up! We&apos;ll keep you updated.</p>
+      {showModal && (
+        <div className="signup-overlay" onClick={() => setShowModal(false)}>
+          <div className="signup-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="close-button"
+              onClick={() => setShowModal(false)}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            {submitted ? (
+              <p className="success-message">
+                Thank you for signing up! We&apos;ll keep you updated.
+              </p>
+            ) : (
+              <form
+                onSubmit={handleSignupSubmit(onEmailSubmit)}
+                className="signup-form"
+              >
+                <Input
+                  type="text"
+                  placeholder="Your Name"
+                  {...registerSignup("name", { required: true })}
+                  className="input signup-input"
+                />
+                <Input
+                  type="email"
+                  placeholder="Your Email"
+                  {...registerSignup("email", { required: true })}
+                  className="input signup-input"
+                />
+                <Button type="submit" className="signup-button">
+                  Sign Up
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
       )}
-
-      <form
-        onSubmit={handleSignupSubmit(onEmailSubmit)}
-        className="signup-bar"
-      >
-        <Input
-          type="text"
-          placeholder="Your Name"
-          {...registerSignup("name", { required: true })}
-          className="input signup-input"
-        />
-        <Input
-          type="email"
-          placeholder="Your Email"
-          {...registerSignup("email", { required: true })}
-          className="input signup-input"
-        />
-        <Button type="submit" className="signup-button">
-          Sign Up
-        </Button>
-      </form>
     </div>
   );
 }
