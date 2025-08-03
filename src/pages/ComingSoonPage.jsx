@@ -11,7 +11,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 
-import "../App.css"; // Ensure styling is still applied
+import "../App.css";
 import "../coreBenefits.css";
 
 export default function ComingSoonPage({ openSignupModal }) {
