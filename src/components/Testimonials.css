@@ -1,0 +1,38 @@
+.testimonials {
+  display: grid;
+  gap: 2rem;
+  margin: 4rem auto;
+  max-width: 800px;
+  padding: 0 1rem;
+}
+
+.testimonial {
+  text-align: center;
+  padding: 1.5rem;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.testimonial-logo {
+  max-height: 40px;
+  margin-bottom: 0.75rem;
+}
+
+.testimonial-quote {
+  font-style: italic;
+  color: #333;
+  margin-bottom: 0.75rem;
+}
+
+.testimonial-author {
+  color: #555;
+}
+
+.testimonial-name {
+  font-weight: 600;
+}
+
+.testimonial-title {
+  font-weight: 400;
+}
