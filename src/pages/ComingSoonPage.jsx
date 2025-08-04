@@ -15,9 +15,7 @@ import "../App.css";
 import "../coreBenefits.css";
 
 export default function ComingSoonPage({ openSignupModal }) {
-  console.log("VITE_XAPI_BASIC_AUTH raw:", import.meta.env.VITE_XAPI_BASIC_AUTH);
-const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
-console.log("LRS_AUTH header:", LRS_AUTH);
+  const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
   const {
     register: registerSignup,
     handleSubmit: handleSignupSubmit,
@@ -34,6 +32,44 @@ console.log("LRS_AUTH header:", LRS_AUTH);
   const [submitted, setSubmitted] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
+
+  const sliderItems = [
+    {
+      title: "Course Outline Generator",
+      description: "Lays the foundation for your entire project.",
+      image: "https://placehold.co/800x400?text=Course+Outline+Generator",
+    },
+    {
+      title: "Lesson Content Generator",
+      description: "Builds upon your outline to create engaging material.",
+      image: "https://placehold.co/800x400?text=Lesson+Content+Generator",
+    },
+    {
+      title: "Study Material Generator",
+      description: "Creates reinforcement assets from your core content.",
+      image: "https://placehold.co/800x400?text=Study+Material+Generator",
+    },
+    {
+      title: "E-Learning Storyboard Generator",
+      description:
+        "Translates your lessons into a visual plan for development.",
+      image: "https://placehold.co/800x400?text=Storyboard+Generator",
+    },
+    {
+      title: "Assessment Generator",
+      description:
+        "Checks for understanding by creating questions tied directly to your learning objectives.",
+      image: "https://placehold.co/800x400?text=Assessment+Generator",
+    },
+  ];
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const nextSlide = () =>
+    setCurrentSlide((prev) => (prev + 1) % sliderItems.length);
+
+  const prevSlide = () =>
+    setCurrentSlide((prev) => (prev - 1 + sliderItems.length) % sliderItems.length);
 
   useEffect(() => {
     const analytics = getAnalytics(app);
@@ -111,7 +147,6 @@ const onEmailSubmit = async (data) => {
     } else {
       lrsResponseData = await lrsResponse.text();
     }
-    console.log("xAPI raw response:", lrsResponseData);
 
     // 5) Handle HTTP errors
     if (!lrsResponse.ok) {
@@ -170,7 +205,6 @@ const onEmailSubmit = async (data) => {
       });
 
       const lrsResponseData = await lrsResponse.json();
-      console.log("xAPI Response:", lrsResponseData);
 
       if (!lrsResponse.ok) {
         console.error("SCORM Cloud LRS Error:", lrsResponseData);
@@ -184,15 +218,152 @@ const onEmailSubmit = async (data) => {
   };
 
   return (
-    <div className="page-container">
-      <h1 className="main-title">Thoughtify Training</h1>
-      <h1 className="main-title">Coming Soon</h1>
-      <p className="subtitle">
-        Our AI-fueled tools and assessments help organizations of any size design impactful, future-ready learning and development initiatives.
-      </p>
-      
-      {/* Inquiry Form */}
-      <Card className="glass-card">
+    <>
+      <section className="hero">
+        <div className="hero-content">
+          <h1 className="hero-title">
+            Stop Drowning in Content. Start Designing with Impact.
+          </h1>
+          <p className="hero-subtitle">
+            Thoughtify.Training is your AI partner for instructional design. Our integrated suite automates the repetitive tasks, freeing you to focus on the strategic and creative work you love.
+          </p>
+        </div>
+        <img
+          src="https://placehold.co/600x400?text=Thoughtify"
+          alt="Thoughtify Training illustration"
+          className="hero-image"
+        />
+      </section>
+
+      <section className="cta-section">
+        <a href="#workflow-video" className="cta-primary">
+          Watch the 2-Minute Workflow
+        </a>
+        <Link to="/ai-tools" className="cta-secondary">
+          Or, start building now →
+        </Link>
+      </section>
+
+      <section id="workflow-video" className="workflow-section">
+        <h2 className="workflow-headline">
+          Go from Idea to Assessment in Minutes, Not Weeks.
+        </h2>
+        <img
+          src="https://placehold.co/800x450?text=Workflow+Video"
+          alt="Workflow demo placeholder"
+          className="workflow-video"
+        />
+        <div className="workflow-steps">
+          <div className="workflow-step">
+            <div className="step-number">1</div>
+            <h3 className="step-title">Define Your Outline</h3>
+            <p className="step-description">
+              Instantly generate a pedagogically sound structure for any topic.
+            </p>
+          </div>
+          <div className="workflow-step">
+            <div className="step-number">2</div>
+            <h3 className="step-title">Generate Your Content</h3>
+            <p className="step-description">
+              Transform your outline into rich lesson content, study materials, and storyboards with a single click.
+            </p>
+          </div>
+          <div className="workflow-step">
+            <div className="step-number">3</div>
+            <h3 className="step-title">Create Your Assessments</h3>
+            <p className="step-description">
+              Automatically create relevant, objective-based questions from your generated content.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="benefits-section">
+        <h2 className="benefits-headline">Reclaim Your Time. Amplify Your Genius.</h2>
+        <div className="benefits-grid">
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="clock">⏰</span>
+            <h3 className="benefit-title">Slash Development Time</h3>
+            <p className="benefit-description">
+              Cut down on the manual labor of writing and structuring content. Ship projects faster.
+            </p>
+          </div>
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="lightbulb">💡</span>
+            <h3 className="benefit-title">Eliminate Writer&apos;s Block</h3>
+            <p className="benefit-description">
+              Instantly generate creative ideas, examples, and scenarios so you can start with a powerful draft, not a blank page.
+            </p>
+          </div>
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="target">🎯</span>
+            <h3 className="benefit-title">Ensure Instructional Soundness</h3>
+            <p className="benefit-description">
+              Build on outlines and content grounded in solid learning principles, ensuring consistency and quality.
+            </p>
+          </div>
+          <div className="benefit-item">
+            <span className="benefit-icon" role="img" aria-label="upward arrow">⬆️</span>
+            <h3 className="benefit-title">Focus on High-Value Work</h3>
+            <p className="benefit-description">
+              Automate the tedious tasks and free yourself to focus on learning strategy, creative design, and stakeholder management.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="info-slider">
+        <div
+          className="slider-track"
+          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+        >
+          {sliderItems.map((item, index) => (
+            <div className="slide" key={index}>
+              <img
+                src={item.image}
+                alt={item.title}
+                className="slide-image"
+              />
+              <h3 className="slide-title">{item.title}</h3>
+              <p className="slide-description">{item.description}</p>
+            </div>
+          ))}
+        </div>
+        <button
+          className="slider-button prev"
+          onClick={prevSlide}
+          aria-label="Previous"
+        >
+          ‹
+        </button>
+        <button
+          className="slider-button next"
+          onClick={nextSlide}
+          aria-label="Next"
+        >
+          ›
+        </button>
+      </section>
+
+      <section className="founder-section">
+        <img
+          src="https://placehold.co/400x400?text=Jonny+Davis"
+          alt="Photo of Jonny Davis"
+          className="founder-photo"
+        />
+        <div className="founder-content">
+          <h2 className="founder-headline">
+            Built by an Instructional Designer, for Instructional Designers.
+          </h2>
+          <p className="founder-text">
+            My name is Jonny Davis, and I&apos;ve spent over a decade in the trenches of instructional design. I built Thoughtify to solve the challenges I faced every day: tight deadlines, repetitive work, and not enough time for deep, creative thinking. This platform isn&apos;t just code; it&apos;s a reflection of my passion for creating better learning experiences. I built it for me, and now I&apos;m sharing it with you.
+          </p>
+        </div>
+      </section>
+
+      <div className="page-container">
+        {/* Inquiry Form */}
+      <Card id="contact-form" className="glass-card">
         <CardContent>
           <form onSubmit={handleInquirySubmit(onInquirySubmit)} className="form">
             <label className="form-label">Have a question? Reach out to us:</label>
@@ -293,6 +464,18 @@ const onEmailSubmit = async (data) => {
         </Button>
       </div>
 
+      <section className="final-cta">
+        <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
+        <div className="final-cta-actions">
+          <Link to="/ai-tools" className="final-cta-button">
+            Start Building for Free Today
+          </Link>
+          <a href="#contact-form" className="final-cta-link">
+            Have questions or ideas? Let&apos;s connect.
+          </a>
+        </div>
+      </section>
+
       {showModal && (
         <div className="signup-overlay" onClick={() => setShowModal(false)}>
           <div className="signup-modal" onClick={(e) => e.stopPropagation()}>
@@ -333,6 +516,7 @@ const onEmailSubmit = async (data) => {
         </div>
       )}
     </div>
+  </>
   );
 }
 
