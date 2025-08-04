@@ -70,6 +70,12 @@ body::before {
   margin: 60px auto;
 }
 
+.hero-content {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  border-radius: 8px;
+}
+
 .hero-title {
   font-size: 2.5rem;
   font-weight: 600;
@@ -80,7 +86,7 @@ body::before {
 
 .hero-subtitle {
   font-size: 1.2rem;
-  color: #EDE0DE;
+  color: #FFFFFF;
   margin-top: 10px;
 }
 
