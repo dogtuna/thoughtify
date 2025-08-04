@@ -227,7 +227,7 @@ const onEmailSubmit = async (data) => {
             Stop Drowning in Content. Start Designing with Impact.
           </h1>
           <p className="hero-subtitle">
-            Create course outlines, lessons, and assessments in minutes—no instructional design experience required.
+            Create course outlines, lessons, and assessments in minutes. No instructional design experience required.
           </p>
         </div>
         <img
@@ -260,21 +260,21 @@ const onEmailSubmit = async (data) => {
             <div className="step-number">1</div>
             <h3 className="step-title">Define Your Outline</h3>
             <p className="step-description">
-              Instantly generate a pedagogically sound structure for any topic.
+              Generate a structured outline for any topic in seconds.
             </p>
           </div>
           <div className="workflow-step">
             <div className="step-number">2</div>
             <h3 className="step-title">Generate Your Content</h3>
             <p className="step-description">
-              Transform your outline into rich lesson content, study materials, and storyboards with a single click.
+              Turn outlines into lessons, study aids, and storyboards with one click.
             </p>
           </div>
           <div className="workflow-step">
             <div className="step-number">3</div>
             <h3 className="step-title">Create Your Assessments</h3>
             <p className="step-description">
-              Automatically create relevant, objective-based questions from your generated content.
+              Generate objective-based questions automatically.
             </p>
           </div>
         </div>
@@ -286,30 +286,34 @@ const onEmailSubmit = async (data) => {
           <div className="benefit-item">
             <span className="benefit-icon" role="img" aria-label="clock">⏰</span>
             <h3 className="benefit-title">Slash Development Time</h3>
-            <p className="benefit-description">
-              Cut down on the manual labor of writing and structuring content. Ship projects faster.
-            </p>
+            <ul className="benefit-description">
+              <li>Automate writing and structure.</li>
+              <li>Ship projects faster.</li>
+            </ul>
           </div>
           <div className="benefit-item">
             <span className="benefit-icon" role="img" aria-label="lightbulb">💡</span>
             <h3 className="benefit-title">Eliminate Writer&apos;s Block</h3>
-            <p className="benefit-description">
-              Instantly generate creative ideas, examples, and scenarios so you can start with a powerful draft, not a blank page.
-            </p>
+            <ul className="benefit-description">
+              <li>Generate ideas, examples, and scenarios.</li>
+              <li>Start with a strong draft, not a blank page.</li>
+            </ul>
           </div>
           <div className="benefit-item">
             <span className="benefit-icon" role="img" aria-label="target">🎯</span>
             <h3 className="benefit-title">Ensure Instructional Soundness</h3>
-            <p className="benefit-description">
-              Build on outlines and content grounded in solid learning principles, ensuring consistency and quality.
-            </p>
+            <ul className="benefit-description">
+              <li>Use outlines grounded in learning principles.</li>
+              <li>Keep content consistent and high quality.</li>
+            </ul>
           </div>
           <div className="benefit-item">
             <span className="benefit-icon" role="img" aria-label="upward arrow">⬆️</span>
             <h3 className="benefit-title">Focus on High-Value Work</h3>
-            <p className="benefit-description">
-              Automate the tedious tasks and free yourself to focus on learning strategy, creative design, and stakeholder management.
-            </p>
+            <ul className="benefit-description">
+              <li>Automate tedious tasks.</li>
+              <li>Spend time on strategy and design.</li>
+            </ul>
           </div>
         </div>
       </section>
@@ -359,9 +363,12 @@ const onEmailSubmit = async (data) => {
           <h2 className="founder-headline">
             Built by an Instructional Designer, for Instructional Designers.
           </h2>
-          <p className="founder-text">
-            My name is Jonny Davis, and I&apos;ve spent over a decade in the trenches of instructional design. I built Thoughtify to solve the challenges I faced every day: tight deadlines, repetitive work, and not enough time for deep, creative thinking. This platform isn&apos;t just code; it&apos;s a reflection of my passion for creating better learning experiences. I built it for me, and now I&apos;m sharing it with you.
-          </p>
+          <ul className="founder-text">
+            <li>Jonny Davis has over a decade in instructional design.</li>
+            <li>Thoughtify tackles tight deadlines and repetitive work.</li>
+            <li>The platform frees time for creative thinking.</li>
+            <li>It&apos;s built for designers like you.</li>
+          </ul>
         </div>
       </section>
 
@@ -401,7 +408,7 @@ const onEmailSubmit = async (data) => {
 
       <div className="core-benefits-cta">
         <h2>{headline}</h2>
-        <p>Get exclusive insights and be the first to know when we launch.</p>
+        <p>Get exclusive insights. Be the first to know when we launch.</p>
         <Button className="join-mailing-button" onClick={handleJoinClick}>
           Get Started for Free
         </Button>
