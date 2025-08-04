@@ -221,7 +221,7 @@ const onEmailSubmit = async (data) => {
 
   return (
     <>
-      <section className="hero">
+      <section id="home" className="hero">
         <div className="hero-content">
           <h1 className="hero-title">
             Stop Drowning in Content. Start Designing with Impact.
@@ -319,7 +319,7 @@ const onEmailSubmit = async (data) => {
 
       <Testimonials />
 
-      <section className="info-slider">
+      <section id="tools" className="info-slider">
         <div
           className="slider-track"
           style={{ transform: `translateX(-${currentSlide * 100}%)` }}
@@ -370,7 +370,7 @@ const onEmailSubmit = async (data) => {
 
       <div className="page-container">
         {/* Inquiry Form */}
-      <Card id="contact-form" className="glass-card">
+      <Card id="contact" className="glass-card">
         <CardContent>
           <form onSubmit={handleInquirySubmit(onInquirySubmit)} className="form">
             <label className="form-label">Have a question? Reach out to us:</label>
@@ -410,13 +410,13 @@ const onEmailSubmit = async (data) => {
         </Button>
       </div>
 
-      <section className="final-cta">
+      <section id="pricing" className="final-cta">
         <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
         <div className="final-cta-actions">
           <Link to="/ai-tools" className="final-cta-button">
             Get Started for Free
           </Link>
-          <a href="#contact-form" className="final-cta-link">
+          <a href="#contact" className="final-cta-link">
             Contact Us
           </a>
         </div>
