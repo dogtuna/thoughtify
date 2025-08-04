@@ -10,6 +10,7 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
+import Testimonials from "../components/Testimonials";
 
 import "../App.css";
 import "../coreBenefits.css";
@@ -311,6 +312,8 @@ const onEmailSubmit = async (data) => {
           </div>
         </div>
       </section>
+
+      <Testimonials />
 
       <section className="info-slider">
         <div
