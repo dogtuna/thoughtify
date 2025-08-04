@@ -33,6 +33,7 @@ export default function ComingSoonPage({ openSignupModal }) {
 
   const [submitted, setSubmitted] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [signupStep, setSignupStep] = useState(1);
   const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
 
   const sliderItems = [
@@ -86,6 +87,7 @@ export default function ComingSoonPage({ openSignupModal }) {
       openSignupModal();
     }
     setShowModal(true);
+    setSignupStep(1);
   };
 
   const headline =
@@ -158,8 +160,9 @@ const onEmailSubmit = async (data) => {
       );
     }
 
-    // 6) Clear the form
+    // 6) Clear the form and reset step
     resetSignup();
+    setSignupStep(1);
   } catch (error) {
     console.error("Error adding email or sending xAPI:", error);
   }
@@ -426,11 +429,20 @@ const onEmailSubmit = async (data) => {
       </section>
 
       {showModal && (
-        <div className="signup-overlay" onClick={() => setShowModal(false)}>
+        <div
+          className="signup-overlay"
+          onClick={() => {
+            setShowModal(false);
+            setSignupStep(1);
+          }}
+        >
           <div className="signup-modal" onClick={(e) => e.stopPropagation()}>
             <button
               className="close-button"
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                setSignupStep(1);
+              }}
               aria-label="Close"
             >
               &times;
@@ -444,24 +456,44 @@ const onEmailSubmit = async (data) => {
                 onSubmit={handleSignupSubmit(onEmailSubmit)}
                 className="signup-form"
               >
-                <Input
-                  type="text"
-                  placeholder="Your Name"
-                  {...registerSignup("name", { required: true })}
-                  className="input signup-input"
-                />
-                <Input
-                  type="email"
-                  placeholder="Your Email"
-                  {...registerSignup("email", { required: true })}
-                  className="input signup-input"
-                />
-                <Button type="submit" className="signup-button">
-                  Get Started for Free
-                </Button>
-                <p className="privacy-notice">
-                  We respect your privacy; see our <Link to="/privacy">privacy policy</Link> for details.
-                </p>
+                {signupStep === 1 ? (
+                  <>
+                    <Input
+                      type="text"
+                      placeholder="Your Name"
+                      {...registerSignup("name", { required: true })}
+                      className="input signup-input"
+                    />
+                    <Input
+                      type="email"
+                      placeholder="Your Email"
+                      {...registerSignup("email", { required: true })}
+                      className="input signup-input"
+                    />
+                    <Button
+                      type="button"
+                      className="signup-button"
+                      onClick={() => setSignupStep(2)}
+                    >
+                      Next
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      type="text"
+                      placeholder="Business Name"
+                      {...registerSignup("businessName")}
+                      className="input signup-input"
+                    />
+                    <Button type="submit" className="signup-button">
+                      Get Started for Free
+                    </Button>
+                    <p className="privacy-notice">
+                      We respect your privacy; see our <Link to="/privacy">privacy policy</Link> for details.
+                    </p>
+                  </>
+                )}
               </form>
             )}
           </div>
