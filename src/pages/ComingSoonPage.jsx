@@ -363,9 +363,9 @@ const onEmailSubmit = async (data) => {
 
       <div className="page-container">
         {/* Inquiry Form */}
-        <Card className="glass-card">
-          <CardContent>
-            <form onSubmit={handleInquirySubmit(onInquirySubmit)} className="form">
+      <Card id="contact-form" className="glass-card">
+        <CardContent>
+          <form onSubmit={handleInquirySubmit(onInquirySubmit)} className="form">
             <label className="form-label">Have a question? Reach out to us:</label>
             <Input
               type="text"
@@ -463,6 +463,18 @@ const onEmailSubmit = async (data) => {
           Join our mailing list
         </Button>
       </div>
+
+      <section className="final-cta">
+        <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
+        <div className="final-cta-actions">
+          <Link to="/ai-tools" className="final-cta-button">
+            Start Building for Free Today
+          </Link>
+          <a href="#contact-form" className="final-cta-link">
+            Have questions or ideas? Let&apos;s connect.
+          </a>
+        </div>
+      </section>
 
       {showModal && (
         <div className="signup-overlay" onClick={() => setShowModal(false)}>
