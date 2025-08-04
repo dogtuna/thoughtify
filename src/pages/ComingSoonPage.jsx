@@ -432,8 +432,18 @@ const onEmailSubmit = async (data) => {
           </p>
         </CardContent>
       </Card>
-
       <section id="pricing" className="final-cta">
+        <h2 className="final-cta-headline">
+          Pricing coming soon – join the waitlist
+        </h2>
+        <div className="final-cta-actions">
+          <Button className="final-cta-button" onClick={handleJoinClick}>
+            Join the Waitlist
+          </Button>
+        </div>
+      </section>
+
+      <section className="final-cta">
         <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
         <div className="final-cta-actions">
           <Link to="/ai-tools" className="final-cta-button">
