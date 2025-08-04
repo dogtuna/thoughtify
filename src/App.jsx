@@ -20,6 +20,7 @@ import NavBar from "./components/NavBar";
 import Footer from "./components/Footer";
 import "./App.css";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import CookieConsent from "./components/CookieConsent";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -92,6 +93,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       <Footer />
+      <CookieConsent />
     </Router>
   );
 }
