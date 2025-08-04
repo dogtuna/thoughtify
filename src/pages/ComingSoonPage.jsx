@@ -229,21 +229,20 @@ const onEmailSubmit = async (data) => {
           <p className="hero-subtitle">
             Create course outlines, lessons, and assessments in minutes. No instructional design experience required.
           </p>
+          <div className="hero-actions">
+            <Link to="/ai-tools" className="cta-primary">
+              Get Started for Free
+            </Link>
+            <a href="#workflow-video" className="cta-secondary">
+              Watch Demo
+            </a>
+          </div>
         </div>
         <img
-         src={hero1}
-         alt="Illustration showing AI-powered course generation"
-         className="hero-image"
-       />
-      </section>
-
-      <section className="cta-section">
-        <Link to="/ai-tools" className="cta-primary">
-          Get Started for Free
-        </Link>
-        <a href="#workflow-video" className="cta-secondary">
-          Watch Demo
-        </a>
+          src={hero1}
+          alt="Illustration showing AI-powered course generation"
+          className="hero-image"
+        />
       </section>
 
       <section id="workflow-video" className="workflow-section">
@@ -363,12 +362,9 @@ const onEmailSubmit = async (data) => {
           <h2 className="founder-headline">
             Built by an Instructional Designer, for Instructional Designers.
           </h2>
-          <ul className="founder-text">
-            <li>Jonny Davis has over a decade in instructional design.</li>
-            <li>Thoughtify tackles tight deadlines and repetitive work.</li>
-            <li>The platform frees time for creative thinking.</li>
-            <li>It&apos;s built for designers like you.</li>
-          </ul>
+          <p className="founder-text">
+            I&apos;m Jonny Davis, an instructional designer with over a decade of experience. I built Thoughtify to tackle tight deadlines and repetitive work. It frees you to focus on creative, high-impact learning.
+          </p>
         </div>
       </section>
 
