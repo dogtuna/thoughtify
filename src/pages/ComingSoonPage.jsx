@@ -41,28 +41,33 @@ export default function ComingSoonPage({ openSignupModal }) {
       title: "Course Outline Generator",
       description: "Lays the foundation for your entire project.",
       image: "https://placehold.co/800x400?text=Course+Outline+Generator",
+      alt: "Screenshot of the Course Outline Generator interface",
     },
     {
       title: "Lesson Content Generator",
       description: "Builds upon your outline to create engaging material.",
       image: "https://placehold.co/800x400?text=Lesson+Content+Generator",
+      alt: "Screenshot of the Lesson Content Generator workspace",
     },
     {
       title: "Study Material Generator",
       description: "Creates reinforcement assets from your core content.",
       image: "https://placehold.co/800x400?text=Study+Material+Generator",
+      alt: "Screenshot demonstrating generated study materials",
     },
     {
       title: "E-Learning Storyboard Generator",
       description:
         "Translates your lessons into a visual plan for development.",
       image: "https://placehold.co/800x400?text=Storyboard+Generator",
+      alt: "Screenshot of an e-learning storyboard layout",
     },
     {
       title: "Assessment Generator",
       description:
         "Checks for understanding by creating questions tied directly to your learning objectives.",
       image: "https://placehold.co/800x400?text=Assessment+Generator",
+      alt: "Screenshot of assessment questions generated from objectives",
     },
   ];
 
@@ -252,11 +257,23 @@ const onEmailSubmit = async (data) => {
         <h2 className="workflow-headline">
           Go from Idea to Assessment in Minutes, Not Weeks.
         </h2>
-        <img
-          src="https://placehold.co/800x450?text=Workflow+Video"
-          alt="Workflow demo placeholder"
+        <video
           className="workflow-video"
-        />
+          controls
+          aria-label="Workflow demonstration video"
+        >
+          <source
+            src="https://www.w3schools.com/html/mov_bbb.mp4"
+            type="video/mp4"
+          />
+          <track
+            src="/workflow-demo-captions.vtt"
+            kind="captions"
+            srcLang="en"
+            label="English captions"
+            default
+          />
+        </video>
         <div className="workflow-steps">
           <div className="workflow-step">
             <div className="step-number">1</div>
@@ -339,7 +356,7 @@ const onEmailSubmit = async (data) => {
             <div className="slide" key={index}>
               <img
                 src={item.image}
-                alt={item.title}
+                alt={item.alt}
                 className="slide-image"
               />
               <h3 className="slide-title">{item.title}</h3>
