@@ -238,12 +238,12 @@ const onEmailSubmit = async (data) => {
       </section>
 
       <section className="cta-section">
-        <a href="#workflow-video" className="cta-primary">
-          Watch the 2-Minute Workflow
-        </a>
-        <Link to="/ai-tools" className="cta-secondary">
-          Or, start building now →
+        <Link to="/ai-tools" className="cta-primary">
+          Get Started for Free
         </Link>
+        <a href="#workflow-video" className="cta-secondary">
+          Watch Demo
+        </a>
       </section>
 
       <section id="workflow-video" className="workflow-section">
@@ -399,72 +399,11 @@ const onEmailSubmit = async (data) => {
         </CardContent>
       </Card>
 
-      <br /><br />
-
-      {/* New Section: Try our free AI tools */}
-      <Card className="glass-card">
-        <CardContent>
-          <h2>Try our free AI tools</h2>
-          <div className="ai-tools-links" style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
-            <Link to="/ai-tools/course-outline" style={{
-              padding: "10px 20px",
-              backgroundColor: "#8C259E",
-              color: "white",
-              borderRadius: "6px",
-              textDecoration: "none",
-              fontWeight: "bold"
-            }}>
-              Course Outline Generator
-            </Link>
-            <Link to="/ai-tools/study-material" style={{
-              padding: "10px 20px",
-              backgroundColor: "#8C259E",
-              color: "white",
-              borderRadius: "6px",
-              textDecoration: "none",
-              fontWeight: "bold"
-            }}>
-              Study Material Generator
-            </Link>
-            <Link to="/ai-tools/assessment" style={{
-              padding: "10px 20px",
-              backgroundColor: "#8C259E",
-              color: "white",
-              borderRadius: "6px",
-              textDecoration: "none",
-              fontWeight: "bold"
-            }}>
-              Assessment Generator
-            </Link>
-            <Link to="/ai-tools/lesson-content" style={{
-              padding: "10px 20px",
-              backgroundColor: "#8C259E",
-              color: "white",
-              borderRadius: "6px",
-              textDecoration: "none",
-              fontWeight: "bold"
-            }}>
-              Lesson Content Generator
-            </Link>
-            <Link to="/ai-tools/storyboard" style={{
-              padding: "10px 20px",
-              backgroundColor: "#8C259E",
-              color: "white",
-              borderRadius: "6px",
-              textDecoration: "none",
-              fontWeight: "bold"
-            }}>
-              E-Learning Storyboard Generator
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="core-benefits-cta">
         <h2>{headline}</h2>
         <p>Get exclusive insights and be the first to know when we launch.</p>
         <Button className="join-mailing-button" onClick={handleJoinClick}>
-          Join our mailing list
+          Get Started for Free
         </Button>
       </div>
 
@@ -472,10 +411,10 @@ const onEmailSubmit = async (data) => {
         <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
         <div className="final-cta-actions">
           <Link to="/ai-tools" className="final-cta-button">
-            Start Building for Free Today
+            Get Started for Free
           </Link>
           <a href="#contact-form" className="final-cta-link">
-            Have questions or ideas? Let&apos;s connect.
+            Contact Us
           </a>
         </div>
       </section>
@@ -512,7 +451,7 @@ const onEmailSubmit = async (data) => {
                   className="input signup-input"
                 />
                 <Button type="submit" className="signup-button">
-                  Sign Up
+                  Get Started for Free
                 </Button>
               </form>
             )}
