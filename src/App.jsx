@@ -16,6 +16,8 @@ import LeadershipAssessmentWizard from "./components/LeadershipAssessmentWizard"
 import CustomDashboard from "./components/CustomDashboard";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import Login from "./components/Login";
+import NavBar from "./components/NavBar";
+import Footer from "./components/Footer";
 import "./App.css";
 
 export default function App() {
@@ -48,6 +50,7 @@ export default function App() {
 
   return (
     <Router>
+      <NavBar />
       <Routes>
         <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />
@@ -86,6 +89,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      <Footer />
     </Router>
   );
 }
