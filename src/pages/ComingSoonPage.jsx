@@ -282,6 +282,14 @@ const onEmailSubmit = async (data) => {
         </div>
       </section>
 
+      <div className="core-benefits-cta">
+        <h2>{headline}</h2>
+        <p>Get exclusive insights. Be the first to know when we launch.</p>
+        <Button className="join-mailing-button" onClick={handleJoinClick}>
+          Join Mailing List
+        </Button>
+      </div>
+
       <section className="benefits-section">
         <h2 className="benefits-headline">Reclaim Your Time. Amplify Your Genius.</h2>
         <div className="benefits-grid">
@@ -408,14 +416,6 @@ const onEmailSubmit = async (data) => {
         </CardContent>
       </Card>
 
-      <div className="core-benefits-cta">
-        <h2>{headline}</h2>
-        <p>Get exclusive insights. Be the first to know when we launch.</p>
-        <Button className="join-mailing-button" onClick={handleJoinClick}>
-          Get Started for Free
-        </Button>
-      </div>
-
       <section id="pricing" className="final-cta">
         <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
         <div className="final-cta-actions">
@@ -458,13 +458,21 @@ const onEmailSubmit = async (data) => {
               >
                 {signupStep === 1 ? (
                   <>
+                    <label htmlFor="signup-name" className="signup-label">
+                      Name
+                    </label>
                     <Input
+                      id="signup-name"
                       type="text"
                       placeholder="Your Name"
                       {...registerSignup("name", { required: true })}
                       className="input signup-input"
                     />
+                    <label htmlFor="signup-email" className="signup-label">
+                      Email
+                    </label>
                     <Input
+                      id="signup-email"
                       type="email"
                       placeholder="Your Email"
                       {...registerSignup("email", { required: true })}
@@ -480,14 +488,21 @@ const onEmailSubmit = async (data) => {
                   </>
                 ) : (
                   <>
+                    <label
+                      htmlFor="signup-business"
+                      className="signup-label"
+                    >
+                      Business Name
+                    </label>
                     <Input
+                      id="signup-business"
                       type="text"
                       placeholder="Business Name"
                       {...registerSignup("businessName")}
                       className="input signup-input"
                     />
                     <Button type="submit" className="signup-button">
-                      Get Started for Free
+                      Join Mailing List
                     </Button>
                     <p className="privacy-notice">
                       We respect your privacy; see our <Link to="/privacy">privacy policy</Link> for details.

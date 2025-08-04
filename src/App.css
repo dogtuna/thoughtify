@@ -340,7 +340,7 @@ body::before {
 }
 
 .success-message {
-  color: #64ffda;
+  color: #000;
   font-weight: 500;
 }
 
@@ -368,6 +368,11 @@ body::before {
   font-weight: bold;
   padding: 12px 16px;
   font-size: 1rem;
+}
+
+.signup-label {
+  text-align: left;
+  font-weight: 500;
 }
 
 .signup-button:hover {
