@@ -11,8 +11,8 @@ import { Textarea } from "../components/ui/textarea";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import Testimonials from "../components/Testimonials";
+import hero1 from "../assets/hero1.jpg";import "../App.css";
 
-import "../App.css";
 import "../coreBenefits.css";
 
 export default function ComingSoonPage({ openSignupModal }) {
@@ -230,10 +230,10 @@ const onEmailSubmit = async (data) => {
           </p>
         </div>
         <img
-          src="https://placehold.co/600x400?text=Thoughtify"
-          alt="Thoughtify Training illustration"
-          className="hero-image"
-        />
+         src={hero1}
+         alt="Illustration showing AI-powered course generation"
+         className="hero-image"
+       />
       </section>
 
       <section className="cta-section">
