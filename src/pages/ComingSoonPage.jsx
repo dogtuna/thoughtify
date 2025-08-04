@@ -345,6 +345,22 @@ const onEmailSubmit = async (data) => {
         </button>
       </section>
 
+      <section className="founder-section">
+        <img
+          src="https://placehold.co/400x400?text=Jonny+Davis"
+          alt="Photo of Jonny Davis"
+          className="founder-photo"
+        />
+        <div className="founder-content">
+          <h2 className="founder-headline">
+            Built by an Instructional Designer, for Instructional Designers.
+          </h2>
+          <p className="founder-text">
+            My name is Jonny Davis, and I&apos;ve spent over a decade in the trenches of instructional design. I built Thoughtify to solve the challenges I faced every day: tight deadlines, repetitive work, and not enough time for deep, creative thinking. This platform isn&apos;t just code; it&apos;s a reflection of my passion for creating better learning experiences. I built it for me, and now I&apos;m sharing it with you.
+          </p>
+        </div>
+      </section>
+
       <div className="page-container">
         {/* Inquiry Form */}
         <Card className="glass-card">

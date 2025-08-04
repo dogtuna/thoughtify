@@ -286,6 +286,54 @@ body::before {
   right: 10px;
 }
 
+.founder-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin: 60px auto;
+  width: 90%;
+  max-width: 800px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 40px 20px;
+  border-radius: 8px;
+}
+
+.founder-photo {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.founder-content {
+  max-width: 500px;
+}
+
+.founder-headline {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f5eef6;
+  margin-bottom: 10px;
+}
+
+.founder-text {
+  font-size: 1rem;
+  color: #EDE0DE;
+}
+
+@media (min-width: 768px) {
+  .founder-section {
+    flex-direction: row;
+    text-align: left;
+  }
+
+  .founder-content {
+    margin-left: 40px;
+  }
+}
+
 .success-message {
   color: #64ffda;
   font-weight: 500;
