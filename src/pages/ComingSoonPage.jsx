@@ -399,6 +399,9 @@ const onEmailSubmit = async (data) => {
             />
             <Button type="submit" className="button">Send</Button>
           </form>
+          <p className="privacy-notice">
+            We respect your privacy; see our <Link to="/privacy">privacy policy</Link> for details.
+          </p>
         </CardContent>
       </Card>
 
@@ -456,6 +459,9 @@ const onEmailSubmit = async (data) => {
                 <Button type="submit" className="signup-button">
                   Get Started for Free
                 </Button>
+                <p className="privacy-notice">
+                  We respect your privacy; see our <Link to="/privacy">privacy policy</Link> for details.
+                </p>
               </form>
             )}
           </div>

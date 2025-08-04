@@ -19,6 +19,7 @@ import Login from "./components/Login";
 import NavBar from "./components/NavBar";
 import Footer from "./components/Footer";
 import "./App.css";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -54,6 +55,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route
           path="/admin-login"
           element={
