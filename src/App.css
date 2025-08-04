@@ -13,6 +13,13 @@ body {
   align-items: center;
 }
 
+/* Ensure keyboard focus is clearly visible */
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
 body::before {
   content: "";
   position: fixed;
