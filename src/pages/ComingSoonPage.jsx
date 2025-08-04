@@ -1,5 +1,5 @@
 // src/ComingSoonPage.jsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { addDoc, collection } from "firebase/firestore";
 import { getAnalytics, logEvent } from "firebase/analytics";
@@ -34,7 +34,6 @@ export default function ComingSoonPage({ openSignupModal }) {
   const [submitted, setSubmitted] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [signupStep, setSignupStep] = useState(1);
-  const [variant] = useState(() => (Math.random() < 0.5 ? "A" : "B"));
 
   const sliderItems = [
     {
@@ -79,14 +78,9 @@ export default function ComingSoonPage({ openSignupModal }) {
   const prevSlide = () =>
     setCurrentSlide((prev) => (prev - 1 + sliderItems.length) % sliderItems.length);
 
-  useEffect(() => {
-    const analytics = getAnalytics(app);
-    logEvent(analytics, "headline_variant_view", { variant });
-  }, [variant]);
-
   const handleJoinClick = () => {
     const analytics = getAnalytics(app);
-    logEvent(analytics, "join_mailing_list_click", { variant });
+    logEvent(analytics, "join_mailing_list_click");
     setSubmitted(false);
     if (openSignupModal) {
       openSignupModal();
@@ -94,11 +88,6 @@ export default function ComingSoonPage({ openSignupModal }) {
     setShowModal(true);
     setSignupStep(1);
   };
-
-  const headline =
-    variant === "A"
-      ? "Stay ahead with Thoughtify updates"
-      : "Join Thoughtify's learning revolution";
 
 const onEmailSubmit = async (data) => {
   try {
@@ -299,11 +288,11 @@ const onEmailSubmit = async (data) => {
         </div>
       </section>
 
-      <div className="core-benefits-cta">
-        <h2>{headline}</h2>
-        <p>Get exclusive insights. Be the first to know when we launch.</p>
+      <div id="pricing" className="core-benefits-cta">
+        <h2>Full platform coming soon.</h2>
+        <p>Be the first to know when we launch.</p>
         <Button className="join-mailing-button" onClick={handleJoinClick}>
-          Join Mailing List
+          Join the Waitlist
         </Button>
       </div>
 
@@ -432,17 +421,6 @@ const onEmailSubmit = async (data) => {
           </p>
         </CardContent>
       </Card>
-      <section id="pricing" className="final-cta">
-        <h2 className="final-cta-headline">
-          Pricing coming soon – join the waitlist
-        </h2>
-        <div className="final-cta-actions">
-          <Button className="final-cta-button" onClick={handleJoinClick}>
-            Join the Waitlist
-          </Button>
-        </div>
-      </section>
-
       <section className="final-cta">
         <h2 className="final-cta-headline">Ready to Revolutionize Your Workflow?</h2>
         <div className="final-cta-actions">
