@@ -226,7 +226,7 @@ const onEmailSubmit = async (data) => {
             Stop Drowning in Content. Start Designing with Impact.
           </h1>
           <p className="hero-subtitle">
-            Thoughtify.Training is your AI partner for instructional design. Our integrated suite automates the repetitive tasks, freeing you to focus on the strategic and creative work you love.
+            Create course outlines, lessons, and assessments in minutes—no instructional design experience required.
           </p>
         </div>
         <img
