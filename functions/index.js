@@ -457,7 +457,7 @@ export const generateLearningStrategy = onRequest(
       if (Array.isArray(strategy.learnerPersonas)) {
         strategy.learnerPersonas = strategy.learnerPersonas.map((p) => ({
           ...p,
-          avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+          avatar: `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${encodeURIComponent(
             p.name
           )}`,
         }));

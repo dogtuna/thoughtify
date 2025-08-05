@@ -217,7 +217,7 @@ const InitiativesNew = () => {
                       <img
                         src={p.avatar}
                         alt={`${p.name} avatar`}
-                        style={{ width: "40px", height: "40px" }}
+                        style={{ width: "40px", height: "40px", borderRadius: "50%" }}
                       />
                     )}
                     <span>
