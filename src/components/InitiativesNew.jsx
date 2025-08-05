@@ -209,8 +209,20 @@ const InitiativesNew = () => {
               <h4>Learner Personas</h4>
               <ul>
                 {strategy.learnerPersonas.map((p, idx) => (
-                  <li key={idx}>
-                    <strong>{p.name}</strong>: {p.motivation}; {p.challenges}
+                  <li
+                    key={idx}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                  >
+                    {p.avatar && (
+                      <img
+                        src={p.avatar}
+                        alt={`${p.name} avatar`}
+                        style={{ width: "40px", height: "40px" }}
+                      />
+                    )}
+                    <span>
+                      <strong>{p.name}</strong>: {p.motivation}; {p.challenges}
+                    </span>
                   </li>
                 ))}
               </ul>

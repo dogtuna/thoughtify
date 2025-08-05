@@ -453,6 +453,16 @@ export const generateLearningStrategy = onRequest(
         res.status(500).json({ error: "Invalid AI response format." });
         return;
       }
+
+      if (Array.isArray(strategy.learnerPersonas)) {
+        strategy.learnerPersonas = strategy.learnerPersonas.map((p) => ({
+          ...p,
+          avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+            p.name
+          )}`,
+        }));
+      }
+
       res.status(200).json(strategy);
     } catch (error) {
       console.error("Error generating learning strategy:", error);
