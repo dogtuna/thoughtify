@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
 
 const InitiativesNew = () => {
@@ -12,11 +10,8 @@ const InitiativesNew = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const functionsInstance = getFunctions(app);
-  const generateProjectBrief = httpsCallable(
-    functionsInstance,
-    "generateProjectBrief"
-  );
+  const functionUrl =
+    "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateProjectBrief";
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -35,13 +30,21 @@ const InitiativesNew = () => {
     setError("");
     setProjectBrief("");
     try {
-      const result = await generateProjectBrief({
-        businessGoal,
-        audienceProfile,
-        sourceMaterial,
-        projectConstraints,
+      const response = await fetch(functionUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessGoal,
+          audienceProfile,
+          sourceMaterial,
+          projectConstraints,
+        }),
       });
-      setProjectBrief(result.data.projectBrief);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setProjectBrief(data.projectBrief);
     } catch (err) {
       console.error("Error generating project brief:", err);
       setError(err.message || "Error generating project brief.");
