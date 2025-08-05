@@ -7,8 +7,13 @@ const InitiativesNew = () => {
   const [sourceMaterial, setSourceMaterial] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
   const [projectBrief, setProjectBrief] = useState("");
+  const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
+  const [clarifyingAnswers, setClarifyingAnswers] = useState([]);
+  const [strategy, setStrategy] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [nextLoading, setNextLoading] = useState(false);
   const [error, setError] = useState("");
+  const [nextError, setNextError] = useState("");
 
   const functionUrl =
     "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateProjectBrief";
@@ -29,6 +34,9 @@ const InitiativesNew = () => {
     setLoading(true);
     setError("");
     setProjectBrief("");
+    setClarifyingQuestions([]);
+    setClarifyingAnswers([]);
+    setStrategy(null);
     try {
       const response = await fetch(functionUrl, {
         method: "POST",
@@ -45,6 +53,10 @@ const InitiativesNew = () => {
       }
       const data = await response.json();
       setProjectBrief(data.projectBrief);
+      setClarifyingQuestions(data.clarifyingQuestions || []);
+      setClarifyingAnswers(
+        data.clarifyingQuestions?.map(() => "") || []
+      );
     } catch (err) {
       console.error("Error generating project brief:", err);
       setError(err.message || "Error generating project brief.");
@@ -61,6 +73,45 @@ const InitiativesNew = () => {
     a.download = "project-brief.txt";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleAnswerChange = (index, value) => {
+    setClarifyingAnswers((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  const handleNext = async () => {
+    setNextLoading(true);
+    setNextError("");
+    setStrategy(null);
+    try {
+      const response = await fetch(
+        "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateLearningStrategy",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectBrief,
+            businessGoal,
+            audienceProfile,
+            projectConstraints,
+          }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setStrategy(data);
+    } catch (err) {
+      console.error("Error generating learning strategy:", err);
+      setNextError(err.message || "Error generating learning strategy.");
+    } finally {
+      setNextLoading(false);
+    }
   };
 
   return (
@@ -109,10 +160,74 @@ const InitiativesNew = () => {
       {projectBrief && (
         <div className="generator-result">
           <h3>Project Brief</h3>
-          <pre>{projectBrief}</pre>
+          <textarea
+            className="generator-input"
+            value={projectBrief}
+            onChange={(e) => setProjectBrief(e.target.value)}
+            rows="10"
+          />
           <button onClick={handleDownload} className="generator-button">
             Download Brief
           </button>
+          {clarifyingQuestions.length > 0 && (
+            <div>
+              <h4>Clarifying Questions</h4>
+              {clarifyingQuestions.map((q, idx) => (
+                <div key={idx}>
+                  <p>{q}</p>
+                  <textarea
+                    className="generator-input"
+                    value={clarifyingAnswers[idx] || ""}
+                    onChange={(e) => handleAnswerChange(idx, e.target.value)}
+                    rows="2"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={handleNext}
+            disabled={nextLoading}
+            className="generator-button"
+          >
+            {nextLoading ? "Generating..." : "Next Step"}
+          </button>
+          {nextError && <p className="generator-error">{nextError}</p>}
+        </div>
+      )}
+      {strategy && (
+        <div className="generator-result">
+          <h3>Learning Strategy</h3>
+          <p>
+            <strong>Modality Recommendation:</strong> {strategy.modalityRecommendation}
+          </p>
+          <p>
+            <strong>Rationale:</strong> {strategy.rationale}
+          </p>
+          {strategy.learnerPersonas && strategy.learnerPersonas.length > 0 && (
+            <div>
+              <h4>Learner Personas</h4>
+              <ul>
+                {strategy.learnerPersonas.map((p, idx) => (
+                  <li
+                    key={idx}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                  >
+                    {p.avatar && (
+                      <img
+                        src={p.avatar}
+                        alt={`${p.name} avatar`}
+                        style={{ width: "40px", height: "40px", borderRadius: "50%" }}
+                      />
+                    )}
+                    <span>
+                      <strong>{p.name}</strong>: {p.motivation}; {p.challenges}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

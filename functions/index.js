@@ -34,7 +34,8 @@ const transporter = nodemailer.createTransport({
 });
 
 function parseJsonFromText(text) {
-  const fenceMatch = text.match(/```(?:json)?\n([\s\S]*?)\n```/i);
+  // Extract JSON content even if it's wrapped in Markdown code fences
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   const jsonString = fenceMatch ? fenceMatch[1] : text;
   return JSON.parse(jsonString);
 }
@@ -452,6 +453,16 @@ export const generateLearningStrategy = onRequest(
         res.status(500).json({ error: "Invalid AI response format." });
         return;
       }
+
+      if (Array.isArray(strategy.learnerPersonas)) {
+        strategy.learnerPersonas = strategy.learnerPersonas.map((p) => ({
+          ...p,
+          avatar: `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${encodeURIComponent(
+            p.name
+          )}`,
+        }));
+      }
+
       res.status(200).json(strategy);
     } catch (error) {
       console.error("Error generating learning strategy:", error);
