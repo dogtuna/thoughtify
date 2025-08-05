@@ -34,7 +34,8 @@ const transporter = nodemailer.createTransport({
 });
 
 function parseJsonFromText(text) {
-  const fenceMatch = text.match(/```(?:json)?\n([\s\S]*?)\n```/i);
+  // Extract JSON content even if it's wrapped in Markdown code fences
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   const jsonString = fenceMatch ? fenceMatch[1] : text;
   return JSON.parse(jsonString);
 }
