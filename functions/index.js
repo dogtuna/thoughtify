@@ -105,7 +105,7 @@ export const generateTrainingPlan = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-2.5-pro'),
+        model: gemini('gemini-1.5-pro'),
       });
 
       const trainingPlanFlow = ai.defineFlow(
@@ -153,7 +153,7 @@ export const generateStudyMaterial = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-2.5-pro'),
+        model: gemini('gemini-1.5-pro'),
       });
 
       const promptTemplate = `Create a comprehensive study guide on "${topic}" for high school or college students.  Include the following:
@@ -215,7 +215,7 @@ export const generateCourseOutline = onCall(
       // Initialize GenKit instance with the Google AI plugin using the secret API key.
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-2.5-pro'),
+        model: gemini('gemini-1.5-pro'),
       });
 
       // Build the prompt template using the provided topic.
@@ -278,7 +278,7 @@ export const generateAssessment = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-2.5-pro'),
+        model: gemini('gemini-1.5-pro'),
       });
 
       const promptTemplate = `Create an assessment and answer key/rubric on the topic of "${topic}".  The assessment should evaluate understanding of the key concepts related to this topic.
@@ -331,7 +331,7 @@ export const generateLessonContent = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-2.5-pro'), // Or your preferred model
+        model: gemini('gemini-1.5-pro'), // Or your preferred model
       });
 
       const promptTemplate = `Create comprehensive lesson content on the topic: "${topic}".
@@ -363,14 +363,8 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
 );
 
 export const generateProjectBrief = onRequest(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") {
-      res.status(204).send("");
-      return;
-    }
 
     const {
       businessGoal,
@@ -393,7 +387,7 @@ export const generateProjectBrief = onRequest(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini("gemini-2.5-pro"),
+        model: gemini("gemini-1.5-pro"),
       });
 
       const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief that includes:\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}\n\nReturn the brief with clear sections for the business goal, audience analysis, key learning topics from the source material, and a scope suggestion based on the constraints.`;
@@ -437,7 +431,7 @@ export const generateStoryboard = onCall(
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-2.5-pro'),
+        model: gemini('gemini-1.5-pro'),
       });
 
       const promptTemplate = `Create a detailed and engaging e-learning storyboard on the topic: "${topic}".
