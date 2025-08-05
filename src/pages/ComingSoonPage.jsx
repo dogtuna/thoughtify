@@ -367,6 +367,9 @@ const onEmailSubmit = async (data) => {
         >
           ›
         </button>
+        <Link to="/ai-tools">
+          <Button className="button">Try Our Free Tools</Button>
+        </Link>
       </section>
 
       <section className="founder-section">
