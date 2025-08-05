@@ -362,6 +362,51 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
   }
 );
 
+export const generateProjectBrief = onRequest(
+  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    const {
+      businessGoal,
+      audienceProfile,
+      sourceMaterial,
+      projectConstraints,
+    } = req.body || {};
+
+    if (!businessGoal) {
+      res.status(400).json({ error: "A business goal is required." });
+      return;
+    }
+
+    try {
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) {
+        res.status(500).json({ error: "No API key available." });
+        return;
+      }
+
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-2.5-pro"),
+      });
+
+      const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief that includes:\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}\n\nReturn the brief with clear sections for the business goal, audience analysis, key learning topics from the source material, and a scope suggestion based on the constraints.`;
+
+      const { text } = await ai.generate(promptTemplate);
+      res.status(200).json({ projectBrief: text });
+    } catch (error) {
+      console.error("Error generating project brief:", error);
+      res.status(500).json({ error: "Failed to generate project brief." });
+    }
+  }
+);
+
 export const generateStoryboard = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
