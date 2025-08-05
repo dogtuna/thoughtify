@@ -12,6 +12,7 @@ import StudyMaterialGenerator from "./components/StudyMaterialGenerator";
 import AssessmentGenerator from "./components/AssessmentGenerator";
 import LessonContentGenerator from "./components/LessonContentGenerator";
 import StoryboardGenerator from "./components/StoryboardGenerator";
+import InitiativesNew from "./components/InitiativesNew";
 import LeadershipAssessmentWizard from "./components/LeadershipAssessmentWizard";
 import CustomDashboard from "./components/CustomDashboard";
 import ComingSoonPage from "./pages/ComingSoonPage";
@@ -82,7 +83,8 @@ export default function App() {
           path="/leadership-assessment"
           element={user ? <LeadershipAssessmentWizard /> : <Navigate to="/login" />}
         />
-        <Route path="/ai-tools" element={<AIToolsLayout />}>
+        <Route path="/ai-tools" element={<AIToolsLayout />}> 
+          <Route path="initiatives" element={<InitiativesNew />} />
           <Route path="course-outline" element={<CourseOutlineGenerator />} />
           <Route path="study-material" element={<StudyMaterialGenerator />} />
           <Route path="assessment" element={<AssessmentGenerator />} />
