@@ -365,7 +365,6 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
 export const generateProjectBrief = onRequest(
   { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req, res) => {
-
     const {
       businessGoal,
       audienceProfile,
@@ -390,13 +389,67 @@ export const generateProjectBrief = onRequest(
         model: gemini("gemini-1.5-pro"),
       });
 
-      const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief that includes:\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}\n\nReturn the brief with clear sections for the business goal, audience analysis, key learning topics from the source material, and a scope suggestion based on the constraints.`;
+      const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief and list any questions that require clarification before moving forward.\nReturn a valid JSON object with the structure:{\n  "projectBrief": "text of the brief",\n  "clarifyingQuestions": ["question1", "question2"]\n}\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
 
       const { text } = await ai.generate(promptTemplate);
-      res.status(200).json({ projectBrief: text });
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (err) {
+        console.error("Failed to parse AI response:", err, text);
+        res.status(500).json({ error: "Invalid AI response format." });
+        return;
+      }
+      res.status(200).json(json);
     } catch (error) {
       console.error("Error generating project brief:", error);
       res.status(500).json({ error: "Failed to generate project brief." });
+    }
+  }
+);
+
+export const generateLearningStrategy = onRequest(
+  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req, res) => {
+    const {
+      projectBrief,
+      businessGoal,
+      audienceProfile,
+      projectConstraints,
+    } = req.body || {};
+
+    if (!projectBrief) {
+      res.status(400).json({ error: "A project brief is required." });
+      return;
+    }
+
+    try {
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) {
+        res.status(500).json({ error: "No API key available." });
+        return;
+      }
+
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-1.5-pro"),
+      });
+
+      const promptTemplate = `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality and create 2-3 learner personas. Return a JSON object with the structure:{\n  "modalityRecommendation": "brief recommendation",\n  "rationale": "why this modality fits",\n  "learnerPersonas": [{"name": "Name", "motivation": "text", "challenges": "text"}]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}`;
+
+      const { text } = await ai.generate(promptTemplate);
+      let strategy;
+      try {
+        strategy = JSON.parse(text);
+      } catch (err) {
+        console.error("Failed to parse AI response:", err, text);
+        res.status(500).json({ error: "Invalid AI response format." });
+        return;
+      }
+      res.status(200).json(strategy);
+    } catch (error) {
+      console.error("Error generating learning strategy:", error);
+      res.status(500).json({ error: "Failed to generate learning strategy." });
     }
   }
 );
