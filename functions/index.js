@@ -33,6 +33,12 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function parseJsonFromText(text) {
+  const fenceMatch = text.match(/```(?:json)?\n([\s\S]*?)\n```/i);
+  const jsonString = fenceMatch ? fenceMatch[1] : text;
+  return JSON.parse(jsonString);
+}
+
 export const setCustomClaims = onRequest(async (req, res) => {
   // Expect a JSON body like: { id: "USER_UID", claims: { admin: true } }
   const { id, claims } = req.body;
@@ -389,12 +395,12 @@ export const generateProjectBrief = onRequest(
         model: gemini("gemini-1.5-pro"),
       });
 
-      const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief and list any questions that require clarification before moving forward.\nReturn a valid JSON object with the structure:{\n  "projectBrief": "text of the brief",\n  "clarifyingQuestions": ["question1", "question2"]\n}\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
+      const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief and list any questions that require clarification before moving forward.\nReturn a valid JSON object with the structure:{\n  "projectBrief": "text of the brief",\n  "clarifyingQuestions": ["question1", "question2"]\n}\nDo not include any code fences or additional formatting.\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
 
       const { text } = await ai.generate(promptTemplate);
       let json;
       try {
-        json = JSON.parse(text);
+        json = parseJsonFromText(text);
       } catch (err) {
         console.error("Failed to parse AI response:", err, text);
         res.status(500).json({ error: "Invalid AI response format." });
@@ -435,12 +441,12 @@ export const generateLearningStrategy = onRequest(
         model: gemini("gemini-1.5-pro"),
       });
 
-      const promptTemplate = `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality and create 2-3 learner personas. Return a JSON object with the structure:{\n  "modalityRecommendation": "brief recommendation",\n  "rationale": "why this modality fits",\n  "learnerPersonas": [{"name": "Name", "motivation": "text", "challenges": "text"}]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}`;
+      const promptTemplate = `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality and create 2-3 learner personas. Return a JSON object with the structure:{\n  "modalityRecommendation": "brief recommendation",\n  "rationale": "why this modality fits",\n  "learnerPersonas": [{"name": "Name", "motivation": "text", "challenges": "text"}]\n}\nDo not include any code fences or additional formatting.\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}`;
 
       const { text } = await ai.generate(promptTemplate);
       let strategy;
       try {
-        strategy = JSON.parse(text);
+        strategy = parseJsonFromText(text);
       } catch (err) {
         console.error("Failed to parse AI response:", err, text);
         res.status(500).json({ error: "Invalid AI response format." });
