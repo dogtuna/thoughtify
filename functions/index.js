@@ -363,14 +363,8 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
 );
 
 export const generateProjectBrief = onRequest(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") {
-      res.status(204).send("");
-      return;
-    }
 
     const {
       businessGoal,
