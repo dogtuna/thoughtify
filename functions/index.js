@@ -6,6 +6,7 @@ import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 
 // Initialize Firebase Admin (if not already initialized)
@@ -34,8 +35,18 @@ const transporter = nodemailer.createTransport({
 });
 
 function parseJsonFromText(text) {
-  const fenceMatch = text.match(/```(?:json)?\n([\s\S]*?)\n```/i);
-  const jsonString = fenceMatch ? fenceMatch[1] : text;
+  // Extract JSON content even if it's wrapped in Markdown code fences
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const raw = fenceMatch ? fenceMatch[1] : text;
+
+  // Locate the first JSON object within the raw text
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("No JSON object found in text");
+  }
+
+  const jsonString = raw.slice(start, end + 1);
   return JSON.parse(jsonString);
 }
 
@@ -406,6 +417,11 @@ export const generateProjectBrief = onRequest(
         res.status(500).json({ error: "Invalid AI response format." });
         return;
       }
+      if (!json.projectBrief) {
+        console.error("AI response missing projectBrief field:", json);
+        res.status(500).json({ error: "AI response missing project brief." });
+        return;
+      }
       res.status(200).json(json);
     } catch (error) {
       console.error("Error generating project brief:", error);
@@ -452,6 +468,41 @@ export const generateLearningStrategy = onRequest(
         res.status(500).json({ error: "Invalid AI response format." });
         return;
       }
+
+      if (!strategy.modalityRecommendation || !strategy.learnerPersonas) {
+        console.error("AI response missing expected fields:", strategy);
+        res.status(500).json({ error: "AI response missing learning strategy fields." });
+        return;
+      }
+
+      if (Array.isArray(strategy.learnerPersonas)) {
+        const genAI = new GoogleGenerativeAI(key);
+        const imageModel = genAI.getGenerativeModel({ model: "imagen-3.0" });
+
+        async function generateAvatar(persona) {
+          const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
+          try {
+            const result = await imageModel.generateContent({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "image/png" },
+            });
+            const data =
+              result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            return data ? `data:image/png;base64,${data}` : null;
+          } catch (err) {
+            console.error("Avatar generation failed for persona", persona.name, err);
+            return null;
+          }
+        }
+
+        strategy.learnerPersonas = await Promise.all(
+          strategy.learnerPersonas.map(async (p) => ({
+            ...p,
+            avatar: await generateAvatar(p),
+          }))
+        );
+      }
+
       res.status(200).json(strategy);
     } catch (error) {
       console.error("Error generating learning strategy:", error);
