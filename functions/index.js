@@ -484,29 +484,62 @@ export const generateLearningStrategy = onRequest(
         const vertexAI = new VertexAI({ project, location });
         const imageModel = vertexAI.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
 
+        function fallbackAvatar(name) {
+          const seed = encodeURIComponent(name);
+          return `https://api.dicebear.com/8.x/adventurer-neutral/svg?seed=${seed}`;
+        }
+
         async function generateAvatar(persona) {
           const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
-          try {
-            const result = await imageModel.generateContent({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-            });
-            const data =
-              result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            return data ? `data:image/png;base64,${data}` : null;
-          } catch (err) {
-            console.error("Avatar generation failed for persona", persona.name, err);
-            const seed = encodeURIComponent(persona.name);
-            return `https://api.dicebear.com/8.x/adventurer-neutral/svg?seed=${seed}`;
+          const result = await imageModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+          });
+          const data =
+            result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          return data ? `data:image/png;base64,${data}` : null;
+        }
+
+        async function safeGenerateAvatar(persona, retries = 3) {
+          let delay = 1000;
+          for (let i = 0; i < retries; i++) {
+            try {
+              const avatar = await generateAvatar(persona);
+              return avatar ?? fallbackAvatar(persona.name);
+            } catch (err) {
+              if (err.code === 429 && i < retries - 1) {
+                await new Promise((r) => setTimeout(r, delay));
+                delay *= 2;
+              } else {
+                console.error(
+                  "Avatar generation failed for persona",
+                  persona.name,
+                  err,
+                );
+                return fallbackAvatar(persona.name);
+              }
+            }
           }
         }
 
-        const personasWithAvatars = [];
-        for (const p of strategy.learnerPersonas) {
-          personasWithAvatars.push({
-            ...p,
-            avatar: await generateAvatar(p),
-          });
+        async function generateAvatarsSerial(personas) {
+          const results = [];
+          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
+          const delayMs = Math.ceil(60000 / quota);
+          for (const [index, persona] of personas.entries()) {
+            results.push({
+              ...persona,
+              avatar: await safeGenerateAvatar(persona),
+            });
+            if (index < personas.length - 1) {
+              await new Promise((r) => setTimeout(r, delayMs));
+            }
+          }
+          return results;
         }
+
+        const personasWithAvatars = await generateAvatarsSerial(
+          strategy.learnerPersonas,
+        );
         strategy.learnerPersonas = personasWithAvatars;
       }
 
