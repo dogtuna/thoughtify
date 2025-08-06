@@ -500,12 +500,14 @@ export const generateLearningStrategy = onRequest(
           }
         }
 
-        strategy.learnerPersonas = await Promise.all(
-          strategy.learnerPersonas.map(async (p) => ({
+        const personasWithAvatars = [];
+        for (const p of strategy.learnerPersonas) {
+          personasWithAvatars.push({
             ...p,
             avatar: await generateAvatar(p),
-          }))
-        );
+          });
+        }
+        strategy.learnerPersonas = personasWithAvatars;
       }
 
       res.status(200).json(strategy);
