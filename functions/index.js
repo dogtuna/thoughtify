@@ -495,19 +495,16 @@ export const generateLearningStrategy = onRequest(
         }
 
         async function safeGenerateAvatar(persona, retries = 3) {
-          let delay = 1000;
+          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
+          const delayMs = Math.ceil(60_000 / quota);
           for (let i = 0; i < retries; i++) {
             try {
               const avatar = await generateAvatar(persona);
               if (avatar) return avatar;
               throw new Error("No avatar generated");
             } catch (err) {
-              if (err.code === 429 && i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delay));
-                delay *= 2;
-              } else if (i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delay));
-                delay *= 2;
+              if (i < retries - 1) {
+                await new Promise((r) => setTimeout(r, delayMs));
               } else {
                 console.error(
                   "Avatar generation failed for persona",
