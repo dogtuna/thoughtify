@@ -52,11 +52,12 @@ const InitiativesNew = () => {
         throw new Error(`HTTP ${response.status}`);
       }
       const data = await response.json();
+      if (!data.projectBrief) {
+        throw new Error("No project brief returned.");
+      }
       setProjectBrief(data.projectBrief);
       setClarifyingQuestions(data.clarifyingQuestions || []);
-      setClarifyingAnswers(
-        data.clarifyingQuestions?.map(() => "") || []
-      );
+      setClarifyingAnswers(data.clarifyingQuestions?.map(() => "") || []);
     } catch (err) {
       console.error("Error generating project brief:", err);
       setError(err.message || "Error generating project brief.");
@@ -105,6 +106,9 @@ const InitiativesNew = () => {
         throw new Error(`HTTP ${response.status}`);
       }
       const data = await response.json();
+      if (!data.modalityRecommendation || !data.learnerPersonas) {
+        throw new Error("No learning strategy returned.");
+      }
       setStrategy(data);
     } catch (err) {
       console.error("Error generating learning strategy:", err);

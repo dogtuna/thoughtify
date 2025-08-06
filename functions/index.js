@@ -37,7 +37,16 @@ const transporter = nodemailer.createTransport({
 function parseJsonFromText(text) {
   // Extract JSON content even if it's wrapped in Markdown code fences
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const jsonString = fenceMatch ? fenceMatch[1] : text;
+  const raw = fenceMatch ? fenceMatch[1] : text;
+
+  // Locate the first JSON object within the raw text
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("No JSON object found in text");
+  }
+
+  const jsonString = raw.slice(start, end + 1);
   return JSON.parse(jsonString);
 }
 
@@ -408,6 +417,11 @@ export const generateProjectBrief = onRequest(
         res.status(500).json({ error: "Invalid AI response format." });
         return;
       }
+      if (!json.projectBrief) {
+        console.error("AI response missing projectBrief field:", json);
+        res.status(500).json({ error: "AI response missing project brief." });
+        return;
+      }
       res.status(200).json(json);
     } catch (error) {
       console.error("Error generating project brief:", error);
@@ -452,6 +466,12 @@ export const generateLearningStrategy = onRequest(
       } catch (err) {
         console.error("Failed to parse AI response:", err, text);
         res.status(500).json({ error: "Invalid AI response format." });
+        return;
+      }
+
+      if (!strategy.modalityRecommendation || !strategy.learnerPersonas) {
+        console.error("AI response missing expected fields:", strategy);
+        res.status(500).json({ error: "AI response missing learning strategy fields." });
         return;
       }
 
