@@ -484,11 +484,6 @@ export const generateLearningStrategy = onRequest(
         const vertexAI = new VertexAI({ project, location });
         const imageModel = vertexAI.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
 
-        function fallbackAvatar(name) {
-          const seed = encodeURIComponent(name);
-          return `https://api.dicebear.com/8.x/adventurer-neutral/svg?seed=${seed}`;
-        }
-
         async function generateAvatar(persona) {
           const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
           const result = await imageModel.generateContent({
@@ -504,9 +499,13 @@ export const generateLearningStrategy = onRequest(
           for (let i = 0; i < retries; i++) {
             try {
               const avatar = await generateAvatar(persona);
-              return avatar ?? fallbackAvatar(persona.name);
+              if (avatar) return avatar;
+              throw new Error("No avatar generated");
             } catch (err) {
               if (err.code === 429 && i < retries - 1) {
+                await new Promise((r) => setTimeout(r, delay));
+                delay *= 2;
+              } else if (i < retries - 1) {
                 await new Promise((r) => setTimeout(r, delay));
                 delay *= 2;
               } else {
@@ -515,7 +514,7 @@ export const generateLearningStrategy = onRequest(
                   persona.name,
                   err,
                 );
-                return fallbackAvatar(persona.name);
+                throw err;
               }
             }
           }
@@ -524,11 +523,17 @@ export const generateLearningStrategy = onRequest(
         async function generateAvatarsSerial(personas) {
           const results = [];
           const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-          const delayMs = Math.ceil(60000 / quota);
+          const delayMs = Math.ceil(60_000 / quota);
           for (const [index, persona] of personas.entries()) {
+            let avatar = null;
+            try {
+              avatar = await safeGenerateAvatar(persona);
+            } catch (err) {
+              console.error("safeGenerateAvatar error", err);
+            }
             results.push({
               ...persona,
-              avatar: await safeGenerateAvatar(persona),
+              avatar,
             });
             if (index < personas.length - 1) {
               await new Promise((r) => setTimeout(r, delayMs));
