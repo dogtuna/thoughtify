@@ -477,7 +477,7 @@ export const generateLearningStrategy = onRequest(
 
       if (Array.isArray(strategy.learnerPersonas)) {
         const genAI = new GoogleGenerativeAI(key);
-        const imageModel = genAI.getGenerativeModel({ model: "imagen-3.0" });
+        const imageModel = genAI.getGenerativeModel({ model: "imagegeneration" });
 
         async function generateAvatar(persona) {
           const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
@@ -490,7 +490,8 @@ export const generateLearningStrategy = onRequest(
             return data ? `data:image/png;base64,${data}` : null;
           } catch (err) {
             console.error("Avatar generation failed for persona", persona.name, err);
-            return null;
+            const seed = encodeURIComponent(persona.name);
+            return `https://api.dicebear.com/8.x/adventurer-neutral/svg?seed=${seed}`;
           }
         }
 
