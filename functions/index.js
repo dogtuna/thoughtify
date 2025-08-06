@@ -484,7 +484,6 @@ export const generateLearningStrategy = onRequest(
           try {
             const result = await imageModel.generateContent({
               contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: "image/png" },
             });
             const data =
               result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
