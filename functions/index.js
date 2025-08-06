@@ -482,7 +482,7 @@ export const generateLearningStrategy = onRequest(
           process.env.GCP_PROJECT;
         const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
         const vertexAI = new VertexAI({ project, location });
-        const imageModel = vertexAI.getGenerativeModel({ model: "imagen-3.0" });
+        const imageModel = vertexAI.getGenerativeModel({ model: "imagen-4.0-fast-generate-preview-06-06" });
 
         async function generateAvatar(persona) {
           const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
