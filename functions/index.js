@@ -7,7 +7,6 @@ import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { VertexAI } from "@google-cloud/vertexai";
 import { genkit } from "genkit";
-import { parseDataUrl } from "data-urls";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 
 // Initialize Firebase Admin (if not already initialized)
@@ -433,116 +432,113 @@ export const generateProjectBrief = onRequest(
 
 export const generateLearningStrategy = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },
-  async (request) => {
+  async (req) => {
     const {
       projectBrief,
       businessGoal,
       audienceProfile,
       projectConstraints,
       personaCount = 3,
-    } = request.data || {};
+    } = req.data || {};
 
     if (!projectBrief) {
       throw new HttpsError("invalid-argument", "A project brief is required.");
     }
 
+    // 1) Generate strategy JSON via Gemini
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+    if (!apiKey) {
+      throw new HttpsError("internal", "No API key available.");
+    }
+    const ai = genkit({
+      plugins: [ googleAI({ apiKey }) ],
+      model: gemini("gemini-1.5-pro"),
+    });
+
+    const personaInstruction = personaCount
+      ? ` and create ${personaCount} learner persona${personaCount > 1 ? "s" : ""}`
+      : "";
+    const returnStructure = personaCount
+      ? `{
+  "modalityRecommendation": "brief recommendation",
+  "rationale": "why this modality fits",
+  "learnerPersonas": [{"name":"Name","motivation":"text","challenges":"text"}]
+}`
+      : `{
+  "modalityRecommendation": "brief recommendation",
+  "rationale": "why this modality fits"
+}`;
+
+    const prompt = 
+      `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality${personaInstruction}. ` +
+      `Return a JSON object with the structure:${returnStructure} ` +
+      `Do not include code fences or extra formatting.\n\n` +
+      `Project Brief: ${projectBrief}\n` +
+      `Business Goal: ${businessGoal}\n` +
+      `Audience Profile: ${audienceProfile}\n` +
+      `Project Constraints: ${projectConstraints}`;
+
+    const { text } = await ai.generate(prompt);
+
+    let strategy;
     try {
-      const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      strategy = parseJsonFromText(text);
+    } catch (err) {
+      console.error("Failed to parse AI response:", err, text);
+      throw new HttpsError("internal", "Invalid AI response format.");
+    }
+    if (!strategy.modalityRecommendation || !strategy.rationale) {
+      console.error("AI response missing expected fields:", strategy);
+      throw new HttpsError("internal", "AI response missing learning strategy fields.");
+    }
 
-      const project =
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCLOUD_PROJECT ||
-        process.env.GCP_PROJECT;
-      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const ai = genkit({
-        plugins: [
-          googleAI({ apiKey: key }),
-          vertexAI({ project, location }),
-        ],
-        model: gemini("gemini-1.5-pro"),
-      });
+    // 2) If personas requested, generate avatars via Vertex AI
+    if (personaCount && Array.isArray(strategy.learnerPersonas)) {
+      const projectId = process.env.GOOGLE_CLOUD_PROJECT
+                      || process.env.GCLOUD_PROJECT
+                      || process.env.GCP_PROJECT;
+      const location  = process.env.GOOGLE_CLOUD_REGION || "us-central1";
+      const vertex    = new VertexAI({ projectId, location });
+      const imageModel= vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate" });
 
-      const personaInstruction =
-        personaCount > 0
-          ? ` and create ${personaCount} learner persona${personaCount > 1 ? "s" : ""}`
-          : "";
-      const returnStructure =
-        personaCount > 0
-          ? `{\n  "modalityRecommendation": "brief recommendation",\n  "rationale": "why this modality fits",\n  "learnerPersonas": [{"name": "Name", "motivation": "text", "challenges": "text"}]\n}`
-          : `{\n  "modalityRecommendation": "brief recommendation",\n  "rationale": "why this modality fits"\n}`;
-      const promptTemplate = `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality${personaInstruction}. Return a JSON object with the structure:${returnStructure}\nDo not include any code fences or additional formatting.\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}`;
+      async function generateAvatar(p) {
+        const avatarPrompt = 
+          `Create a modern corporate vector style avatar of a learner persona named ${p.name}. ` +
+          `Their motivation is: ${p.motivation}. Their challenges are: ${p.challenges}.`;
 
-      const { text } = await ai.generate(promptTemplate);
-      let strategy;
-      try {
-        strategy = parseJsonFromText(text);
-      } catch (err) {
-        console.error("Failed to parse AI response:", err, text);
-        throw new HttpsError("internal", "Invalid AI response format.");
-      }
-
-      if (!strategy.modalityRecommendation || !strategy.rationale) {
-        console.error("AI response missing expected fields:", strategy);
-        throw new HttpsError(
-          "internal",
-          "AI response missing learning strategy fields.",
-        );
-      }
-
-      if (personaCount > 0 && Array.isArray(strategy.learnerPersonas)) {
-        async function generateAvatar(persona) {
-          const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
-          const response = await ai.generate({
-            model: vertexAI.model("imagegeneration@002"),
-            prompt,
-            output: { format: "media" },
-          });
-          const imagePart = response.output;
-          if (imagePart?.media?.url) {
-            const parsed = parseDataUrl(imagePart.media.url);
-            if (parsed) {
-              return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
-            }
-          }
+        const res = await imageModel.generateContent({
+          contents: [{ role: "user", parts: [{ text: avatarPrompt }] }],
+        });
+        const candidate = res.response
+          ?.candidates?.[0]
+          ?.content?.parts?.[0]
+          ?.inlineData;
+        if (!candidate || !candidate.data || !candidate.mimeType) {
           return null;
         }
-
-        async function generateAvatarsSerial(personas) {
-          const results = [];
-          const baseDelay = Math.ceil(60_000 / (Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5));
-          for (const [index, persona] of personas.entries()) {
-            let avatar = null;
-            try {
-              avatar = await generateAvatar(persona);
-            } catch (err) {
-              console.error("Avatar generation failed for persona", persona.name, err);
-            }
-            results.push({ ...persona, avatar });
-            if (index < personas.length - 1) {
-              await new Promise((r) => setTimeout(r, baseDelay));
-            }
-          }
-          return results;
-        }
-
-        const personasWithAvatars = await generateAvatarsSerial(
-          strategy.learnerPersonas,
-        );
-        strategy.learnerPersonas = personasWithAvatars;
+        return `data:${candidate.mimeType};base64,${candidate.data}`;
       }
 
-      return strategy;
-    } catch (error) {
-      console.error("Error generating learning strategy:", error);
-      throw new HttpsError(
-        "internal",
-        "Failed to generate learning strategy.",
-      );
+      // throttle to avoid hitting the per-minute quota
+      const quota   = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
+      const delayMs = Math.ceil(60000 / quota);
+
+      const enriched = [];
+      for (const p of strategy.learnerPersonas) {
+        let avatar = null;
+        try {
+          avatar = await generateAvatar(p);
+        } catch (e) {
+          console.error("Avatar generation error for", p.name, e);
+        }
+        enriched.push({ ...p, avatar });
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+      strategy.learnerPersonas = enriched;
     }
-  },
+
+    return strategy;
+  }
 );
 
 export const generateLearnerPersona = onCall(
@@ -642,21 +638,21 @@ export const rerollPersonaAvatar = onCall(
         process.env.GCLOUD_PROJECT ||
         process.env.GCP_PROJECT;
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const ai = genkit({ plugins: [vertexAI({ project, location })] });
+      const ai = genkit({ plugins: [VertexAI({ project, location })] });
 
       async function generateAvatar(p) {
         const prompt = `Create a modern corporate vector style avatar of a learner persona named ${p.name}. Their motivation is ${p.motivation} and their challenges are ${p.challenges}.`;
         const response = await ai.generate({
-          model: vertexAI.model("imagegeneration@002"),
+          model: VertexAI.model("imagegeneration@002"),
           prompt,
           output: { format: "media" },
         });
         const imagePart = response.output;
         if (imagePart?.media?.url) {
-          const parsed = parseDataUrl(imagePart.media.url);
-          if (parsed) {
-            return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
-          }
+          // const parsed = parse(imagePart.media.url);
+          // if (parsed) {
+          //   return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
+          // }
         }
         return null;
       }
