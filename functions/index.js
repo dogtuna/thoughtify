@@ -5,7 +5,7 @@ import functions from "firebase-functions";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
-import { vertexAI } from "@genkit-ai/vertexai";
+import { VertexAI } from "@google-cloud/vertexai";
 import { genkit } from "genkit";
 import { parseDataUrl } from "data-urls";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
@@ -547,72 +547,85 @@ export const generateLearningStrategy = onCall(
 
 export const generateLearnerPersona = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },
-  async (request) => {
+  async (req) => {
+    // 1) Unwrap inputs
     const {
       projectBrief,
       businessGoal,
       audienceProfile,
       projectConstraints,
-    } = request.data || {};
+    } = req.data || {};
 
     if (!projectBrief) {
       throw new HttpsError("invalid-argument", "A project brief is required.");
     }
 
-    try {
-      const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
-
-      const project =
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCLOUD_PROJECT ||
-        process.env.GCP_PROJECT;
-      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const ai = genkit({
-        plugins: [
-          googleAI({ apiKey: key }),
-          vertexAI({ project, location }),
-        ],
-        model: gemini("gemini-1.5-pro"),
-      });
-
-      const promptTemplate = `You are a Senior Instructional Designer. Using the provided information, create one learner persona. Return a JSON object with the structure:{\n  "name": "Name",\n  "motivation": "text",\n  "challenges": "text"\n}\nDo not include any code fences or additional formatting.\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}`;
-
-      const { text } = await ai.generate(promptTemplate);
-      let persona;
-      try {
-        persona = parseJsonFromText(text);
-      } catch (err) {
-        console.error("Failed to parse AI response:", err, text);
-        throw new HttpsError("internal", "Invalid AI response format.");
-      }
-
-      async function generateAvatar(p) {
-        const prompt = `Create a modern corporate vector style avatar of a learner persona named ${p.name}. Their motivation is ${p.motivation} and their challenges are ${p.challenges}.`;
-        const response = await ai.generate({
-          model: vertexAI.model("imagegeneration@002"),
-          prompt,
-          output: { format: "media" },
-        });
-        const imagePart = response.output;
-        if (imagePart?.media?.url) {
-          const parsed = parseDataUrl(imagePart.media.url);
-          if (parsed) {
-            return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
-          }
-        }
-        return null;
-      }
-
-      persona.avatar = await generateAvatar(persona);
-      return persona;
-    } catch (error) {
-      console.error("Error generating learner persona:", error);
-      throw new HttpsError("internal", "Failed to generate learner persona.");
+    // 2) Generate the persona text
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+    if (!apiKey) {
+      throw new HttpsError("internal", "No API key available.");
     }
-  },
+
+    const ai = genkit({
+      plugins: [googleAI({ apiKey })],
+      model: gemini("gemini-1.5-pro"),
+    });
+
+    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona. Return a JSON object exactly like this, no code fences:
+
+{
+  "name": "Name",
+  "motivation": "text",
+  "challenges": "text"
+}
+
+Project Brief: ${projectBrief}
+Business Goal: ${businessGoal}
+Audience Profile: ${audienceProfile}
+Project Constraints: ${projectConstraints}`;
+
+    const { text } = await ai.generate(textPrompt);
+
+    let persona;
+    try {
+      persona = parseJsonFromText(text);
+    } catch (err) {
+      console.error("Failed to parse AI response:", err, text);
+      throw new HttpsError("internal", "Invalid AI response format.");
+    }
+
+    // 3) Generate a single avatar via Vertex AI
+    const projectId =
+      process.env.GOOGLE_CLOUD_PROJECT ||
+      process.env.GCLOUD_PROJECT ||
+      process.env.GCP_PROJECT;
+    const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
+    const vertex = new VertexAI({ projectId, location });
+    const imageModel = vertex.getGenerativeModel({
+      model: "imagen-3.0-fast-generate", // or "projects/google/models/image-bison-001"
+    });
+
+    const avatarPrompt = 
+      `Create a modern corporate-vector-style avatar of a learner persona named ${persona.name}. ` +
+      `Their motivation is: ${persona.motivation}. Their challenges are: ${persona.challenges}.`;
+
+    let avatarDataUrl = null;
+    try {
+      const result = await imageModel.generateContent({
+        contents: [{ role: "user", parts: [{ text: avatarPrompt }] }],
+      });
+      const b64 = result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (b64) {
+        avatarDataUrl = `data:image/png;base64,${b64}`;
+      }
+    } catch (imgErr) {
+      console.error("Avatar generation failed:", imgErr);
+      // leave avatarDataUrl as null or set a fallback URL here
+    }
+
+    persona.avatar = avatarDataUrl;
+    return persona;
+  }
 );
 
 export const rerollPersonaAvatar = onCall(
