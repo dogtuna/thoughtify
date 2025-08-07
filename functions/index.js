@@ -5,8 +5,9 @@ import functions from "firebase-functions";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
+import { vertexAI } from "@genkit-ai/vertexai";
 import { genkit } from "genkit";
-import { VertexAI } from "@google-cloud/vertexai";
+import { parseDataUrl } from "data-urls";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 
 // Initialize Firebase Admin (if not already initialized)
@@ -451,8 +452,16 @@ export const generateLearningStrategy = onCall(
         throw new HttpsError("internal", "No API key available.");
       }
 
+      const project =
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCLOUD_PROJECT ||
+        process.env.GCP_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const ai = genkit({
-        plugins: [googleAI({ apiKey: key })],
+        plugins: [
+          googleAI({ apiKey: key }),
+          vertexAI({ project, location }),
+        ],
         model: gemini("gemini-1.5-pro"),
       });
 
@@ -484,66 +493,36 @@ export const generateLearningStrategy = onCall(
       }
 
       if (personaCount > 0 && Array.isArray(strategy.learnerPersonas)) {
-        const project =
-          process.env.GOOGLE_CLOUD_PROJECT ||
-          process.env.GCLOUD_PROJECT ||
-          process.env.GCP_PROJECT;
-        const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-        const vertexAI = new VertexAI({ project, location });
-        const imageModel = vertexAI.getGenerativeModel({
-          model: "imagegeneration@006",
-        });
-
         async function generateAvatar(persona) {
           const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
-          const result = await imageModel.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
+          const response = await ai.generate({
+            model: vertexAI.model("imagegeneration@002"),
+            prompt,
+            output: { format: "media" },
           });
-          const data =
-            result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-          return data ? `data:image/png;base64,${data}` : null;
-        }
-
-        async function safeGenerateAvatar(persona, retries = 3) {
-          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-          const delayMs = Math.ceil(60_000 / quota);
-          for (let i = 0; i < retries; i++) {
-            try {
-              const avatar = await generateAvatar(persona);
-              if (avatar) return avatar;
-              throw new Error("No avatar generated");
-            } catch (err) {
-              if (i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delayMs));
-              } else {
-                console.error(
-                  "Avatar generation failed for persona",
-                  persona.name,
-                  err,
-                );
-                throw err;
-              }
+          const imagePart = response.output;
+          if (imagePart?.media?.url) {
+            const parsed = parseDataUrl(imagePart.media.url);
+            if (parsed) {
+              return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
             }
           }
+          return null;
         }
 
         async function generateAvatarsSerial(personas) {
           const results = [];
-          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-          const delayMs = Math.ceil(60_000 / quota);
+          const baseDelay = Math.ceil(60_000 / (Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5));
           for (const [index, persona] of personas.entries()) {
             let avatar = null;
             try {
-              avatar = await safeGenerateAvatar(persona);
+              avatar = await generateAvatar(persona);
             } catch (err) {
-              console.error("safeGenerateAvatar error", err);
+              console.error("Avatar generation failed for persona", persona.name, err);
             }
-            results.push({
-              ...persona,
-              avatar,
-            });
+            results.push({ ...persona, avatar });
             if (index < personas.length - 1) {
-              await new Promise((r) => setTimeout(r, delayMs));
+              await new Promise((r) => setTimeout(r, baseDelay));
             }
           }
           return results;
@@ -586,8 +565,16 @@ export const generateLearnerPersona = onCall(
         throw new HttpsError("internal", "No API key available.");
       }
 
+      const project =
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCLOUD_PROJECT ||
+        process.env.GCP_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const ai = genkit({
-        plugins: [googleAI({ apiKey: key })],
+        plugins: [
+          googleAI({ apiKey: key }),
+          vertexAI({ project, location }),
+        ],
         model: gemini("gemini-1.5-pro"),
       });
 
@@ -602,46 +589,24 @@ export const generateLearnerPersona = onCall(
         throw new HttpsError("internal", "Invalid AI response format.");
       }
 
-      const project =
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCLOUD_PROJECT ||
-        process.env.GCP_PROJECT;
-      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const vertexAI = new VertexAI({ project, location });
-      const imageModel = vertexAI.getGenerativeModel({
-        model: "imagegeneration@006",
-      });
-
       async function generateAvatar(p) {
         const prompt = `Create a modern corporate vector style avatar of a learner persona named ${p.name}. Their motivation is ${p.motivation} and their challenges are ${p.challenges}.`;
-        const result = await imageModel.generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        const response = await ai.generate({
+          model: vertexAI.model("imagegeneration@002"),
+          prompt,
+          output: { format: "media" },
         });
-        const data =
-          result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        return data ? `data:image/png;base64,${data}` : null;
-      }
-
-      async function safeGenerateAvatar(p, retries = 3) {
-        const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-        const delayMs = Math.ceil(60_000 / quota);
-        for (let i = 0; i < retries; i++) {
-          try {
-            const avatar = await generateAvatar(p);
-            if (avatar) return avatar;
-            throw new Error("No avatar generated");
-          } catch (err) {
-            if (i < retries - 1) {
-              await new Promise((r) => setTimeout(r, delayMs));
-            } else {
-              console.error("Avatar generation failed for persona", p.name, err);
-              throw err;
-            }
+        const imagePart = response.output;
+        if (imagePart?.media?.url) {
+          const parsed = parseDataUrl(imagePart.media.url);
+          if (parsed) {
+            return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
           }
         }
+        return null;
       }
 
-      persona.avatar = await safeGenerateAvatar(persona);
+      persona.avatar = await generateAvatar(persona);
       return persona;
     } catch (error) {
       console.error("Error generating learner persona:", error);
@@ -664,41 +629,26 @@ export const rerollPersonaAvatar = onCall(
         process.env.GCLOUD_PROJECT ||
         process.env.GCP_PROJECT;
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const vertexAI = new VertexAI({ project, location });
-      const imageModel = vertexAI.getGenerativeModel({
-        model: "imagegeneration@006",
-      });
+      const ai = genkit({ plugins: [vertexAI({ project, location })] });
 
       async function generateAvatar(p) {
         const prompt = `Create a modern corporate vector style avatar of a learner persona named ${p.name}. Their motivation is ${p.motivation} and their challenges are ${p.challenges}.`;
-        const result = await imageModel.generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        const response = await ai.generate({
+          model: vertexAI.model("imagegeneration@002"),
+          prompt,
+          output: { format: "media" },
         });
-        const data =
-          result.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        return data ? `data:image/png;base64,${data}` : null;
-      }
-
-      async function safeGenerateAvatar(p, retries = 3) {
-        const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-        const delayMs = Math.ceil(60_000 / quota);
-        for (let i = 0; i < retries; i++) {
-          try {
-            const avatar = await generateAvatar(p);
-            if (avatar) return avatar;
-            throw new Error("No avatar generated");
-          } catch (err) {
-            if (i < retries - 1) {
-              await new Promise((r) => setTimeout(r, delayMs));
-            } else {
-              console.error("Avatar regeneration failed for persona", p.name, err);
-              throw err;
-            }
+        const imagePart = response.output;
+        if (imagePart?.media?.url) {
+          const parsed = parseDataUrl(imagePart.media.url);
+          if (parsed) {
+            return `data:${parsed.mimeType.toString()};base64,${parsed.body.toString("base64")}`;
           }
         }
+        return null;
       }
 
-      const avatar = await safeGenerateAvatar(persona);
+      const avatar = await generateAvatar(persona);
       return { avatar };
     } catch (error) {
       console.error("Error regenerating avatar:", error);
