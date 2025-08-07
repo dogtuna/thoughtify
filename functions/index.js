@@ -494,12 +494,12 @@ export const generateLearningStrategy = onCall(
 
     // 2) If personas requested, generate avatars via Vertex AI
     if (personaCount && Array.isArray(strategy.learnerPersonas)) {
-      const projectId = process.env.GOOGLE_CLOUD_PROJECT
-                      || process.env.GCLOUD_PROJECT
-                      || process.env.GCP_PROJECT;
-      const location  = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const vertex    = new VertexAI({ projectId, location });
-      const imageModel= vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate" });
+      const project = process.env.GOOGLE_CLOUD_PROJECT
+                   || process.env.GCLOUD_PROJECT
+                   || process.env.GCP_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
+      const vertex   = new VertexAI({ project, location });
+      const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate" });
 
       async function generateAvatar(p) {
         const avatarPrompt = 
@@ -591,12 +591,12 @@ Project Constraints: ${projectConstraints}`;
     }
 
     // 3) Generate a single avatar via Vertex AI
-    const projectId =
+    const project =
       process.env.GOOGLE_CLOUD_PROJECT ||
       process.env.GCLOUD_PROJECT ||
       process.env.GCP_PROJECT;
     const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-    const vertex = new VertexAI({ projectId, location });
+    const vertex = new VertexAI({ project, location });
     const imageModel = vertex.getGenerativeModel({
       model: "imagen-3.0-fast-generate", // or "projects/google/models/image-bison-001"
     });
