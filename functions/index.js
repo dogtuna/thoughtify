@@ -499,7 +499,9 @@ export const generateLearningStrategy = onCall(
                    || process.env.GCP_PROJECT;
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertex   = new VertexAI({ project, location });
-      const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate" });
+
+      const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
+
 
       async function generateAvatar(p) {
         const avatarPrompt = 
@@ -597,6 +599,11 @@ Project Constraints: ${projectConstraints}`;
       process.env.GCP_PROJECT;
     const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
     const vertex = new VertexAI({ project, location });
+
+    const imageModel = vertex.getGenerativeModel({
+      model: "imagen-3.0-fast-generate-001",
+    });
+
 
     const avatarPrompt =
       `Create a modern corporate-vector-style avatar of a learner persona named ${persona.name}. ` +
