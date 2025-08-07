@@ -516,24 +516,42 @@ export const generateLearningStrategy = onCall(
       }
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertex   = new VertexAI({ project, location });
+
       const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
 
+
       async function generateAvatar(p) {
-        const avatarPrompt = 
+        const prompt =
           `Create a modern corporate vector style avatar of a learner persona named ${p.name}. ` +
           `Their motivation is: ${p.motivation}. Their challenges are: ${p.challenges}.`;
-
-        const res = await imageModel.generateContent({
-          contents: [{ role: "user", parts: [{ text: avatarPrompt }] }],
-        });
-        const candidate = res.response
-          ?.candidates?.[0]
-          ?.content?.parts?.[0]
-          ?.inlineData;
-        if (!candidate || !candidate.data || !candidate.mimeType) {
-          return null;
+        const maxRetries = 3;
+        let backoff = 1000;
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            const res = await imageModel.generateContent({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "image/png",
+                candidateCount: 1,
+              },
+            });
+            const candidate = res.response
+              ?.candidates?.[0]
+              ?.content?.parts?.[0]
+              ?.inlineData;
+            if (!candidate || !candidate.data || !candidate.mimeType) {
+              return null;
+            }
+            return `data:${candidate.mimeType};base64,${candidate.data}`;
+          } catch (err) {
+            if (err.code === 429 && i < maxRetries - 1) {
+              await new Promise((r) => setTimeout(r, backoff));
+              backoff *= 2;
+            } else {
+              throw err;
+            }
+          }
         }
-        return `data:${candidate.mimeType};base64,${candidate.data}`;
       }
 
       // throttle to avoid hitting the per-minute quota
@@ -614,6 +632,10 @@ Project Constraints: ${projectConstraints}`;
     }
     const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
     const vertex = new VertexAI({ project, location });
+    const imageModel = vertex.getGenerativeModel({
+      model: "imagen-3.0-fast-generate-001",
+    });
+
 
     const avatarPrompt =
       `Create a modern corporate-vector-style avatar of a learner persona named ${persona.name}. ` +
@@ -624,15 +646,21 @@ Project Constraints: ${projectConstraints}`;
       let delay = 1000;
       for (let i = 0; i < maxRetries; i++) {
         try {
-          const [avatar] = await vertex.generateImage({
-            model: "imagen-3.0-fast-generate-001",
-            prompt: promptText,
-            imageCount: 1,
+          const res = await imageModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            generationConfig: {
+              responseMimeType: "image/png",
+              candidateCount: 1,
+            },
           });
-          if (avatar?.imageBytes) {
-            return `data:image/png;base64,${avatar.imageBytes}`;
+          const candidate = res.response
+            ?.candidates?.[0]
+            ?.content?.parts?.[0]
+            ?.inlineData;
+          if (!candidate || !candidate.data || !candidate.mimeType) {
+            return null;
           }
-          return null;
+          return `data:${candidate.mimeType};base64,${candidate.data}`;
         } catch (err) {
           if (err.code === 429 && i < maxRetries - 1) {
             await new Promise((res) => setTimeout(res, delay));
@@ -672,6 +700,9 @@ export const rerollPersonaAvatar = onCall(
       }
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertex = new VertexAI({ project, location });
+      const imageModel = vertex.getGenerativeModel({
+        model: "imagen-3.0-fast-generate-001",
+      });
 
       async function generateAvatar(p) {
         const prompt = `Create a modern corporate vector style avatar of a learner persona named ${p.name}. Their motivation is ${p.motivation} and their challenges are ${p.challenges}.`;
@@ -679,15 +710,21 @@ export const rerollPersonaAvatar = onCall(
         let delay = 1000;
         for (let i = 0; i < maxRetries; i++) {
           try {
-            const [avatar] = await vertex.generateImage({
-              model: "imagen-3.0-fast-generate",
-              prompt,
-              imageCount: 1,
+            const res = await imageModel.generateContent({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "image/png",
+                candidateCount: 1,
+              },
             });
-            if (avatar?.imageBytes) {
-              return `data:image/png;base64,${avatar.imageBytes}`;
+            const candidate = res.response
+              ?.candidates?.[0]
+              ?.content?.parts?.[0]
+              ?.inlineData;
+            if (!candidate || !candidate.data || !candidate.mimeType) {
+              return null;
             }
-            return null;
+            return `data:${candidate.mimeType};base64,${candidate.data}`;
           } catch (err) {
             if (err.code === 429 && i < maxRetries - 1) {
               await new Promise((res) => setTimeout(res, delay));
