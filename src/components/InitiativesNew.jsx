@@ -16,6 +16,9 @@ const InitiativesNew = () => {
   const [nextLoading, setNextLoading] = useState(false);
   const [error, setError] = useState("");
   const [nextError, setNextError] = useState("");
+  const [persona, setPersona] = useState(null);
+  const [personaLoading, setPersonaLoading] = useState(false);
+  const [personaError, setPersonaError] = useState("");
 
   const functionUrl =
     "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateProjectBrief";
@@ -24,6 +27,14 @@ const InitiativesNew = () => {
   const generateLearningStrategyCallable = httpsCallable(
     functionsInstance,
     "generateLearningStrategy",
+  );
+  const generatePersonaCallable = httpsCallable(
+    functionsInstance,
+    "generateLearnerPersona",
+  );
+  const rerollAvatarCallable = httpsCallable(
+    functionsInstance,
+    "rerollPersonaAvatar",
   );
 
   const handleFileUpload = (e) => {
@@ -96,15 +107,17 @@ const InitiativesNew = () => {
     setNextLoading(true);
     setNextError("");
     setStrategy(null);
+    setPersona(null);
     try {
       const result = await generateLearningStrategyCallable({
         projectBrief,
         businessGoal,
         audienceProfile,
         projectConstraints,
+        personaCount: 0,
       });
       const data = result.data;
-      if (!data.modalityRecommendation || !data.learnerPersonas) {
+      if (!data.modalityRecommendation || !data.rationale) {
         throw new Error("No learning strategy returned.");
       }
       setStrategy(data);
@@ -114,6 +127,44 @@ const InitiativesNew = () => {
     } finally {
       setNextLoading(false);
     }
+  };
+
+  const handleGeneratePersona = async () => {
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const result = await generatePersonaCallable({
+        projectBrief,
+        businessGoal,
+        audienceProfile,
+        projectConstraints,
+      });
+      setPersona(result.data);
+    } catch (err) {
+      console.error("Error generating persona:", err);
+      setPersonaError(err.message || "Error generating persona.");
+    } finally {
+      setPersonaLoading(false);
+    }
+  };
+
+  const handleRerollAvatar = async () => {
+    if (!persona) return;
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const result = await rerollAvatarCallable({ persona });
+      setPersona((prev) => ({ ...prev, avatar: result.data.avatar }));
+    } catch (err) {
+      console.error("Error regenerating avatar:", err);
+      setPersonaError(err.message || "Error regenerating avatar.");
+    } finally {
+      setPersonaLoading(false);
+    }
+  };
+
+  const handlePersonaFieldChange = (field, value) => {
+    setPersona((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -206,30 +257,65 @@ const InitiativesNew = () => {
           <p>
             <strong>Rationale:</strong> {strategy.rationale}
           </p>
-          {strategy.learnerPersonas && strategy.learnerPersonas.length > 0 && (
-            <div>
-              <h4>Learner Personas</h4>
-              <ul>
-                {strategy.learnerPersonas.map((p, idx) => (
-                  <li
-                    key={idx}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                  >
-                    {p.avatar && (
-                      <img
-                        src={p.avatar}
-                        alt={`${p.name} avatar`}
-                        style={{ width: "40px", height: "40px", borderRadius: "50%" }}
-                      />
-                    )}
-                    <span>
-                      <strong>{p.name}</strong>: {p.motivation}; {p.challenges}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div>
+            <h4>Learner Persona</h4>
+            {!persona && (
+              <button
+                onClick={handleGeneratePersona}
+                disabled={personaLoading}
+                className="generator-button"
+              >
+                {personaLoading ? "Generating..." : "Generate Persona & Avatar"}
+              </button>
+            )}
+            {persona && (
+              <div className="persona-card">
+                {persona.avatar && (
+                  <img
+                    src={persona.avatar}
+                    alt={`${persona.name} avatar`}
+                    className="persona-avatar"
+                  />
+                )}
+                <input
+                  className="generator-input"
+                  value={persona.name}
+                  onChange={(e) => handlePersonaFieldChange("name", e.target.value)}
+                />
+                <textarea
+                  className="generator-input"
+                  value={persona.motivation}
+                  onChange={(e) =>
+                    handlePersonaFieldChange("motivation", e.target.value)
+                  }
+                  rows="2"
+                />
+                <textarea
+                  className="generator-input"
+                  value={persona.challenges}
+                  onChange={(e) =>
+                    handlePersonaFieldChange("challenges", e.target.value)
+                  }
+                  rows="2"
+                />
+                <button
+                  onClick={handleRerollAvatar}
+                  disabled={personaLoading}
+                  className="generator-button"
+                >
+                  {personaLoading ? "Generating..." : "Re-roll Avatar"}
+                </button>
+                <button
+                  onClick={handleGeneratePersona}
+                  disabled={personaLoading}
+                  className="generator-button"
+                >
+                  {personaLoading ? "Generating..." : "Replace Persona"}
+                </button>
+              </div>
+            )}
+            {personaError && <p className="generator-error">{personaError}</p>}
+          </div>
         </div>
       )}
     </div>
