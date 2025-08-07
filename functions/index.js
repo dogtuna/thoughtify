@@ -548,6 +548,7 @@ Project Constraints: ${projectConstraints}`;
     return persona;
   }
 );
+
 export const generateStoryboard = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
