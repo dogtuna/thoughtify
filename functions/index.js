@@ -430,7 +430,7 @@ export const generateProjectBrief = onRequest(
   }
 );
 
-export const generateLearningStrategy = onRequest(
+export const generateLearningStrategy = functions.https.onCall(
   { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req, res) => {
     const {
