@@ -516,7 +516,9 @@ export const generateLearningStrategy = onCall(
       }
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertex   = new VertexAI({ project, location });
-      const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate" });
+
+      const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
+
 
       async function generateAvatar(p) {
         const prompt =
@@ -631,8 +633,9 @@ Project Constraints: ${projectConstraints}`;
     const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
     const vertex = new VertexAI({ project, location });
     const imageModel = vertex.getGenerativeModel({
-      model: "imagen-3.0-fast-generate",
+      model: "imagen-3.0-fast-generate-001",
     });
+
 
     const avatarPrompt =
       `Create a modern corporate-vector-style avatar of a learner persona named ${persona.name}. ` +
@@ -674,7 +677,7 @@ Project Constraints: ${projectConstraints}`;
       avatarDataUrl = await generateAvatar(avatarPrompt);
     } catch (imgErr) {
       console.error("Avatar generation failed:", imgErr);
-      // leave avatarDataUrl as null or set a fallback URL here
+      // We’ll just leave avatarDataUrl as null if it fails
     }
 
     persona.avatar = avatarDataUrl;
@@ -698,7 +701,7 @@ export const rerollPersonaAvatar = onCall(
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertex = new VertexAI({ project, location });
       const imageModel = vertex.getGenerativeModel({
-        model: "imagen-3.0-fast-generate",
+        model: "imagen-3.0-fast-generate-001",
       });
 
       async function generateAvatar(p) {
