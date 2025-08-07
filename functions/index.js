@@ -491,7 +491,7 @@ export const generateLearningStrategy = onCall(
         const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
         const vertexAI = new VertexAI({ project, location });
         const imageModel = vertexAI.getGenerativeModel({
-          model: "imagegeneration@006",
+          model: "imagegeneration@002",
         });
 
         async function generateAvatar(persona) {
@@ -504,18 +504,17 @@ export const generateLearningStrategy = onCall(
           return data ? `data:image/png;base64,${data}` : null;
         }
 
-        async function safeGenerateAvatar(persona, retries = 3) {
+        async function safeGenerateAvatar(persona, maxRetries = 5) {
           const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-          const delayMs = Math.ceil(60_000 / quota);
-          for (let i = 0; i < retries; i++) {
+          let delay = Math.ceil(60_000 / quota);
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
               const avatar = await generateAvatar(persona);
               if (avatar) return avatar;
               throw new Error("No avatar generated");
             } catch (err) {
-              if (i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delayMs));
-              } else {
+              const shouldRetry = err.code === 429 || err.message === "No avatar generated";
+              if (attempt === maxRetries - 1 || !shouldRetry) {
                 console.error(
                   "Avatar generation failed for persona",
                   persona.name,
@@ -523,14 +522,16 @@ export const generateLearningStrategy = onCall(
                 );
                 throw err;
               }
+              const jitter = Math.random() * 1000;
+              await new Promise((r) => setTimeout(r, delay + jitter));
+              delay = Math.min(delay * 2, 60_000);
             }
           }
         }
 
         async function generateAvatarsSerial(personas) {
           const results = [];
-          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-          const delayMs = Math.ceil(60_000 / quota);
+          const baseDelay = Math.ceil(60_000 / (Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5));
           for (const [index, persona] of personas.entries()) {
             let avatar = null;
             try {
@@ -543,7 +544,7 @@ export const generateLearningStrategy = onCall(
               avatar,
             });
             if (index < personas.length - 1) {
-              await new Promise((r) => setTimeout(r, delayMs));
+              await new Promise((r) => setTimeout(r, baseDelay));
             }
           }
           return results;
@@ -609,7 +610,7 @@ export const generateLearnerPersona = onCall(
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertexAI = new VertexAI({ project, location });
       const imageModel = vertexAI.getGenerativeModel({
-        model: "imagegeneration@006",
+        model: "imagegeneration@002",
       });
 
       async function generateAvatar(p) {
@@ -622,21 +623,23 @@ export const generateLearnerPersona = onCall(
         return data ? `data:image/png;base64,${data}` : null;
       }
 
-      async function safeGenerateAvatar(p, retries = 3) {
+      async function safeGenerateAvatar(p, maxRetries = 5) {
         const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-        const delayMs = Math.ceil(60_000 / quota);
-        for (let i = 0; i < retries; i++) {
+        let delay = Math.ceil(60_000 / quota);
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
             const avatar = await generateAvatar(p);
             if (avatar) return avatar;
             throw new Error("No avatar generated");
           } catch (err) {
-            if (i < retries - 1) {
-              await new Promise((r) => setTimeout(r, delayMs));
-            } else {
+            const shouldRetry = err.code === 429 || err.message === "No avatar generated";
+            if (attempt === maxRetries - 1 || !shouldRetry) {
               console.error("Avatar generation failed for persona", p.name, err);
               throw err;
             }
+            const jitter = Math.random() * 1000;
+            await new Promise((r) => setTimeout(r, delay + jitter));
+            delay = Math.min(delay * 2, 60_000);
           }
         }
       }
@@ -666,7 +669,7 @@ export const rerollPersonaAvatar = onCall(
       const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
       const vertexAI = new VertexAI({ project, location });
       const imageModel = vertexAI.getGenerativeModel({
-        model: "imagegeneration@006",
+        model: "imagegeneration@002",
       });
 
       async function generateAvatar(p) {
@@ -679,21 +682,23 @@ export const rerollPersonaAvatar = onCall(
         return data ? `data:image/png;base64,${data}` : null;
       }
 
-      async function safeGenerateAvatar(p, retries = 3) {
+      async function safeGenerateAvatar(p, maxRetries = 5) {
         const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-        const delayMs = Math.ceil(60_000 / quota);
-        for (let i = 0; i < retries; i++) {
+        let delay = Math.ceil(60_000 / quota);
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
             const avatar = await generateAvatar(p);
             if (avatar) return avatar;
             throw new Error("No avatar generated");
           } catch (err) {
-            if (i < retries - 1) {
-              await new Promise((r) => setTimeout(r, delayMs));
-            } else {
+            const shouldRetry = err.code === 429 || err.message === "No avatar generated";
+            if (attempt === maxRetries - 1 || !shouldRetry) {
               console.error("Avatar regeneration failed for persona", p.name, err);
               throw err;
             }
+            const jitter = Math.random() * 1000;
+            await new Promise((r) => setTimeout(r, delay + jitter));
+            delay = Math.min(delay * 2, 60_000);
           }
         }
       }
