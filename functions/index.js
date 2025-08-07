@@ -430,9 +430,16 @@ export const generateProjectBrief = onRequest(
   }
 );
 
-export const generateLearningStrategy = functions.https.onCall(
-  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
+export const generateLearningStrategy = onRequest(
+  { secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    if (req.method === "OPTIONS") {
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+      res.set("Access-Control-Allow-Methods", "POST");
+      res.status(204).send("");
+      return;
+    }
     const {
       projectBrief,
       businessGoal,
