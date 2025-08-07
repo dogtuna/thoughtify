@@ -482,7 +482,7 @@ export const generateLearningStrategy = onCall(
         const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
         const vertexAI = new VertexAI({ project, location });
         const imageModel = vertexAI.getGenerativeModel({
-          model: "imagen-3.0-fast-generate-001",
+          model: "imagegeneration@006",
         });
 
         async function generateAvatar(persona) {
