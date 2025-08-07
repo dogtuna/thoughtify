@@ -431,8 +431,15 @@ export const generateProjectBrief = onRequest(
 );
 
 export const generateLearningStrategy = onRequest(
-  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    if (req.method === "OPTIONS") {
+      res.set("Access-Control-Allow-Headers", "Content-Type");
+      res.set("Access-Control-Allow-Methods", "POST");
+      res.status(204).send("");
+      return;
+    }
     const {
       projectBrief,
       businessGoal,
@@ -495,19 +502,16 @@ export const generateLearningStrategy = onRequest(
         }
 
         async function safeGenerateAvatar(persona, retries = 3) {
-          let delay = 1000;
+          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
+          const delayMs = Math.ceil(60_000 / quota);
           for (let i = 0; i < retries; i++) {
             try {
               const avatar = await generateAvatar(persona);
               if (avatar) return avatar;
               throw new Error("No avatar generated");
             } catch (err) {
-              if (err.code === 429 && i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delay));
-                delay *= 2;
-              } else if (i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delay));
-                delay *= 2;
+              if (i < retries - 1) {
+                await new Promise((r) => setTimeout(r, delayMs));
               } else {
                 console.error(
                   "Avatar generation failed for persona",
