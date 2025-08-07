@@ -430,26 +430,24 @@ export const generateProjectBrief = onRequest(
   }
 );
 
-export const generateLearningStrategy = onRequest(
-  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
-  async (req, res) => {
+export const generateLearningStrategy = onCall(
+  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (request) => {
     const {
       projectBrief,
       businessGoal,
       audienceProfile,
       projectConstraints,
-    } = req.body || {};
+    } = request.data || {};
 
     if (!projectBrief) {
-      res.status(400).json({ error: "A project brief is required." });
-      return;
+      throw new HttpsError("invalid-argument", "A project brief is required.");
     }
 
     try {
       const key = process.env.GOOGLE_GENAI_API_KEY;
       if (!key) {
-        res.status(500).json({ error: "No API key available." });
-        return;
+        throw new HttpsError("internal", "No API key available.");
       }
 
       const ai = genkit({
@@ -465,14 +463,15 @@ export const generateLearningStrategy = onRequest(
         strategy = parseJsonFromText(text);
       } catch (err) {
         console.error("Failed to parse AI response:", err, text);
-        res.status(500).json({ error: "Invalid AI response format." });
-        return;
+        throw new HttpsError("internal", "Invalid AI response format.");
       }
 
       if (!strategy.modalityRecommendation || !strategy.learnerPersonas) {
         console.error("AI response missing expected fields:", strategy);
-        res.status(500).json({ error: "AI response missing learning strategy fields." });
-        return;
+        throw new HttpsError(
+          "internal",
+          "AI response missing learning strategy fields.",
+        );
       }
 
       if (Array.isArray(strategy.learnerPersonas)) {
@@ -482,7 +481,9 @@ export const generateLearningStrategy = onRequest(
           process.env.GCP_PROJECT;
         const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
         const vertexAI = new VertexAI({ project, location });
-        const imageModel = vertexAI.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
+        const imageModel = vertexAI.getGenerativeModel({
+          model: "imagen-3.0-fast-generate-001",
+        });
 
         async function generateAvatar(persona) {
           const prompt = `Create a modern corporate vector style avatar of a learner persona named ${persona.name}. Their motivation is ${persona.motivation} and their challenges are ${persona.challenges}.`;
@@ -495,19 +496,16 @@ export const generateLearningStrategy = onRequest(
         }
 
         async function safeGenerateAvatar(persona, retries = 3) {
-          let delay = 1000;
+          const quota = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
+          const delayMs = Math.ceil(60_000 / quota);
           for (let i = 0; i < retries; i++) {
             try {
               const avatar = await generateAvatar(persona);
               if (avatar) return avatar;
               throw new Error("No avatar generated");
             } catch (err) {
-              if (err.code === 429 && i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delay));
-                delay *= 2;
-              } else if (i < retries - 1) {
-                await new Promise((r) => setTimeout(r, delay));
-                delay *= 2;
+              if (i < retries - 1) {
+                await new Promise((r) => setTimeout(r, delayMs));
               } else {
                 console.error(
                   "Avatar generation failed for persona",
@@ -548,12 +546,15 @@ export const generateLearningStrategy = onRequest(
         strategy.learnerPersonas = personasWithAvatars;
       }
 
-      res.status(200).json(strategy);
+      return strategy;
     } catch (error) {
       console.error("Error generating learning strategy:", error);
-      res.status(500).json({ error: "Failed to generate learning strategy." });
+      throw new HttpsError(
+        "internal",
+        "Failed to generate learning strategy.",
+      );
     }
-  }
+  },
 );
 
 export const generateStoryboard = onCall(

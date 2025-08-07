@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
 
 const InitiativesNew = () => {
@@ -17,6 +19,12 @@ const InitiativesNew = () => {
 
   const functionUrl =
     "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateProjectBrief";
+
+  const functionsInstance = getFunctions(app);
+  const generateLearningStrategyCallable = httpsCallable(
+    functionsInstance,
+    "generateLearningStrategy",
+  );
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -89,23 +97,13 @@ const InitiativesNew = () => {
     setNextError("");
     setStrategy(null);
     try {
-      const response = await fetch(
-        "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateLearningStrategy",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectBrief,
-            businessGoal,
-            audienceProfile,
-            projectConstraints,
-          }),
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
+      const result = await generateLearningStrategyCallable({
+        projectBrief,
+        businessGoal,
+        audienceProfile,
+        projectConstraints,
+      });
+      const data = result.data;
       if (!data.modalityRecommendation || !data.learnerPersonas) {
         throw new Error("No learning strategy returned.");
       }
