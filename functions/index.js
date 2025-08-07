@@ -5,7 +5,6 @@ import functions from "firebase-functions";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
-import { VertexAI } from "@google-cloud/vertexai";
 import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 
@@ -50,21 +49,6 @@ function parseJsonFromText(text) {
   return JSON.parse(jsonString);
 }
 
-function resolveProjectId() {
-  return (
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    process.env.GCP_PROJECT ||
-    (() => {
-      try {
-        const cfg = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
-        return cfg.projectId;
-      } catch {
-        return undefined;
-      }
-    })()
-  );
-}
 
 export const setCustomClaims = onRequest(async (req, res) => {
   // Expect a JSON body like: { id: "USER_UID", claims: { admin: true } }
@@ -508,70 +492,6 @@ export const generateLearningStrategy = onCall(
       throw new HttpsError("internal", "AI response missing learning strategy fields.");
     }
 
-    // 2) If personas requested, generate avatars via Vertex AI
-    if (personaCount && Array.isArray(strategy.learnerPersonas)) {
-      const project = resolveProjectId();
-      if (!project) {
-        throw new HttpsError("internal", "Missing GCP project ID.");
-      }
-      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const vertex   = new VertexAI({ project, location });
-
-      const imageModel = vertex.getGenerativeModel({ model: "imagen-3.0-fast-generate-001" });
-
-
-      async function generateAvatar(p) {
-        const prompt =
-          `Create a modern corporate vector style avatar of a learner persona named ${p.name}. ` +
-          `Their motivation is: ${p.motivation}. Their challenges are: ${p.challenges}.`;
-        const maxRetries = 3;
-        let backoff = 1000;
-        for (let i = 0; i < maxRetries; i++) {
-          try {
-            const res = await imageModel.generateContent({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseMimeType: "image/png",
-                candidateCount: 1,
-              },
-            });
-            const candidate = res.response
-              ?.candidates?.[0]
-              ?.content?.parts?.[0]
-              ?.inlineData;
-            if (!candidate || !candidate.data || !candidate.mimeType) {
-              return null;
-            }
-            return `data:${candidate.mimeType};base64,${candidate.data}`;
-          } catch (err) {
-            if (err.code === 429 && i < maxRetries - 1) {
-              await new Promise((r) => setTimeout(r, backoff));
-              backoff *= 2;
-            } else {
-              throw err;
-            }
-          }
-        }
-      }
-
-      // throttle to avoid hitting the per-minute quota
-      const quota   = Number(process.env.IMAGEN_QUOTA_PER_MINUTE) || 5;
-      const delayMs = Math.ceil(60000 / quota);
-
-      const enriched = [];
-      for (const p of strategy.learnerPersonas) {
-        let avatar = null;
-        try {
-          avatar = await generateAvatar(p);
-        } catch (e) {
-          console.error("Avatar generation error for", p.name, e);
-        }
-        enriched.push({ ...p, avatar });
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
-      strategy.learnerPersonas = enriched;
-    }
-
     return strategy;
   }
 );
@@ -625,124 +545,8 @@ Project Constraints: ${projectConstraints}`;
       throw new HttpsError("internal", "Invalid AI response format.");
     }
 
-    // 3) Generate a single avatar via Vertex AI
-    const project = resolveProjectId();
-    if (!project) {
-      throw new HttpsError("internal", "Missing GCP project ID.");
-    }
-    const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-    const vertex = new VertexAI({ project, location });
-    const imageModel = vertex.getGenerativeModel({
-      model: "imagen-3.0-fast-generate-001",
-    });
-
-
-    const avatarPrompt =
-      `Create a modern corporate-vector-style avatar of a learner persona named ${persona.name}. ` +
-      `Their motivation is: ${persona.motivation}. Their challenges are: ${persona.challenges}.`;
-
-    async function generateAvatar(promptText) {
-      const maxRetries = 3;
-      let delay = 1000;
-      for (let i = 0; i < maxRetries; i++) {
-        try {
-          const res = await imageModel.generateContent({
-            contents: [{ role: "user", parts: [{ text: promptText }] }],
-            generationConfig: {
-              responseMimeType: "image/png",
-              candidateCount: 1,
-            },
-          });
-          const candidate = res.response
-            ?.candidates?.[0]
-            ?.content?.parts?.[0]
-            ?.inlineData;
-          if (!candidate || !candidate.data || !candidate.mimeType) {
-            return null;
-          }
-          return `data:${candidate.mimeType};base64,${candidate.data}`;
-        } catch (err) {
-          if (err.code === 429 && i < maxRetries - 1) {
-            await new Promise((res) => setTimeout(res, delay));
-            delay *= 2;
-          } else {
-            throw err;
-          }
-        }
-      }
-    }
-
-    let avatarDataUrl = null;
-    try {
-      avatarDataUrl = await generateAvatar(avatarPrompt);
-    } catch (imgErr) {
-      console.error("Avatar generation failed:", imgErr);
-      // We’ll just leave avatarDataUrl as null if it fails
-    }
-
-    persona.avatar = avatarDataUrl;
     return persona;
   }
-);
-
-export const rerollPersonaAvatar = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
-  async (request) => {
-    const { persona } = request.data || {};
-    if (!persona || !persona.name) {
-      throw new HttpsError("invalid-argument", "Persona details are required.");
-    }
-
-    try {
-      const project = resolveProjectId();
-      if (!project) {
-        throw new HttpsError("internal", "Missing GCP project ID.");
-      }
-      const location = process.env.GOOGLE_CLOUD_REGION || "us-central1";
-      const vertex = new VertexAI({ project, location });
-      const imageModel = vertex.getGenerativeModel({
-        model: "imagen-3.0-fast-generate-001",
-      });
-
-      async function generateAvatar(p) {
-        const prompt = `Create a modern corporate vector style avatar of a learner persona named ${p.name}. Their motivation is ${p.motivation} and their challenges are ${p.challenges}.`;
-        const maxRetries = 3;
-        let delay = 1000;
-        for (let i = 0; i < maxRetries; i++) {
-          try {
-            const res = await imageModel.generateContent({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseMimeType: "image/png",
-                candidateCount: 1,
-              },
-            });
-            const candidate = res.response
-              ?.candidates?.[0]
-              ?.content?.parts?.[0]
-              ?.inlineData;
-            if (!candidate || !candidate.data || !candidate.mimeType) {
-              return null;
-            }
-            return `data:${candidate.mimeType};base64,${candidate.data}`;
-          } catch (err) {
-            if (err.code === 429 && i < maxRetries - 1) {
-              await new Promise((res) => setTimeout(res, delay));
-              delay *= 2;
-            } else {
-              throw err;
-            }
-          }
-        }
-      }
-
-      const avatar = await generateAvatar(persona);
-      return { avatar };
-    } catch (error) {
-      console.error("Error regenerating avatar:", error);
-      throw new HttpsError("internal", "Failed to regenerate avatar.");
-    }
-  },
 );
 
 export const generateStoryboard = onCall(
