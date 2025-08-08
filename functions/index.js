@@ -16,6 +16,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 const db = admin.firestore();
+const corsHandler = cors({ origin: true });
 
 // Retrieve the API key from environment variables (using Firebase secrets)
 // Make sure you have set the secret via:
@@ -96,7 +97,6 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
   await db.collection("invitations").add(invitationData);
   return { invitationCode };
 });
-
 
 export const generateTrainingPlan = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },

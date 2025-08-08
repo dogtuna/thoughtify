@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
+// Avatar images are generated via a Cloud Function using OpenAI
 
 const InitiativesNew = () => {
   const [businessGoal, setBusinessGoal] = useState("");
