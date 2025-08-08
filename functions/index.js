@@ -15,6 +15,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 const db = admin.firestore();
+const corsHandler = cors({ origin: true });
 
 // Retrieve the API key from environment variables (using Firebase secrets)
 // Make sure you have set the secret via:
