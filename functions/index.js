@@ -7,7 +7,8 @@ import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
-import OpenAI from "openai";
+import { createAvatar } from "@dicebear/core";
+import { notionists } from "@dicebear/collection";
 import crypto from "crypto";
 import { Buffer } from "buffer";
 
@@ -15,7 +16,7 @@ const PROJECT_ID =
   process.env.GCLOUD_PROJECT ||
   process.env.GCP_PROJECT ||
   "thoughtify-web-bb1ea";
-  
+
 const DEFAULT_BUCKET =
   process.env.FIREBASE_STORAGE_BUCKET || `${PROJECT_ID}.appspot.com`;
 // Initialize Firebase Admin (if not already initialized)
@@ -452,8 +453,6 @@ export const generateLearningStrategy = onCall(
       throw new HttpsError("internal", "AI response missing learning strategy fields.");
     }
 
-    // NOTE: Avatar creation moved to dedicated callable 'generateAvatar'
-    // so this function focuses just on the strategy/personas JSON.
     return strategy;
   }
 );
@@ -504,7 +503,6 @@ Project Constraints: ${projectConstraints}`;
       throw new HttpsError("internal", "Invalid AI response format.");
     }
 
-    // Avatar is generated separately via generateAvatar callable.
     return persona;
   }
 );
@@ -643,56 +641,44 @@ export const generateAvatar = onCall(
   {
     region: "us-central1",
     invoker: "public",
-    secrets: ["OPENAI_API_KEY"],
-    timeoutSeconds: 120,
+    timeoutSeconds: 60,
     maxInstances: 2,
-    concurrency: 1,
+    // NOTE: no "secrets" needed anymore
   },
   async (request) => {
     const { name, motivation = "", challenges = "" } = request.data || {};
     if (!name) throw new HttpsError("invalid-argument", "name is required");
 
+    // deterministic seed + cache key
     const seed = `${name}|${motivation}|${challenges}`;
     const hash = crypto.createHash("md5").update(seed).digest("hex");
-    const bucket = admin.storage().bucket();
-    const file = bucket.file(`avatars/${hash}.png`);
 
-    // return from cache if present
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(`avatars/${hash}.svg`);
+
+    // 1) Serve from cache if present
     const [exists] = await file.exists();
     if (exists) {
-      const [buffer] = await file.download();
-      return { avatar: `data:image/png;base64,${buffer.toString("base64")}` };
+      const [buf] = await file.download();
+      const svgCached = buf.toString("utf8");
+      return { avatar: `data:image/svg+xml;utf8,${encodeURIComponent(svgCached)}` };
     }
 
-    try {
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // 2) Generate new SVG with DiceBear (notionists)
+    const svg = createAvatar(notionists, {
+      seed,
+      radius: 50, // rounded avatar
+      backgroundColor: ["#E9F0FF", "#F9EAFF", "#FFF3D6", "#E8FFF3", "#FDEEEF"],
+      // backgroundType: "gradientLinear", // uncomment for gradient backgrounds
+    }).toString();
 
-      const prompt =
-        `Professional, illustrative character portrait. ` +
-        `Subject: ${name}. Motivation: ${motivation}. Challenges: ${challenges}. ` +
-        `Crisp lines, soft lighting, friendly corporate style, square composition.`;
+    // 3) Save to Storage + return
+    await file.save(Buffer.from(svg), {
+      contentType: "image/svg+xml",
+      metadata: { cacheControl: "public, max-age=31536000" },
+    });
 
-      const resp = await client.images.generate({
-        model: "gpt-image-1",
-        prompt,
-        size: "1024x1024", // valid: "1024x1024" | "1024x1536" | "1536x1024" | "auto"
-        n: 1,
-      });
-
-      const b64 = resp.data?.[0]?.b64_json;
-      if (!b64) throw new Error("Image generation returned no data.");
-
-      const buffer = Buffer.from(b64, "base64");
-      await file.save(buffer, {
-        contentType: "image/png",
-        metadata: { cacheControl: "public, max-age=31536000" },
-      });
-
-      return { avatar: `data:image/png;base64,${b64}` };
-    } catch (err) {
-      console.error("Error generating avatar:", err);
-      throw new HttpsError("internal", err?.message || "Failed to generate avatar");
-    }
+    return { avatar: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}` };
   }
 );
 

@@ -14,13 +14,14 @@
   },
   "main": "index.js",
   "dependencies": {
+    "@dicebear/collection": "^9.2.3",
+    "@dicebear/core": "^9.2.3",
     "@genkit-ai/googleai": "^1.0.4",
     "@google-cloud/firestore": "^7.11.0",
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.3.1",
     "genkit": "^1.0.4",
-    "nodemailer": "^6.10.0",
-    "openai": "^4.104.0"
+    "nodemailer": "^6.10.0"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",
