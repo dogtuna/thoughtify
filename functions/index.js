@@ -52,11 +52,9 @@ function parseJsonFromText(text) {
   return JSON.parse(jsonString);
 }
 
-
 export const setCustomClaims = onRequest(async (req, res) => {
   // Expect a JSON body like: { id: "USER_UID", claims: { admin: true } }
   const { id, claims } = req.body;
-  
   if (!id || !claims) {
     res.status(400).send({ status: "error", message: "Missing id or claims" });
     return;
@@ -80,8 +78,7 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
   }
 
   // Generate a random 8-character code.
-  const generateRandomCode = () =>
-    Math.random().toString(36).substring(2, 10).toUpperCase();
+  const generateRandomCode = () => Math.random().toString(36).substring(2, 10).toUpperCase();
 
   const invitationCode = generateRandomCode();
   const invitationData = {
@@ -98,43 +95,30 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
 });
 
 export const generateTrainingPlan = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     console.log("Incoming request data:", request.data);
     console.log("Incoming auth:", request.auth);
 
-    // if (!request.auth) {  // Optional: Add authentication if needed
-    //   throw new HttpsError(
-    //     "unauthenticated",
-    //     "You must be logged in to generate a training plan."
-    //   );
-    // }
-
     const payload = request.data;
-    const prompt = payload.prompt;
-
+    const prompt = payload?.prompt;
     if (!prompt) {
       throw new HttpsError("invalid-argument", "A prompt must be provided.");
     }
 
     try {
       const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      if (!key) throw new HttpsError("internal", "No API key available.");
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-1.5-pro'),
+        model: gemini("gemini-1.5-pro"),
       });
 
-      const trainingPlanFlow = ai.defineFlow(
-        "trainingPlanFlow",
-        async () => {
-          const { text } = await ai.generate(prompt);
-          return text;
-        }
-      );
+      const trainingPlanFlow = ai.defineFlow("trainingPlanFlow", async () => {
+        const { text } = await ai.generate(prompt);
+        return text;
+      });
 
       const trainingPlan = await trainingPlanFlow();
       return { trainingPlan };
@@ -145,35 +129,24 @@ export const generateTrainingPlan = onCall(
   }
 );
 
-// Create Study Material from topic prompt
 export const generateStudyMaterial = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     console.log("Incoming request data:", request.data);
     console.log("Incoming auth:", request.auth);
 
-    // if (!request.auth) {
-    //   throw new HttpsError(
-    //     "unauthenticated",
-    //     "You must be logged in to generate study material."
-    //   );
-    // }
-
-    const payload = request.data;
-    const topic = payload.topic;
+    const topic = request?.data?.topic;
     if (!topic) {
       throw new HttpsError("invalid-argument", "A topic must be provided.");
     }
 
     try {
       const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      if (!key) throw new HttpsError("internal", "No API key available.");
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-1.5-pro'),
+        model: gemini("gemini-1.5-pro"),
       });
 
       const promptTemplate = `Create a comprehensive study guide on "${topic}" for high school or college students.  Include the following:
@@ -187,12 +160,12 @@ export const generateStudyMaterial = onCall(
 Prioritize accuracy and avoid fabricating information. If unsure about specific details, it's better to omit them than provide inaccurate information.  Focus on clear explanations and relevant examples.
 `;
 
-      const studyMaterialFlow = ai.defineFlow("studyMaterialFlow", async () => {
+      const flow = ai.defineFlow("studyMaterialFlow", async () => {
         const { text } = await ai.generate(promptTemplate);
         return text;
       });
 
-      const studyMaterial = await studyMaterialFlow();
+      const studyMaterial = await flow();
       return { studyMaterial };
     } catch (error) {
       console.error("Error generating study material:", error);
@@ -201,44 +174,26 @@ Prioritize accuracy and avoid fabricating information. If unsure about specific 
   }
 );
 
-/**
- * Firebase Callable Function: generateCourseOutline
- *
- * Uses a pre-written prompt template to generate a course outline for the provided topic.
- * This function uses Firebase Functions v2 secrets.
- */
 export const generateCourseOutline = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     console.log("Incoming request data:", request.data);
     console.log("Incoming auth:", request.auth);
 
-    // Enforce that the caller is authenticated.
-    // if (!request.auth) {
-    //   throw new HttpsError("unauthenticated", "You must be logged in to generate a course outline.");
-    // }
-
-    // Unwrap the payload (in v2, request.data contains the client-sent payload).
-    const payload = request.data;
-    const topic = payload.topic;
+    const topic = request?.data?.topic;
     if (!topic) {
       throw new HttpsError("invalid-argument", "A course topic must be provided.");
     }
 
     try {
-      // Retrieve the API key injected as a secret.
       const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      if (!key) throw new HttpsError("internal", "No API key available.");
 
-      // Initialize GenKit instance with the Google AI plugin using the secret API key.
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-1.5-pro'),
+        model: gemini("gemini-1.5-pro"),
       });
 
-      // Build the prompt template using the provided topic.
       const promptTemplate = `Generate a professional, multi-module course outline for a course on "${topic}".
 Prioritize accuracy and avoid fabricating information.  If you are unsure about the details of a resource, it is better to omit it than to provide inaccurate information.  Focus on generating a solid course structure and suggesting general learning areas.
       Include the following sections:
@@ -255,14 +210,12 @@ Prioritize accuracy and avoid fabricating information.  If you are unsure about 
 6. **Conclusion/Next Steps:** Summarize the overall course and provide actionable recommendations for further study.
 Use clear, concise, and professional language suitable for a general audience.`;
 
-      // Define the flow using the prompt template.
-      const courseOutlineFlow = ai.defineFlow("courseOutlineFlow", async () => {
+      const flow = ai.defineFlow("courseOutlineFlow", async () => {
         const { text } = await ai.generate(promptTemplate);
         return text;
       });
 
-      // Call the flow (the prompt already includes the topic).
-      const outline = await courseOutlineFlow();
+      const outline = await flow();
       return { outline };
     } catch (error) {
       console.error("Error generating course outline:", error);
@@ -272,33 +225,23 @@ Use clear, concise, and professional language suitable for a general audience.`;
 );
 
 export const generateAssessment = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     console.log("Incoming request data:", request.data);
     console.log("Incoming auth:", request.auth);
 
-    // if (!request.auth) {
-    //   throw new HttpsError(
-    //     "unauthenticated",
-    //     "You must be logged in to generate an assessment."
-    //   );
-    // }
-
-    const payload = request.data;
-    const topic = payload.topic;
+    const topic = request?.data?.topic;
     if (!topic) {
       throw new HttpsError("invalid-argument", "A topic must be provided.");
     }
 
     try {
       const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      if (!key) throw new HttpsError("internal", "No API key available.");
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-1.5-pro'),
+        model: gemini("gemini-1.5-pro"),
       });
 
       const promptTemplate = `Create an assessment and answer key/rubric on the topic of "${topic}".  The assessment should evaluate understanding of the key concepts related to this topic.
@@ -310,12 +253,12 @@ export const generateAssessment = onCall(
 **Answer Key/Rubric:**  Provide the correct answers or a detailed rubric for grading the assessment.  Ensure the answer key/rubric aligns with the chosen assessment format and effectively evaluates understanding of the topic.
 `;
 
-      const assessmentFlow = ai.defineFlow("assessmentFlow", async () => {
+      const flow = ai.defineFlow("assessmentFlow", async () => {
         const { text } = await ai.generate(promptTemplate);
-        return text; // Return the generated assessment
+        return text;
       });
 
-      const assessment = await assessmentFlow();
+      const assessment = await flow();
       return { assessment };
     } catch (error) {
       console.error("Error generating assessment:", error);
@@ -325,33 +268,23 @@ export const generateAssessment = onCall(
 );
 
 export const generateLessonContent = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     console.log("Incoming request data:", request.data);
     console.log("Incoming auth:", request.auth);
 
-    // if (!request.auth) {
-    //   throw new HttpsError(
-    //     "unauthenticated",
-    //     "You must be logged in to generate lesson content."
-    //   );
-    // }
-
-    const payload = request.data;
-    const topic = payload.topic;
+    const topic = request?.data?.topic;
     if (!topic) {
       throw new HttpsError("invalid-argument", "A topic must be provided.");
     }
 
     try {
       const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      if (!key) throw new HttpsError("internal", "No API key available.");
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-1.5-pro'), // Or your preferred model
+        model: gemini("gemini-1.5-pro"),
       });
 
       const promptTemplate = `Create comprehensive lesson content on the topic: "${topic}".
@@ -367,13 +300,12 @@ The target audience is undergraduate students.  The content should include:
 The lesson content should be well-structured, accurate, and engaging.  Prioritize clarity and avoid unnecessary jargon. If unsure about specific details, it's better to omit them than provide inaccurate information.
 `;
 
-
-      const lessonContentFlow = ai.defineFlow("lessonContentFlow", async () => {
+      const flow = ai.defineFlow("lessonContentFlow", async () => {
         const { text } = await ai.generate(promptTemplate);
         return text;
       });
 
-      const lessonContent = await lessonContentFlow();
+      const lessonContent = await flow();
       return { lessonContent };
     } catch (error) {
       console.error("Error generating lesson content:", error);
@@ -382,59 +314,69 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
   }
 );
 
-export const generateProjectBrief = onRequest(
-  { cors: true, secrets: ["GOOGLE_GENAI_API_KEY"] },
-  async (req, res) => {
+export const generateProjectBrief = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
+  async (request) => {
     const {
       businessGoal,
       audienceProfile,
       sourceMaterial,
       projectConstraints,
-    } = req.body || {};
+    } = request.data || {};
 
     if (!businessGoal) {
-      res.status(400).json({ error: "A business goal is required." });
-      return;
+      throw new HttpsError("invalid-argument", "A business goal is required.");
     }
 
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) {
+      throw new HttpsError("internal", "No API key available.");
+    }
+
+    const ai = genkit({
+      plugins: [googleAI({ apiKey: key })],
+      model: gemini("gemini-1.5-pro"),
+    });
+
+    const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief and list any questions that require clarification before moving forward.
+Return a valid JSON object with the structure:{
+  "projectBrief": "text of the brief",
+  "clarifyingQuestions": ["question1", "question2"]
+}
+Do not include any code fences or additional formatting.
+
+Business Goal: ${businessGoal}
+Audience Profile: ${audienceProfile}
+Project Constraints: ${projectConstraints}
+Source Material: ${sourceMaterial}`;
+
     try {
-      const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        res.status(500).json({ error: "No API key available." });
-        return;
-      }
-
-      const ai = genkit({
-        plugins: [googleAI({ apiKey: key })],
-        model: gemini("gemini-1.5-pro"),
-      });
-
-      const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief and list any questions that require clarification before moving forward.\nReturn a valid JSON object with the structure:{\n  "projectBrief": "text of the brief",\n  "clarifyingQuestions": ["question1", "question2"]\n}\nDo not include any code fences or additional formatting.\n\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
-
       const { text } = await ai.generate(promptTemplate);
+
       let json;
       try {
         json = parseJsonFromText(text);
       } catch (err) {
         console.error("Failed to parse AI response:", err, text);
-        res.status(500).json({ error: "Invalid AI response format." });
-        return;
+        throw new HttpsError("internal", "Invalid AI response format.");
       }
+
       if (!json.projectBrief) {
         console.error("AI response missing projectBrief field:", json);
-        res.status(500).json({ error: "AI response missing project brief." });
-        return;
+        throw new HttpsError("internal", "AI response missing project brief.");
       }
-      res.status(200).json(json);
+
+      // Must return a plain object for callables
+      return json; 
     } catch (error) {
       console.error("Error generating project brief:", error);
-      res.status(500).json({ error: "Failed to generate project brief." });
+      throw new HttpsError("internal", "Failed to generate project brief.");
     }
   }
 );
 
 export const generateLearningStrategy = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req) => {
     const {
       projectBrief,
@@ -450,13 +392,11 @@ export const generateLearningStrategy = onCall(
       throw new HttpsError("invalid-argument", "A project brief is required.");
     }
 
-    // 1) Generate strategy JSON via Gemini
-    const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-    if (!apiKey) {
-      throw new HttpsError("internal", "No API key available.");
-    }
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) throw new HttpsError("internal", "No API key available.");
+
     const ai = genkit({
-      plugins: [ googleAI({ apiKey }) ],
+      plugins: [googleAI({ apiKey: key })],
       model: gemini("gemini-1.5-pro"),
     });
 
@@ -474,6 +414,11 @@ export const generateLearningStrategy = onCall(
   "rationale": "why this modality fits"
 }`;
 
+    const clarificationsBlock = (() => {
+      const pairs = clarifyingQuestions.map((q, i) => `Q: ${q}\nA: ${clarifyingAnswers[i] || ""}`);
+      return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
+    })();
+
     const prompt =
       `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality${personaInstruction}. ` +
       `Return a JSON object with the structure:${returnStructure} ` +
@@ -482,12 +427,7 @@ export const generateLearningStrategy = onCall(
       `Business Goal: ${businessGoal}\n` +
       `Audience Profile: ${audienceProfile}\n` +
       `Project Constraints: ${projectConstraints}` +
-      (() => {
-        const pairs = clarifyingQuestions.map((q, i) =>
-          `Q: ${q}\nA: ${clarifyingAnswers[i] || ""}`
-        );
-        return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
-      })();
+      clarificationsBlock;
 
     const { text } = await ai.generate(prompt);
 
@@ -503,14 +443,15 @@ export const generateLearningStrategy = onCall(
       throw new HttpsError("internal", "AI response missing learning strategy fields.");
     }
 
+    // NOTE: Avatar creation moved to dedicated callable 'generateAvatar'
+    // so this function focuses just on the strategy/personas JSON.
     return strategy;
   }
 );
 
 export const generateLearnerPersona = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req) => {
-    // 1) Unwrap inputs
     const {
       projectBrief,
       businessGoal,
@@ -522,21 +463,18 @@ export const generateLearnerPersona = onCall(
       throw new HttpsError("invalid-argument", "A project brief is required.");
     }
 
-    // 2) Generate the persona text
-    const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-    if (!apiKey) {
-      throw new HttpsError("internal", "No API key available.");
-    }
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) throw new HttpsError("internal", "No API key available.");
 
     const ai = genkit({
-      plugins: [googleAI({ apiKey })],
+      plugins: [googleAI({ apiKey: key })],
       model: gemini("gemini-1.5-pro"),
     });
 
     const randomSeed = Math.random().toString(36).substring(2, 8);
     const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
-{ 
+{
   "name": "Name",
   "motivation": "text",
   "challenges": "text"
@@ -557,27 +495,20 @@ Project Constraints: ${projectConstraints}`;
       throw new HttpsError("internal", "Invalid AI response format.");
     }
 
+    // Avatar is generated separately via generateAvatar callable.
     return persona;
   }
 );
 
 export const generateStoryboard = onCall(
-  { secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     console.log("Incoming request data:", request.data);
     console.log("Incoming auth:", request.auth);
 
-    // if (!request.auth) {
-    //   throw new HttpsError(
-    //     "unauthenticated",
-    //     "You must be logged in to generate a storyboard."
-    //   );
-    // }
-
     const payload = request.data;
-    const topic = payload.topic;
-    const targetAudience = payload.targetAudience || "undergraduate students"; // Default audience
-
+    const topic = payload?.topic;
+    const targetAudience = payload?.targetAudience || "undergraduate students";
 
     if (!topic) {
       throw new HttpsError("invalid-argument", "A topic must be provided.");
@@ -585,13 +516,11 @@ export const generateStoryboard = onCall(
 
     try {
       const key = process.env.GOOGLE_GENAI_API_KEY;
-      if (!key) {
-        throw new HttpsError("internal", "No API key available.");
-      }
+      if (!key) throw new HttpsError("internal", "No API key available.");
 
       const ai = genkit({
         plugins: [googleAI({ apiKey: key })],
-        model: gemini('gemini-1.5-pro'),
+        model: gemini("gemini-1.5-pro"),
       });
 
       const promptTemplate = `Create a detailed and engaging e-learning storyboard on the topic: "${topic}".
@@ -604,16 +533,15 @@ The target audience is ${targetAudience}.  The storyboard should be composed of 
 * **Audio Cues:** Recommendations for audio elements (e.g., "Narration explaining the process," "Upbeat background music," "Sound effect of a cash register").
 * **Annotations/Interactive Elements:**  Notes for additional explanations, interactive questions (multiple-choice, true/false, open-ended), or prompts for learner reflection ("Consider how this applies to your own life...").
 
-
 The storyboard should cover all critical aspects of the topic, starting with an engaging introduction, progressing through the core content with detailed explanations, and concluding with a reflective summary and actionable steps. Include interactive elements that encourage learner engagement and personalization of the content.  Ensure the storyboard guides learners through the topic in a logical, engaging, and educational manner.
 `;
 
-      const storyboardFlow = ai.defineFlow("storyboardFlow", async () => {
+      const flow = ai.defineFlow("storyboardFlow", async () => {
         const { text } = await ai.generate(promptTemplate);
         return text;
       });
 
-      const storyboard = await storyboardFlow();
+      const storyboard = await flow();
       return { storyboard };
     } catch (error) {
       console.error("Error generating storyboard:", error);
@@ -622,12 +550,9 @@ The storyboard should cover all critical aspects of the topic, starting with an 
   }
 );
 
-
-/**
- * Firebase Callable Function: sendEmailBlast
- *
- * (Remains largely unchanged.)
- */
+// ------------------------------
+// EMAIL FUNCTIONS (unchanged API)
+// ------------------------------
 export const sendEmailBlast = functions.https.onCall(async (data, context) => {
   const payload = data.data ? data.data : data;
   console.log("sendEmailBlast called, context.auth:", context.auth);
@@ -674,9 +599,6 @@ export const sendEmailBlast = functions.https.onCall(async (data, context) => {
   }
 });
 
-/**
- * Firebase Callable Function: sendEmailReply
- */
 export const sendEmailReply = functions.https.onCall(async (callData) => {
   const payload = callData.data ? callData.data : callData;
   console.log("Full callData:", callData);
@@ -705,28 +627,46 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
   }
 });
 
+// ---------------------------------------
+// AVATAR GENERATOR (CALLABLE, OPTION A)
+// ---------------------------------------
 export const generateAvatar = onCall(
-  { secrets: ["OPENAI_API_KEY"] },
+  {
+    region: "us-central1",
+    invoker: "public",               // <- allow client callable without CORS pain
+    secrets: ["OPENAI_API_KEY"],
+    timeoutSeconds: 120,
+    maxInstances: 2,
+    concurrency: 1,                  // keep it gentle to avoid rate limits
+  },
   async (request) => {
-    const { name, motivation = "", challenges = "" } = request.data || {};
-    if (!name) {
-      throw new HttpsError("invalid-argument", "name is required");
-    }
+    // If you want to require login, uncomment:
+    // if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
 
+    const { name, motivation = "", challenges = "" } = request.data || {};
+    if (!name) throw new HttpsError("invalid-argument", "name is required");
+
+    // Cache result in Cloud Storage (deterministic key)
     const seed = `${name}|${motivation}|${challenges}`;
     const hash = crypto.createHash("md5").update(seed).digest("hex");
     const bucket = admin.storage().bucket();
     const file = bucket.file(`avatars/${hash}.png`);
 
     try {
+      // Return cached image if it exists
       const [exists] = await file.exists();
       if (exists) {
         const [buffer] = await file.download();
         return { avatar: `data:image/png;base64,${buffer.toString("base64")}` };
       }
 
+      // Generate image with OpenAI
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const prompt = `Professional, illustrative social media style character portrait of ${name}. Motivation: ${motivation}. Challenges: ${challenges}.`;
+      const prompt =
+        `Professional, illustrative, social-media style character portrait. ` +
+        `Subject: ${name}. Motivation: ${motivation}. Challenges: ${challenges}. ` +
+        `Crisp lines, soft lighting, friendly corporate style, square composition.`;
+
       const response = await client.images.generate({
         model: "gpt-image-1",
         prompt,
@@ -734,9 +674,18 @@ export const generateAvatar = onCall(
         response_format: "b64_json",
       });
 
-      const b64 = response.data[0].b64_json;
+      const b64 = response.data?.[0]?.b64_json;
+      if (!b64) {
+        throw new Error("OpenAI image generation returned no data.");
+      }
+
+      // Save to Storage and return
       const buffer = Buffer.from(b64, "base64");
-      await file.save(buffer, { contentType: "image/png" });
+      await file.save(buffer, {
+        contentType: "image/png",
+        metadata: { cacheControl: "public, max-age=31536000" },
+      });
+
       return { avatar: `data:image/png;base64,${b64}` };
     } catch (error) {
       console.error("Error generating avatar:", error);
