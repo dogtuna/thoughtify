@@ -633,62 +633,57 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
 export const generateAvatar = onCall(
   {
     region: "us-central1",
-    invoker: "public",               // <- allow client callable without CORS pain
+    invoker: "public",
     secrets: ["OPENAI_API_KEY"],
     timeoutSeconds: 120,
     maxInstances: 2,
-    concurrency: 1,                  // keep it gentle to avoid rate limits
+    concurrency: 1,
   },
   async (request) => {
-    // If you want to require login, uncomment:
-    // if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
-
     const { name, motivation = "", challenges = "" } = request.data || {};
     if (!name) throw new HttpsError("invalid-argument", "name is required");
 
-    // Cache result in Cloud Storage (deterministic key)
     const seed = `${name}|${motivation}|${challenges}`;
     const hash = crypto.createHash("md5").update(seed).digest("hex");
     const bucket = admin.storage().bucket();
     const file = bucket.file(`avatars/${hash}.png`);
 
-    try {
-      // Return cached image if it exists
-  const [exists] = await file.exists();
-  if (exists) {
-    const [cached] = await file.download();
-    return { avatar: `data:image/png;base64,${cached.toString("base64")}` };
-  }
+    // return from cache if present
+    const [exists] = await file.exists();
+    if (exists) {
+      const [buffer] = await file.download();
+      return { avatar: `data:image/png;base64,${buffer.toString("base64")}` };
+    }
 
-      // Generate image with OpenAI
+    try {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
       const prompt =
-        `Professional, illustrative, social-media style character portrait. ` +
+        `Professional, illustrative character portrait. ` +
         `Subject: ${name}. Motivation: ${motivation}. Challenges: ${challenges}. ` +
         `Crisp lines, soft lighting, friendly corporate style, square composition.`;
 
-  const imageResp = await client.images.generate({
-    model: "gpt-image-1",
-    prompt,
-    size: "1024x1024",
-    // optional, looks nice with UI overlays:
-    // background: "transparent",
-    // quality: "high",
-  });
+      const resp = await client.images.generate({
+        model: "gpt-image-1",
+        prompt,
+        size: "1024x1024", // valid: "1024x1024" | "1024x1536" | "1536x1024" | "auto"
+        n: 1,
+      });
 
-  const b64 = imageResp?.data?.[0]?.b64_json;
-  if (!b64) throw new Error("OpenAI image generation returned no data.");
+      const b64 = resp.data?.[0]?.b64_json;
+      if (!b64) throw new Error("Image generation returned no data.");
 
-  const buffer = Buffer.from(b64, "base64");
-  await file.save(buffer, {
-    contentType: "image/png",
-    metadata: { cacheControl: "public, max-age=31536000" },
-  });
+      const buffer = Buffer.from(b64, "base64");
+      await file.save(buffer, {
+        contentType: "image/png",
+        metadata: { cacheControl: "public, max-age=31536000" },
+      });
 
       return { avatar: `data:image/png;base64,${b64}` };
-    } catch (error) {
-      console.error("Error generating avatar:", error);
-      throw new HttpsError("internal", "Failed to generate avatar");
+    } catch (err) {
+      console.error("Error generating avatar:", err);
+      throw new HttpsError("internal", err?.message || "Failed to generate avatar");
     }
   }
 );
+
