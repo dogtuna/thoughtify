@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
+import multiavatar from "../utils/multiavatar.js";
 
 const InitiativesNew = () => {
   const [businessGoal, setBusinessGoal] = useState("");
@@ -140,15 +141,10 @@ const InitiativesNew = () => {
 
       let avatar;
       try {
-        const avatarRes = await fetch(
-          `https://api.multiavatar.com/${encodeURIComponent(
-            result.data.name,
-          )}.svg`,
-        );
-        const svg = await avatarRes.text();
+        const svg = multiavatar(result.data.name || "");
         avatar = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
       } catch (avatarErr) {
-        console.error("Error fetching avatar:", avatarErr);
+        console.error("Error generating avatar:", avatarErr);
       }
 
       setPersona({ ...result.data, avatar });
