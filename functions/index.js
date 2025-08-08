@@ -684,3 +684,29 @@ export const generateAvatar = onCall(
   }
 );
 
+
+export const savePersona = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "User must be authenticated");
+  }
+  const { initiativeId, personaId, persona } = request.data || {};
+  if (!initiativeId || !personaId || !persona) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Missing initiativeId, personaId, or persona data"
+    );
+  }
+  if (!persona.name) {
+    throw new HttpsError("invalid-argument", "Persona must include a name");
+  }
+  await db
+    .collection("users")
+    .doc(uid)
+    .collection("initiatives")
+    .doc(initiativeId)
+    .collection("personas")
+    .doc(personaId)
+    .set(persona, { merge: true });
+  return { id: personaId };
+});

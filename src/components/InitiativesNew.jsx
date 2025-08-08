@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../firebase.js";
+import { app, auth } from "../firebase.js";
+import { loadPersonas, savePersona } from "../utils/personas.js";
+import { useSearchParams } from "react-router-dom";
 import "./AIToolsGenerators.css";
 
 const InitiativesNew = () => {
@@ -24,6 +26,21 @@ const InitiativesNew = () => {
   const [personaError, setPersonaError] = useState("");
 
   const [persona, setPersona] = useState(null);
+
+  const [searchParams] = useSearchParams();
+  const initiativeId = searchParams.get("initiativeId") || "default";
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    loadPersonas(uid, initiativeId)
+      .then((items) => {
+        if (items.length > 0) {
+          setPersona(items[0]);
+        }
+      })
+      .catch((err) => console.error("Error loading personas:", err));
+  }, [initiativeId]);
 
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
@@ -147,10 +164,17 @@ const InitiativesNew = () => {
         challenges: personaData.challenges || "",
       });
 
-      setPersona({
+      const uid = auth.currentUser?.uid;
+      const personaToSave = {
         ...personaData,
-        avatar: avatarRes?.data?.avatar || null, // base64 data URL or null
-      });
+        avatar: avatarRes?.data?.avatar || null,
+      };
+      if (uid) {
+        const id = await savePersona(uid, initiativeId, personaToSave);
+        setPersona({ id, ...personaToSave });
+      } else {
+        setPersona(personaToSave);
+      }
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err?.message || "Error generating persona.");
@@ -160,7 +184,14 @@ const InitiativesNew = () => {
   };
 
   const handlePersonaFieldChange = (field, value) => {
-    setPersona((prev) => ({ ...prev, [field]: value }));
+    setPersona((prev) => {
+      const updated = { ...prev, [field]: value };
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        savePersona(uid, initiativeId, updated);
+      }
+      return updated;
+    });
   };
 
   return (
