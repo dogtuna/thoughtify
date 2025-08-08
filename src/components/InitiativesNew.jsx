@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
+// Avatar images are generated via a Cloud Function using OpenAI
 
 const InitiativesNew = () => {
   const [businessGoal, setBusinessGoal] = useState("");
@@ -32,6 +33,8 @@ const InitiativesNew = () => {
     functionsInstance,
     "generateLearnerPersona",
   );
+  const avatarFunctionUrl =
+    "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateAvatar";
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -137,7 +140,25 @@ const InitiativesNew = () => {
         audienceProfile,
         projectConstraints,
       });
-      setPersona(result.data);
+
+      let avatar;
+      try {
+        const resp = await fetch(avatarFunctionUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: result.data.name }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          avatar = data.avatar;
+        } else {
+          console.error("Avatar fetch failed:", resp.status);
+        }
+      } catch (avatarErr) {
+        console.error("Error generating avatar:", avatarErr);
+      }
+
+      setPersona({ ...result.data, avatar });
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err.message || "Error generating persona.");
