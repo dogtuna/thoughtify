@@ -142,18 +142,9 @@ const InitiativesNew = () => {
         audienceProfile,
         projectConstraints,
       });
-
-    let avatar;
-    try {
-      const avatarResp = await generateAvatarCallable({
-        name: result.data.name,
-      });
-      avatar = avatarResp.data.avatar;
-    } catch (avatarErr) {
-      console.error("Error generating avatar:", avatarErr);
-    }
-
-    setPersona({ ...result.data, avatar });
+      const personaData = result.data;
+      const avatarResp = await generateAvatarCallable(personaData);
+      setPersona({ ...personaData, avatar: avatarResp.data.avatar });
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err.message || "Error generating persona.");

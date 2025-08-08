@@ -20,7 +20,7 @@
     "firebase-functions": "^6.3.1",
     "genkit": "^1.0.4",
     "nodemailer": "^6.10.0",
-    "openai": "^4.79.3"
+    "openai": "^4.0.0"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.1.0",
