@@ -7,6 +7,9 @@ import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
+import OpenAI from "openai";
+import crypto from "crypto";
+import { Buffer } from "buffer";
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -93,6 +96,7 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
   await db.collection("invitations").add(invitationData);
   return { invitationCode };
 });
+
 
 export const generateTrainingPlan = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },
@@ -701,3 +705,43 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
     return { success: false, error: error.message };
   }
 });
+
+export const generateAvatar = onCall(
+  { secrets: ["OPENAI_API_KEY"] },
+  async (request) => {
+    const { name, motivation = "", challenges = "" } = request.data || {};
+    if (!name) {
+      throw new HttpsError("invalid-argument", "name is required");
+    }
+
+    const seed = `${name}|${motivation}|${challenges}`;
+    const hash = crypto.createHash("md5").update(seed).digest("hex");
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(`avatars/${hash}.png`);
+
+    try {
+      const [exists] = await file.exists();
+      if (exists) {
+        const [buffer] = await file.download();
+        return { avatar: `data:image/png;base64,${buffer.toString("base64")}` };
+      }
+
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const prompt = `Professional, illustrative social media style character portrait of ${name}. Motivation: ${motivation}. Challenges: ${challenges}.`;
+      const response = await client.images.generate({
+        model: "gpt-image-1",
+        prompt,
+        size: "512x512",
+        response_format: "b64_json",
+      });
+
+      const b64 = response.data[0].b64_json;
+      const buffer = Buffer.from(b64, "base64");
+      await file.save(buffer, { contentType: "image/png" });
+      return { avatar: `data:image/png;base64,${b64}` };
+    } catch (error) {
+      console.error("Error generating avatar:", error);
+      throw new HttpsError("internal", "Failed to generate avatar");
+    }
+  }
+);

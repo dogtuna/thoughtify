@@ -32,6 +32,10 @@ const InitiativesNew = () => {
     functionsInstance,
     "generateLearnerPersona",
   );
+  const generateAvatarCallable = httpsCallable(
+    functionsInstance,
+    "generateAvatar",
+  );
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -137,7 +141,9 @@ const InitiativesNew = () => {
         audienceProfile,
         projectConstraints,
       });
-      setPersona(result.data);
+      const personaData = result.data;
+      const avatarResp = await generateAvatarCallable(personaData);
+      setPersona({ ...personaData, avatar: avatarResp.data.avatar });
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err.message || "Error generating persona.");
