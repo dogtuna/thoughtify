@@ -141,7 +141,7 @@ const InitiativesNew = () => {
 
       let avatar;
       try {
-        const svg = multiavatar(result.data.name || "");
+        const svg = multiavatar(JSON.stringify(result.data) || "");
         avatar = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
       } catch (avatarErr) {
         console.error("Error generating avatar:", avatarErr);
