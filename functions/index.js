@@ -654,11 +654,11 @@ export const generateAvatar = onCall(
 
     try {
       // Return cached image if it exists
-      const [exists] = await file.exists();
-      if (exists) {
-        const [buffer] = await file.download();
-        return { avatar: `data:image/png;base64,${buffer.toString("base64")}` };
-      }
+  const [exists] = await file.exists();
+  if (exists) {
+    const [cached] = await file.download();
+    return { avatar: `data:image/png;base64,${cached.toString("base64")}` };
+  }
 
       // Generate image with OpenAI
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -667,24 +667,23 @@ export const generateAvatar = onCall(
         `Subject: ${name}. Motivation: ${motivation}. Challenges: ${challenges}. ` +
         `Crisp lines, soft lighting, friendly corporate style, square composition.`;
 
-      const response = await client.images.generate({
-        model: "gpt-image-1",
-        prompt,
-        size: "512x512",
-        response_format: "b64_json",
-      });
+  const imageResp = await client.images.generate({
+    model: "gpt-image-1",
+    prompt,
+    size: "512x512",
+    // optional, looks nice with UI overlays:
+    // background: "transparent",
+    // quality: "high",
+  });
 
-      const b64 = response.data?.[0]?.b64_json;
-      if (!b64) {
-        throw new Error("OpenAI image generation returned no data.");
-      }
+  const b64 = imageResp?.data?.[0]?.b64_json;
+  if (!b64) throw new Error("OpenAI image generation returned no data.");
 
-      // Save to Storage and return
-      const buffer = Buffer.from(b64, "base64");
-      await file.save(buffer, {
-        contentType: "image/png",
-        metadata: { cacheControl: "public, max-age=31536000" },
-      });
+  const buffer = Buffer.from(b64, "base64");
+  await file.save(buffer, {
+    contentType: "image/png",
+    metadata: { cacheControl: "public, max-age=31536000" },
+  });
 
       return { avatar: `data:image/png;base64,${b64}` };
     } catch (error) {
