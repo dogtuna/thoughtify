@@ -438,6 +438,7 @@ export const generateLearningStrategy = onCall(
       businessGoal,
       audienceProfile,
       projectConstraints,
+      clarifyingAnswers = [],
       personaCount = 3,
     } = req.data || {};
 
@@ -469,14 +470,17 @@ export const generateLearningStrategy = onCall(
   "rationale": "why this modality fits"
 }`;
 
-    const prompt = 
+    const prompt =
       `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality${personaInstruction}. ` +
       `Return a JSON object with the structure:${returnStructure} ` +
       `Do not include code fences or extra formatting.\n\n` +
       `Project Brief: ${projectBrief}\n` +
       `Business Goal: ${businessGoal}\n` +
       `Audience Profile: ${audienceProfile}\n` +
-      `Project Constraints: ${projectConstraints}`;
+      `Project Constraints: ${projectConstraints}` +
+      (clarifyingAnswers.length
+        ? `\nClarifying Answers: ${clarifyingAnswers.join(" | ")}`
+        : "");
 
     const { text } = await ai.generate(prompt);
 

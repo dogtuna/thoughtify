@@ -110,6 +110,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        clarifyingAnswers,
         personaCount: 0,
       });
       const data = result.data;
