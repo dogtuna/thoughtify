@@ -522,9 +522,10 @@ export const generateLearnerPersona = onCall(
       model: gemini("gemini-1.5-pro"),
     });
 
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona. Return a JSON object exactly like this, no code fences:
+    const randomSeed = Math.random().toString(36).substring(2, 8);
+    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
-{
+{ 
   "name": "Name",
   "motivation": "text",
   "challenges": "text"

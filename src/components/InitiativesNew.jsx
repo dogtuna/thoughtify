@@ -32,10 +32,6 @@ const InitiativesNew = () => {
     functionsInstance,
     "generateLearnerPersona",
   );
-  const rerollAvatarCallable = httpsCallable(
-    functionsInstance,
-    "rerollPersonaAvatar",
-  );
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -143,21 +139,6 @@ const InitiativesNew = () => {
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err.message || "Error generating persona.");
-    } finally {
-      setPersonaLoading(false);
-    }
-  };
-
-  const handleRerollAvatar = async () => {
-    if (!persona) return;
-    setPersonaLoading(true);
-    setPersonaError("");
-    try {
-      const result = await rerollAvatarCallable({ persona });
-      setPersona((prev) => ({ ...prev, avatar: result.data.avatar }));
-    } catch (err) {
-      console.error("Error regenerating avatar:", err);
-      setPersonaError(err.message || "Error regenerating avatar.");
     } finally {
       setPersonaLoading(false);
     }
@@ -298,13 +279,6 @@ const InitiativesNew = () => {
                   }
                   rows="2"
                 />
-                <button
-                  onClick={handleRerollAvatar}
-                  disabled={personaLoading}
-                  className="generator-button"
-                >
-                  {personaLoading ? "Generating..." : "Re-roll Avatar"}
-                </button>
                 <button
                   onClick={handleGeneratePersona}
                   disabled={personaLoading}
