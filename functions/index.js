@@ -12,19 +12,21 @@ import { notionists } from "@dicebear/collection";
 import crypto from "crypto";
 import { Buffer } from "buffer";
 
+const FIREBASE_CONFIG = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
 const PROJECT_ID =
   process.env.GCLOUD_PROJECT ||
   process.env.GCP_PROJECT ||
   "thoughtify-web-bb1ea";
 
-const DEFAULT_BUCKET =
-  process.env.FIREBASE_STORAGE_BUCKET || `${PROJECT_ID}.appspot.com`;
-// Initialize Firebase Admin (if not already initialized)
+const BUCKET_NAME =
+  FIREBASE_CONFIG.storageBucket ||                 // ✅ best source
+  process.env.FIREBASE_STORAGE_BUCKET ||           // optional override
+  `${PROJECT_ID}.appspot.com`;                     // legacy fallback
+
 if (!admin.apps.length) {
-  admin.initializeApp({
-    storageBucket: DEFAULT_BUCKET,
-  });
+  admin.initializeApp({ storageBucket: BUCKET_NAME });
 }
+
 const db = admin.firestore();
 
 // Retrieve the API key from environment variables (using Firebase secrets)
@@ -653,7 +655,7 @@ export const generateAvatar = onCall(
     const seed = `${name}|${motivation}|${challenges}`;
     const hash = crypto.createHash("md5").update(seed).digest("hex");
 
-    const bucket = admin.storage().bucket();
+    const bucket = admin.storage().bucket(BUCKET_NAME);
     const file = bucket.file(`avatars/${hash}.svg`);
 
     // 1) Serve from cache if present
