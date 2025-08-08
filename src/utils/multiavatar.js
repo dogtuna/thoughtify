@@ -1,3 +1,4 @@
+
 // Lightweight avatar generator producing simple cartoon faces.
 // Deterministic output based on a seed string.
 export default function multiavatar(seed = "") {
