@@ -11,9 +11,18 @@ import OpenAI from "openai";
 import crypto from "crypto";
 import { Buffer } from "buffer";
 
+const PROJECT_ID =
+  process.env.GCLOUD_PROJECT ||
+  process.env.GCP_PROJECT ||
+  "thoughtify-web-bb1ea";
+  
+const DEFAULT_BUCKET =
+  process.env.FIREBASE_STORAGE_BUCKET || `${PROJECT_ID}.appspot.com`;
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
-  admin.initializeApp();
+  admin.initializeApp({
+    storageBucket: DEFAULT_BUCKET,
+  });
 }
 const db = admin.firestore();
 
