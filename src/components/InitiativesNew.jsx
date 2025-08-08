@@ -33,10 +33,8 @@ const InitiativesNew = () => {
     functionsInstance,
     "generateLearnerPersona",
   );
-  const generateAvatarCallable = httpsCallable(
-    functionsInstance,
-    "generateAvatar",
-  );
+  const avatarFunctionUrl =
+    "https://us-central1-thoughtify-web-bb1ea.cloudfunctions.net/generateAvatar";
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -145,10 +143,17 @@ const InitiativesNew = () => {
 
       let avatar;
       try {
-        const avatarResp = await generateAvatarCallable({
-          name: result.data.name,
+        const resp = await fetch(avatarFunctionUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: result.data.name }),
         });
-        avatar = avatarResp.data.avatar;
+        if (resp.ok) {
+          const data = await resp.json();
+          avatar = data.avatar;
+        } else {
+          console.error("Avatar fetch failed:", resp.status);
+        }
       } catch (avatarErr) {
         console.error("Error generating avatar:", avatarErr);
       }

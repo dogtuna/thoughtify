@@ -9,12 +9,14 @@ import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 import OpenAI from "openai";
 import { Buffer } from "node:buffer";
+import cors from "cors";
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 const db = admin.firestore();
+const corsHandler = cors({ origin: true });
 
 // Retrieve the API key from environment variables (using Firebase secrets)
 // Make sure you have set the secret via:
@@ -96,38 +98,50 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
   return { invitationCode };
 });
 
-export const generateAvatar = onCall(
+export const generateAvatar = onRequest(
   { secrets: ["OPENAI_API_KEY"] },
-  async (request) => {
-    const { name } = request.data || {};
-    if (!name) {
-      throw new HttpsError("invalid-argument", "Name is required.");
-    }
-
-    try {
-      const bucket = admin.storage().bucket();
-      const filePath = `avatars/${encodeURIComponent(name)}.png`;
-      const file = bucket.file(filePath);
-      const [exists] = await file.exists();
-      if (exists) {
-        const [contents] = await file.download();
-        return { avatar: `data:image/png;base64,${contents.toString("base64")}` };
+  async (req, res) => {
+    corsHandler(req, res, async () => {
+      if (req.method !== "POST") {
+        res.status(405).send("Method Not Allowed");
+        return;
       }
-
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const response = await openai.images.generate({
-        model: "gpt-image-1",
-        prompt: `professional, illustrative social media avatar of ${name}`,
-        size: "256x256",
-        response_format: "b64_json",
-      });
-      const b64 = response.data[0].b64_json;
-      await file.save(Buffer.from(b64, "base64"), { contentType: "image/png" });
-      return { avatar: `data:image/png;base64,${b64}` };
-    } catch (error) {
-      console.error("Error generating avatar:", error);
-      throw new HttpsError("internal", "Failed to generate avatar.");
-    }
+      const { name } = req.body || {};
+      if (!name) {
+        res.status(400).json({ error: "Name is required." });
+        return;
+      }
+      try {
+        const bucket = admin.storage().bucket();
+        const filePath = `avatars/${encodeURIComponent(name)}.png`;
+        const file = bucket.file(filePath);
+        const [exists] = await file.exists();
+        if (exists) {
+          const [contents] = await file.download();
+          res
+            .status(200)
+            .json({
+              avatar: `data:image/png;base64,${contents.toString("base64")}`,
+            });
+          return;
+        }
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const response = await openai.images.generate({
+          model: "gpt-image-1",
+          prompt: `professional, illustrative social media avatar of ${name}`,
+          size: "256x256",
+          response_format: "b64_json",
+        });
+        const b64 = response.data[0].b64_json;
+        await file.save(Buffer.from(b64, "base64"), {
+          contentType: "image/png",
+        });
+        res.status(200).json({ avatar: `data:image/png;base64,${b64}` });
+      } catch (error) {
+        console.error("Error generating avatar:", error);
+        res.status(500).json({ error: "Failed to generate avatar." });
+      }
+    });
   },
 );
 
