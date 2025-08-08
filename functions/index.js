@@ -438,6 +438,7 @@ export const generateLearningStrategy = onCall(
       businessGoal,
       audienceProfile,
       projectConstraints,
+      clarifyingQuestions = [],
       clarifyingAnswers = [],
       personaCount = 3,
     } = req.data || {};
@@ -478,9 +479,12 @@ export const generateLearningStrategy = onCall(
       `Business Goal: ${businessGoal}\n` +
       `Audience Profile: ${audienceProfile}\n` +
       `Project Constraints: ${projectConstraints}` +
-      (clarifyingAnswers.length
-        ? `\nClarifying Answers: ${clarifyingAnswers.join(" | ")}`
-        : "");
+      (() => {
+        const pairs = clarifyingQuestions.map((q, i) =>
+          `Q: ${q}\nA: ${clarifyingAnswers[i] || ""}`
+        );
+        return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
+      })();
 
     const { text } = await ai.generate(prompt);
 
