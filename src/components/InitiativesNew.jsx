@@ -137,7 +137,21 @@ const InitiativesNew = () => {
         audienceProfile,
         projectConstraints,
       });
-      setPersona(result.data);
+
+      let avatar;
+      try {
+        const avatarRes = await fetch(
+          `https://api.multiavatar.com/${encodeURIComponent(
+            result.data.name,
+          )}.svg`,
+        );
+        const svg = await avatarRes.text();
+        avatar = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+      } catch (avatarErr) {
+        console.error("Error fetching avatar:", avatarErr);
+      }
+
+      setPersona({ ...result.data, avatar });
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err.message || "Error generating persona.");
