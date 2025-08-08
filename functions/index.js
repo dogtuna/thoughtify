@@ -7,6 +7,8 @@ import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
+import OpenAI from "openai";
+import { Buffer } from "node:buffer";
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -93,6 +95,41 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
   await db.collection("invitations").add(invitationData);
   return { invitationCode };
 });
+
+export const generateAvatar = onCall(
+  { secrets: ["OPENAI_API_KEY"] },
+  async (request) => {
+    const { name } = request.data || {};
+    if (!name) {
+      throw new HttpsError("invalid-argument", "Name is required.");
+    }
+
+    try {
+      const bucket = admin.storage().bucket();
+      const filePath = `avatars/${encodeURIComponent(name)}.png`;
+      const file = bucket.file(filePath);
+      const [exists] = await file.exists();
+      if (exists) {
+        const [contents] = await file.download();
+        return { avatar: `data:image/png;base64,${contents.toString("base64")}` };
+      }
+
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const response = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt: `professional, illustrative social media avatar of ${name}`,
+        size: "256x256",
+        response_format: "b64_json",
+      });
+      const b64 = response.data[0].b64_json;
+      await file.save(Buffer.from(b64, "base64"), { contentType: "image/png" });
+      return { avatar: `data:image/png;base64,${b64}` };
+    } catch (error) {
+      console.error("Error generating avatar:", error);
+      throw new HttpsError("internal", "Failed to generate avatar.");
+    }
+  },
+);
 
 export const generateTrainingPlan = onCall(
   { secrets: ["GOOGLE_GENAI_API_KEY"] },

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
-import multiavatar from "../utils/multiavatar.js";
+// Avatar images are generated via a Cloud Function using OpenAI
 
 const InitiativesNew = () => {
   const [businessGoal, setBusinessGoal] = useState("");
@@ -32,6 +32,10 @@ const InitiativesNew = () => {
   const generatePersonaCallable = httpsCallable(
     functionsInstance,
     "generateLearnerPersona",
+  );
+  const generateAvatarCallable = httpsCallable(
+    functionsInstance,
+    "generateAvatar",
   );
 
   const handleFileUpload = (e) => {
@@ -141,8 +145,10 @@ const InitiativesNew = () => {
 
       let avatar;
       try {
-        const svg = multiavatar(JSON.stringify(result.data) || "");
-        avatar = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+        const avatarResp = await generateAvatarCallable({
+          name: result.data.name,
+        });
+        avatar = avatarResp.data.avatar;
       } catch (avatarErr) {
         console.error("Error generating avatar:", avatarErr);
       }
