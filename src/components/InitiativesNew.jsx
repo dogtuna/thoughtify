@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
+// Avatar images are generated via a Cloud Function using OpenAI
 
 const InitiativesNew = () => {
   const [businessGoal, setBusinessGoal] = useState("");
@@ -31,6 +32,10 @@ const InitiativesNew = () => {
   const generatePersonaCallable = httpsCallable(
     functionsInstance,
     "generateLearnerPersona",
+  );
+  const generateAvatarCallable = httpsCallable(
+    functionsInstance,
+    "generateAvatar",
   );
 
   const handleFileUpload = (e) => {
@@ -137,7 +142,18 @@ const InitiativesNew = () => {
         audienceProfile,
         projectConstraints,
       });
-      setPersona(result.data);
+
+    let avatar;
+    try {
+      const avatarResp = await generateAvatarCallable({
+        name: result.data.name,
+      });
+      avatar = avatarResp.data.avatar;
+    } catch (avatarErr) {
+      console.error("Error generating avatar:", avatarErr);
+    }
+
+    setPersona({ ...result.data, avatar });
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err.message || "Error generating persona.");
