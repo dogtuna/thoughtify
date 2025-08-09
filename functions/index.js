@@ -714,11 +714,16 @@ export const savePersona = onCall(async (request) => {
   if (!persona.name) {
     throw new HttpsError("invalid-argument", "Persona must include a name");
   }
-  await db
+  const initiativeRef = db
     .collection("users")
     .doc(uid)
     .collection("initiatives")
-    .doc(initiativeId)
+    .doc(initiativeId);
+  await initiativeRef.set(
+    { updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+    { merge: true }
+  );
+  await initiativeRef
     .collection("personas")
     .doc(personaId)
     .set(persona, { merge: true });

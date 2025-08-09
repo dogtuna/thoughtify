@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app, auth } from "../firebase.js";
 import { loadPersonas, savePersona } from "../utils/personas.js";
+import {
+  loadInitiative,
+  saveInitiative,
+} from "../utils/initiatives.js";
 import { useSearchParams } from "react-router-dom";
 import "./AIToolsGenerators.css";
 
@@ -33,6 +37,22 @@ const InitiativesNew = () => {
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
+
+    loadInitiative(uid, initiativeId)
+      .then((data) => {
+        if (data) {
+          setBusinessGoal(data.businessGoal || "");
+          setAudienceProfile(data.audienceProfile || "");
+          setSourceMaterial(data.sourceMaterial || "");
+          setProjectConstraints(data.projectConstraints || "");
+          setProjectBrief(data.projectBrief || "");
+          setClarifyingQuestions(data.clarifyingQuestions || []);
+          setClarifyingAnswers(data.clarifyingAnswers || []);
+          setStrategy(data.strategy || null);
+        }
+      })
+      .catch((err) => console.error("Error loading initiative:", err));
+
     loadPersonas(uid, initiativeId)
       .then((items) => {
         if (items.length > 0) {
@@ -86,6 +106,19 @@ const InitiativesNew = () => {
       const qs = data.clarifyingQuestions || [];
       setClarifyingQuestions(qs);
       setClarifyingAnswers(qs.map(() => ""));
+
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveInitiative(uid, initiativeId, {
+          businessGoal,
+          audienceProfile,
+          sourceMaterial,
+          projectConstraints,
+          projectBrief: data.projectBrief,
+          clarifyingQuestions: qs,
+          clarifyingAnswers: qs.map(() => ""),
+        });
+      }
     } catch (err) {
       console.error("Error generating project brief:", err);
       setError(err?.message || "Error generating project brief.");
@@ -108,6 +141,10 @@ const InitiativesNew = () => {
     setClarifyingAnswers((prev) => {
       const updated = [...prev];
       updated[index] = value;
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        saveInitiative(uid, initiativeId, { clarifyingAnswers: updated });
+      }
       return updated;
     });
   };
@@ -133,6 +170,10 @@ const InitiativesNew = () => {
         throw new Error("No learning strategy returned.");
       }
       setStrategy(data);
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveInitiative(uid, initiativeId, { strategy: data });
+      }
     } catch (err) {
       console.error("Error generating learning strategy:", err);
       setNextError(err?.message || "Error generating learning strategy.");
