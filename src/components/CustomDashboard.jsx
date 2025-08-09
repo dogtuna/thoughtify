@@ -10,6 +10,7 @@ import {
   getDocs,
   doc,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { app, auth } from "../firebase";
@@ -75,7 +76,23 @@ const CustomDashboard = () => {
             setDisplayName(profileData.businessName || profileData.name || "Your Business");
           } catch (err) {
             console.error("Error fetching profile:", err);
-            setError("No profile data found.");
+            // If no profile exists, create a default one so the user can proceed.
+            try {
+              await setDoc(
+                doc(db, "profiles", user.uid),
+                {
+                  name: user.displayName || "",
+                  businessName: "",
+                  businessEmail: user.email || "",
+                  uid: user.uid,
+                },
+                { merge: true }
+              );
+              setDisplayName(user.displayName || "Your Business");
+            } catch (creationErr) {
+              console.error("Error creating default profile:", creationErr);
+              setError("No profile data found.");
+            }
           }
         } catch (err) {
           console.error("Error fetching invitation or profile data:", err);
