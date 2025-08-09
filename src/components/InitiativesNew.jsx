@@ -29,7 +29,9 @@ const InitiativesNew = () => {
   const [nextError, setNextError] = useState("");
   const [personaError, setPersonaError] = useState("");
 
-  const [persona, setPersona] = useState(null);
+  const [personas, setPersonas] = useState([]);
+  const [activePersonaIndex, setActivePersonaIndex] = useState(0);
+  const [editingPersona, setEditingPersona] = useState(null);
 
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
@@ -55,9 +57,8 @@ const InitiativesNew = () => {
 
     loadPersonas(uid, initiativeId)
       .then((items) => {
-        if (items.length > 0) {
-          setPersona(items[0]);
-        }
+        setPersonas(items);
+        setActivePersonaIndex(0);
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [initiativeId]);
@@ -88,7 +89,9 @@ const InitiativesNew = () => {
     setClarifyingQuestions([]);
     setClarifyingAnswers([]);
     setStrategy(null);
-    setPersona(null);
+    setPersonas([]);
+    setActivePersonaIndex(0);
+    setEditingPersona(null);
 
     try {
       const { data } = await generateProjectBrief({
@@ -153,7 +156,9 @@ const InitiativesNew = () => {
     setNextLoading(true);
     setNextError("");
     setStrategy(null);
-    setPersona(null);
+    setPersonas([]);
+    setActivePersonaIndex(0);
+    setEditingPersona(null);
 
     try {
       const { data } = await generateLearningStrategy({
@@ -182,11 +187,12 @@ const InitiativesNew = () => {
     }
   };
 
-  const handleGeneratePersona = async () => {
+  const currentPersona = personas[activePersonaIndex] || null;
+
+  const handleGeneratePersona = async (action = "add") => {
     setPersonaLoading(true);
     setPersonaError("");
     try {
-      // 1) AI generates persona JSON (name/motivation/challenges)
       const personaRes = await generateLearnerPersona({
         projectBrief,
         businessGoal,
@@ -198,23 +204,41 @@ const InitiativesNew = () => {
         throw new Error("Persona generation returned no name.");
       }
 
-      // 2) Use that AI persona to generate avatar image
       const avatarRes = await generateAvatar({
         name: personaData.name,
         motivation: personaData.motivation || "",
         challenges: personaData.challenges || "",
       });
 
-      const uid = auth.currentUser?.uid;
       const personaToSave = {
         ...personaData,
         avatar: avatarRes?.data?.avatar || null,
       };
+      const uid = auth.currentUser?.uid;
       if (uid) {
-        const id = await savePersona(uid, initiativeId, personaToSave);
-        setPersona({ id, ...personaToSave });
+        if (action === "replace" && currentPersona) {
+          const id = currentPersona.id;
+          await savePersona(uid, initiativeId, { ...personaToSave, id });
+          setPersonas((prev) =>
+            prev.map((p, i) => (i === activePersonaIndex ? { id, ...personaToSave } : p))
+          );
+        } else {
+          const id = await savePersona(uid, initiativeId, personaToSave);
+          const newPersona = { id, ...personaToSave };
+          const newIndex = personas.length;
+          setPersonas((prev) => [...prev, newPersona]);
+          setActivePersonaIndex(newIndex);
+        }
       } else {
-        setPersona(personaToSave);
+        if (action === "replace" && currentPersona) {
+          setPersonas((prev) =>
+            prev.map((p, i) => (i === activePersonaIndex ? { ...personaToSave } : p))
+          );
+        } else {
+          const newIndex = personas.length;
+          setPersonas((prev) => [...prev, personaToSave]);
+          setActivePersonaIndex(newIndex);
+        }
       }
     } catch (err) {
       console.error("Error generating persona:", err);
@@ -225,14 +249,46 @@ const InitiativesNew = () => {
   };
 
   const handlePersonaFieldChange = (field, value) => {
-    setPersona((prev) => {
-      const updated = { ...prev, [field]: value };
-      const uid = auth.currentUser?.uid;
+    setEditingPersona((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSavePersonaEdits = async () => {
+    if (!editingPersona) return;
+    const uid = auth.currentUser?.uid;
+    try {
       if (uid) {
-        savePersona(uid, initiativeId, updated);
+        await savePersona(uid, initiativeId, editingPersona);
       }
-      return updated;
-    });
+      setPersonas((prev) =>
+        prev.map((p, i) => (i === activePersonaIndex ? editingPersona : p))
+      );
+      setEditingPersona(null);
+    } catch (err) {
+      console.error("Error saving persona:", err);
+      setPersonaError(err?.message || "Error saving persona.");
+    }
+  };
+
+  const handleRegenerateAvatar = async () => {
+    if (!editingPersona) return;
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const avatarRes = await generateAvatar({
+        name: editingPersona.name,
+        motivation: editingPersona.motivation || "",
+        challenges: editingPersona.challenges || "",
+      });
+      setEditingPersona((prev) => ({
+        ...prev,
+        avatar: avatarRes?.data?.avatar || null,
+      }));
+    } catch (err) {
+      console.error("Error generating avatar:", err);
+      setPersonaError(err?.message || "Error generating avatar.");
+    } finally {
+      setPersonaLoading(false);
+    }
   };
 
   return (
@@ -325,10 +381,10 @@ const InitiativesNew = () => {
           </p>
 
           <div>
-            <h4>Learner Persona</h4>
-            {!persona && (
+            <h4>Learner Personas</h4>
+            {personas.length === 0 && (
               <button
-                onClick={handleGeneratePersona}
+                onClick={() => handleGeneratePersona("add")}
                 disabled={personaLoading}
                 className="generator-button"
               >
@@ -336,47 +392,138 @@ const InitiativesNew = () => {
               </button>
             )}
 
-            {persona && (
-              <div className="persona-card">
-                {persona.avatar && (
-                  <img
-                    src={persona.avatar}
-                    alt={`${persona.name} avatar`}
-                    className="persona-avatar"
-                  />
+            {personas.length > 0 && (
+              <div>
+                {personas.length > 1 && (
+                  <div className="persona-tabs">
+                    {personas.map((p, i) => (
+                      <button
+                        key={p.id || i}
+                        type="button"
+                        onClick={() => {
+                          setActivePersonaIndex(i);
+                          setEditingPersona(null);
+                        }}
+                        className={`persona-tab ${i === activePersonaIndex ? "active" : ""}`}
+                      >
+                        {p.avatar && (
+                          <img
+                            src={p.avatar}
+                            alt={`${p.name} avatar`}
+                            className="persona-tab-avatar"
+                          />
+                        )}
+                        <span>{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
 
-                <input
-                  className="generator-input"
-                  value={persona.name}
-                  onChange={(e) => handlePersonaFieldChange("name", e.target.value)}
-                />
-                <textarea
-                  className="generator-input"
-                  value={persona.motivation}
-                  onChange={(e) => handlePersonaFieldChange("motivation", e.target.value)}
-                  rows={2}
-                />
-                <textarea
-                  className="generator-input"
-                  value={persona.challenges}
-                  onChange={(e) => handlePersonaFieldChange("challenges", e.target.value)}
-                  rows={2}
-                />
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    onClick={handleGeneratePersona}
-                    disabled={personaLoading}
-                    className="generator-button"
-                    type="button"
-                  >
-                    {personaLoading ? "Generating..." : "Replace Persona"}
-                  </button>
-                </div>
+                {currentPersona && (
+                  <div className="persona-card">
+                    {editingPersona ? (
+                      <>
+                        {editingPersona.avatar && (
+                          <img
+                            src={editingPersona.avatar}
+                            alt={`${editingPersona.name} avatar`}
+                            className="persona-avatar"
+                          />
+                        )}
+                        <input
+                          className="generator-input"
+                          value={editingPersona.name}
+                          onChange={(e) => handlePersonaFieldChange("name", e.target.value)}
+                        />
+                        <textarea
+                          className="generator-input"
+                          value={editingPersona.motivation}
+                          onChange={(e) => handlePersonaFieldChange("motivation", e.target.value)}
+                          rows={2}
+                        />
+                        <textarea
+                          className="generator-input"
+                          value={editingPersona.challenges}
+                          onChange={(e) => handlePersonaFieldChange("challenges", e.target.value)}
+                          rows={2}
+                        />
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            onClick={handleRegenerateAvatar}
+                            disabled={personaLoading}
+                            className="generator-button"
+                            type="button"
+                          >
+                            {personaLoading ? "Generating..." : "Regenerate Avatar"}
+                          </button>
+                          <button
+                            onClick={handleSavePersonaEdits}
+                            disabled={personaLoading}
+                            className="generator-button"
+                            type="button"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingPersona(null)}
+                            className="generator-button"
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {currentPersona.avatar && (
+                          <img
+                            src={currentPersona.avatar}
+                            alt={`${currentPersona.name} avatar`}
+                            className="persona-avatar"
+                          />
+                        )}
+                        <h5>{currentPersona.name}</h5>
+                        <p>
+                          <strong>Motivation:</strong> {currentPersona.motivation}
+                        </p>
+                        <p>
+                          <strong>Challenges:</strong> {currentPersona.challenges}
+                        </p>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => setEditingPersona(currentPersona)}
+                            className="generator-button"
+                            type="button"
+                          >
+                            Edit Persona
+                          </button>
+                          <button
+                            onClick={() => handleGeneratePersona("replace")}
+                            disabled={personaLoading}
+                            className="generator-button"
+                            type="button"
+                          >
+                            {personaLoading ? "Generating..." : "Replace Persona"}
+                          </button>
+                          {personas.length < 3 && (
+                            <button
+                              onClick={() => handleGeneratePersona("add")}
+                              disabled={personaLoading}
+                              className="generator-button"
+                              type="button"
+                            >
+                              {personaLoading ? "Generating..." : "Add Persona"}
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {personaError && <p className="generator-error">{personaError}</p>}
               </div>
             )}
-
-            {personaError && <p className="generator-error">{personaError}</p>}
           </div>
         </div>
       )}
