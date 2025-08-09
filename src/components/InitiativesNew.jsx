@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../firebase.js";
+import { app, auth } from "../firebase.js";
+import { loadPersonas, savePersona } from "../utils/personas.js";
+import {
+  loadInitiative,
+  saveInitiative,
+} from "../utils/initiatives.js";
+import { useSearchParams } from "react-router-dom";
 import "./AIToolsGenerators.css";
 
 const InitiativesNew = () => {
@@ -24,6 +30,37 @@ const InitiativesNew = () => {
   const [personaError, setPersonaError] = useState("");
 
   const [persona, setPersona] = useState(null);
+
+  const [searchParams] = useSearchParams();
+  const initiativeId = searchParams.get("initiativeId") || "default";
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    loadInitiative(uid, initiativeId)
+      .then((data) => {
+        if (data) {
+          setBusinessGoal(data.businessGoal || "");
+          setAudienceProfile(data.audienceProfile || "");
+          setSourceMaterial(data.sourceMaterial || "");
+          setProjectConstraints(data.projectConstraints || "");
+          setProjectBrief(data.projectBrief || "");
+          setClarifyingQuestions(data.clarifyingQuestions || []);
+          setClarifyingAnswers(data.clarifyingAnswers || []);
+          setStrategy(data.strategy || null);
+        }
+      })
+      .catch((err) => console.error("Error loading initiative:", err));
+
+    loadPersonas(uid, initiativeId)
+      .then((items) => {
+        if (items.length > 0) {
+          setPersona(items[0]);
+        }
+      })
+      .catch((err) => console.error("Error loading personas:", err));
+  }, [initiativeId]);
 
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
@@ -69,6 +106,19 @@ const InitiativesNew = () => {
       const qs = data.clarifyingQuestions || [];
       setClarifyingQuestions(qs);
       setClarifyingAnswers(qs.map(() => ""));
+
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveInitiative(uid, initiativeId, {
+          businessGoal,
+          audienceProfile,
+          sourceMaterial,
+          projectConstraints,
+          projectBrief: data.projectBrief,
+          clarifyingQuestions: qs,
+          clarifyingAnswers: qs.map(() => ""),
+        });
+      }
     } catch (err) {
       console.error("Error generating project brief:", err);
       setError(err?.message || "Error generating project brief.");
@@ -91,6 +141,10 @@ const InitiativesNew = () => {
     setClarifyingAnswers((prev) => {
       const updated = [...prev];
       updated[index] = value;
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        saveInitiative(uid, initiativeId, { clarifyingAnswers: updated });
+      }
       return updated;
     });
   };
@@ -116,6 +170,10 @@ const InitiativesNew = () => {
         throw new Error("No learning strategy returned.");
       }
       setStrategy(data);
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveInitiative(uid, initiativeId, { strategy: data });
+      }
     } catch (err) {
       console.error("Error generating learning strategy:", err);
       setNextError(err?.message || "Error generating learning strategy.");
@@ -147,10 +205,17 @@ const InitiativesNew = () => {
         challenges: personaData.challenges || "",
       });
 
-      setPersona({
+      const uid = auth.currentUser?.uid;
+      const personaToSave = {
         ...personaData,
-        avatar: avatarRes?.data?.avatar || null, // base64 data URL or null
-      });
+        avatar: avatarRes?.data?.avatar || null,
+      };
+      if (uid) {
+        const id = await savePersona(uid, initiativeId, personaToSave);
+        setPersona({ id, ...personaToSave });
+      } else {
+        setPersona(personaToSave);
+      }
     } catch (err) {
       console.error("Error generating persona:", err);
       setPersonaError(err?.message || "Error generating persona.");
@@ -160,7 +225,14 @@ const InitiativesNew = () => {
   };
 
   const handlePersonaFieldChange = (field, value) => {
-    setPersona((prev) => ({ ...prev, [field]: value }));
+    setPersona((prev) => {
+      const updated = { ...prev, [field]: value };
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        savePersona(uid, initiativeId, updated);
+      }
+      return updated;
+    });
   };
 
   return (

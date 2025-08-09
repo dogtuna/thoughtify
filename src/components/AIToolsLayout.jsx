@@ -9,7 +9,10 @@ const AIToolsLayout = () => {
         <nav>
           <ul>
             <li>
-              <Link to="initiatives">Initiatives *NEW*</Link>
+              <Link to="/ai-tools">Your Initiatives</Link>
+            </li>
+            <li>
+              <Link to="initiatives">New Initiative</Link>
             </li>
             <li>
               {/* Use relative paths here */}
