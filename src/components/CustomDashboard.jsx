@@ -151,6 +151,14 @@ const CustomDashboard = () => {
           {/* Additional to-do items can be added here */}
         </ul>
       </div>
+      <div className="ai-tools-access">
+        <button
+          onClick={() => navigate("/ai-tools")}
+          className="ai-tools-button"
+        >
+          Go to AI Tools
+        </button>
+      </div>
     </div>
   );
 };
