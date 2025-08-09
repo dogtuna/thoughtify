@@ -344,6 +344,7 @@ const InitiativesNew = () => {
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         refreshField: field,
+        personaName: editingPersona.name,
       });
       if (field === "motivation") {
         const opts = (data.motivationOptions || []).map((o) => ({

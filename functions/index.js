@@ -484,6 +484,7 @@ export const generateLearnerPersona = onCall(
       existingMotivationKeywords = [],
       existingChallengeKeywords = [],
       refreshField,
+      personaName,
     } = req.data || {};
 
     if (!projectBrief) {
@@ -502,10 +503,12 @@ export const generateLearnerPersona = onCall(
 
     // Refresh motivations or challenges only
     if (refreshField === "motivation" || refreshField === "challenges") {
-      const listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
+      const personaContext = personaName
+        ? `The persona's name is ${personaName}. Write each option's "text" as a third-person sentence about ${personaName}.`
+        : "Write each option's \"text\" as a third-person sentence about the learner persona.";
+      const listPrompt = `You are a Senior Instructional Designer. ${personaContext} Based on the project information below, list three fresh learner ${
         refreshField
-      } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field with a full sentence. Avoid the following ${
-
+      } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written in full sentences. Avoid the following ${
         refreshField
       } keywords: ${
         refreshField === "motivation"
@@ -536,9 +539,8 @@ Project Constraints: ${projectConstraints}`;
 
     const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. For both the primary motivation and the primary challenge:
 - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-- Provide a full-sentence description in a "text" field.
-Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
-
+- Provide a full-sentence description in a "text" field written about the persona in third person using their name.
+Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the persona using their name. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
 {
   "name": "Name",
