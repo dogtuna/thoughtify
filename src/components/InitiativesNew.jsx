@@ -249,6 +249,9 @@ const InitiativesNew = () => {
     setPersonaLoading(true);
     setPersonaError("");
     try {
+      const existingNames = personas
+        .filter((_, i) => !(action === "replace" && i === activePersonaIndex))
+        .map((p) => p.name);
       const personaRes = await generateLearnerPersona({
         projectBrief,
         businessGoal,
@@ -256,6 +259,7 @@ const InitiativesNew = () => {
         projectConstraints,
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
+        existingNames,
       });
       const personaData = normalizePersona(personaRes.data);
       if (!personaData?.name) {

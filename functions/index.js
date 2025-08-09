@@ -29,6 +29,30 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+const FIRST_NAMES = [
+  "Anika", "Leo", "Maya", "Jonah", "Sophia", "Ethan", "Lila",
+  "Noah", "Ava", "Mason", "Isla", "Liam", "Zoe", "Kai",
+  "Emma", "Lucas", "Aria", "Owen", "Mila", "Finn",
+];
+
+const LAST_NAMES = [
+  "Fischer", "Kim", "Gupta", "O'Neill", "Rodriguez", "Chen",
+  "Patel", "Johnson", "Khan", "Liu", "Garcia", "Singh",
+  "Lopez", "Mori", "Smith", "Williams", "Brown", "Davis",
+  "Martinez", "Wilson",
+];
+
+function generateUniqueName(existing = []) {
+  const used = new Set(existing.map((n) => n.toLowerCase()));
+  for (let i = 0; i < 100; i++) {
+    const first = FIRST_NAMES[crypto.randomInt(0, FIRST_NAMES.length)];
+    const last = LAST_NAMES[crypto.randomInt(0, LAST_NAMES.length)];
+    const name = `${first} ${last}`;
+    if (!used.has(name.toLowerCase())) return name;
+  }
+  return `Learner ${crypto.randomInt(1000, 9999)}`;
+}
+
 // Retrieve the API key from environment variables (using Firebase secrets)
 // Make sure you have set the secret via:
 //    firebase functions:secrets:set GOOGLE_GENAI_API_KEY "your_api_key"
@@ -485,6 +509,7 @@ export const generateLearnerPersona = onCall(
       existingChallengeKeywords = [],
       refreshField,
       personaName,
+      existingNames = [],
     } = req.data || {};
 
     if (!projectBrief) {
@@ -500,11 +525,12 @@ export const generateLearnerPersona = onCall(
     });
 
     const randomSeed = Math.random().toString(36).substring(2, 8);
+    const finalName = personaName || generateUniqueName(existingNames);
 
     // Refresh motivations or challenges only
     if (refreshField === "motivation" || refreshField === "challenges") {
-      const personaContext = personaName
-        ? `The persona's name is ${personaName}. Write each option's "text" as a third-person sentence about ${personaName}.`
+      const personaContext = finalName
+        ? `The persona's name is ${finalName}. Write each option's "text" as a third-person sentence about ${finalName}.`
         : "Write each option's \"text\" as a third-person sentence about the learner persona.";
       const listPrompt = `You are a Senior Instructional Designer. ${personaContext} Based on the project information below, list three fresh learner ${
         refreshField
@@ -537,10 +563,11 @@ Project Constraints: ${projectConstraints}`;
       return { challengeOptions: data.options || [] };
     }
 
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. For both the primary motivation and the primary challenge:
+    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona named ${finalName}. For both the primary motivation and the primary challenge:
 - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-- Provide a full-sentence description in a "text" field written about the persona in third person using their name.
-Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the persona using their name. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+- Provide a full-sentence description in a "text" field written about ${finalName} in third person using their name.
+Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about ${finalName}. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+
 
 {
   "name": "Name",
@@ -568,6 +595,7 @@ Project Constraints: ${projectConstraints}`;
       throw new HttpsError("internal", "Invalid AI response format.");
     }
 
+    persona.name = finalName;
     return persona;
   }
 );
