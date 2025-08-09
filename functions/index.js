@@ -49,19 +49,33 @@ const transporter = nodemailer.createTransport({
 });
 
 function parseJsonFromText(text) {
-  // Extract JSON content even if it's wrapped in Markdown code fences
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const raw = fenceMatch ? fenceMatch[1] : text;
+  const start = text.indexOf("{");
+  if (start === -1) throw new Error("No JSON object found in text");
 
-  // Locate the first JSON object within the raw text
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("No JSON object found in text");
+  let depth = 0, inStr = false, esc = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inStr) {
+      if (esc) { esc = false; }
+      else if (ch === "\\") { esc = true; }
+      else if (ch === '"') { inStr = false; }
+      continue;
+    }
+
+    if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        return JSON.parse(candidate);
+      }
+    }
   }
 
-  const jsonString = raw.slice(start, end + 1);
-  return JSON.parse(jsonString);
+  throw new Error("No complete JSON object found");
 }
 
 export const setCustomClaims = onRequest(async (req, res) => {
