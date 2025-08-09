@@ -9,6 +9,35 @@ import {
 import { useSearchParams } from "react-router-dom";
 import "./AIToolsGenerators.css";
 
+const formatKeyword = (kw = "") =>
+  kw ? kw.charAt(0).toUpperCase() + kw.slice(1) : "";
+
+const normalizePersona = (p = {}) => ({
+  ...p,
+  motivation:
+    typeof p.motivation === "string"
+      ? { keyword: "General", text: p.motivation }
+      : {
+          keyword: formatKeyword(p.motivation?.keyword) || "General",
+          text: p.motivation?.text || "",
+        },
+  challenges:
+    typeof p.challenges === "string"
+      ? { keyword: "General", text: p.challenges }
+      : {
+          keyword: formatKeyword(p.challenges?.keyword) || "General",
+          text: p.challenges?.text || "",
+        },
+  motivationOptions: (p.motivationOptions || []).map((o) => ({
+    ...o,
+    keyword: formatKeyword(o.keyword),
+  })),
+  challengeOptions: (p.challengeOptions || []).map((o) => ({
+    ...o,
+    keyword: formatKeyword(o.keyword),
+  })),
+});
+
 const InitiativesNew = () => {
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -70,22 +99,7 @@ const InitiativesNew = () => {
 
     loadPersonas(uid, initiativeId)
       .then((items) => {
-        const normalized = items.map((p) => {
-          const persona = {
-            ...p,
-            motivation:
-              typeof p.motivation === "string"
-                ? { keyword: "General", text: p.motivation }
-                : p.motivation,
-            challenges:
-              typeof p.challenges === "string"
-                ? { keyword: "General", text: p.challenges }
-                : p.challenges,
-            motivationOptions: p.motivationOptions || [],
-            challengeOptions: p.challengeOptions || [],
-          };
-          return persona;
-        });
+        const normalized = items.map((p) => normalizePersona(p));
         setPersonas(normalized);
         setActivePersonaIndex(0);
         // populate used keyword sets
@@ -243,7 +257,7 @@ const InitiativesNew = () => {
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
       });
-      const personaData = personaRes.data;
+      const personaData = normalizePersona(personaRes.data);
       if (!personaData?.name) {
         throw new Error("Persona generation returned no name.");
       }
@@ -260,12 +274,12 @@ const InitiativesNew = () => {
       };
       // record used keywords
       addUsedMotivation([
-        personaData.motivation?.keyword,
-        ...(personaData.motivationOptions || []).map((o) => o.keyword),
+        personaToSave.motivation?.keyword,
+        ...(personaToSave.motivationOptions || []).map((o) => o.keyword),
       ]);
       addUsedChallenge([
-        personaData.challenges?.keyword,
-        ...(personaData.challengeOptions || []).map((o) => o.keyword),
+        personaToSave.challenges?.keyword,
+        ...(personaToSave.challengeOptions || []).map((o) => o.keyword),
       ]);
       const uid = auth.currentUser?.uid;
       if (uid) {
@@ -316,6 +330,11 @@ const InitiativesNew = () => {
     if (!editingPersona) return;
     setPersonaLoading(true);
     setPersonaError("");
+    if (field === "motivation") {
+      setEditingPersona((prev) => ({ ...prev, motivationOptions: [] }));
+    } else {
+      setEditingPersona((prev) => ({ ...prev, challengeOptions: [] }));
+    }
     try {
       const { data } = await generateLearnerPersona({
         projectBrief,
@@ -327,13 +346,27 @@ const InitiativesNew = () => {
         refreshField: field,
       });
       if (field === "motivation") {
-        const opts = data.motivationOptions || [];
-        addUsedMotivation(opts.map((o) => o.keyword));
-        setEditingPersona((prev) => ({ ...prev, motivationOptions: opts }));
+        const opts = (data.motivationOptions || []).map((o) => ({
+          ...o,
+          keyword: formatKeyword(o.keyword),
+        }));
+        if (opts.length === 0) {
+          setPersonaError("No new options available.");
+        } else {
+          addUsedMotivation(opts.map((o) => o.keyword));
+          setEditingPersona((prev) => ({ ...prev, motivationOptions: opts }));
+        }
       } else {
-        const opts = data.challengeOptions || [];
-        addUsedChallenge(opts.map((o) => o.keyword));
-        setEditingPersona((prev) => ({ ...prev, challengeOptions: opts }));
+        const opts = (data.challengeOptions || []).map((o) => ({
+          ...o,
+          keyword: formatKeyword(o.keyword),
+        }));
+        if (opts.length === 0) {
+          setPersonaError("No new options available.");
+        } else {
+          addUsedChallenge(opts.map((o) => o.keyword));
+          setEditingPersona((prev) => ({ ...prev, challengeOptions: opts }));
+        }
       }
     } catch (err) {
       console.error("Error generating options:", err);
