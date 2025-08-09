@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app, auth } from "../firebase.js";
-import { loadPersonas, savePersona } from "../utils/personas.js";
+import {
+  loadPersonas,
+  savePersona,
+  deletePersona,
+} from "../utils/personas.js";
 import {
   loadInitiative,
   saveInitiative,
@@ -246,6 +250,10 @@ const InitiativesNew = () => {
   const currentPersona = personas[activePersonaIndex] || null;
 
   const handleGeneratePersona = async (action = "add") => {
+    if (action === "add" && personas.length >= 3) {
+      setPersonaError("You can only have up to three personas.");
+      return;
+    }
     setPersonaLoading(true);
     setPersonaError("");
     try {
@@ -415,6 +423,34 @@ const InitiativesNew = () => {
     } catch (err) {
       console.error("Error generating avatar:", err);
       setPersonaError(err?.message || "Error generating avatar.");
+    } finally {
+      setPersonaLoading(false);
+    }
+  };
+
+  const handleDeletePersona = async (index) => {
+    const persona = personas[index];
+    if (!persona) return;
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const uid = auth.currentUser?.uid;
+      if (uid && persona.id) {
+        await deletePersona(uid, initiativeId, persona.id);
+      }
+      const updated = personas.filter((_, i) => i !== index);
+      setPersonas(updated);
+      const newActive =
+        updated.length === 0
+          ? 0
+          : activePersonaIndex > index
+          ? activePersonaIndex - 1
+          : Math.min(activePersonaIndex, updated.length - 1);
+      setActivePersonaIndex(newActive);
+      setEditingPersona(null);
+    } catch (err) {
+      console.error("Error deleting persona:", err);
+      setPersonaError(err?.message || "Error deleting persona.");
     } finally {
       setPersonaLoading(false);
     }
@@ -658,6 +694,14 @@ const InitiativesNew = () => {
                             Save
                           </button>
                           <button
+                            onClick={() => handleDeletePersona(activePersonaIndex)}
+                            disabled={personaLoading}
+                            className="generator-button"
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                          <button
                             onClick={() => setEditingPersona(null)}
                             className="generator-button"
                             type="button"
@@ -701,6 +745,14 @@ const InitiativesNew = () => {
                             type="button"
                           >
                             {personaLoading ? "Generating..." : "Replace Persona"}
+                          </button>
+                          <button
+                            onClick={() => handleDeletePersona(activePersonaIndex)}
+                            disabled={personaLoading}
+                            className="generator-button"
+                            type="button"
+                          >
+                            Delete Persona
                           </button>
                           {personas.length < 3 && (
                             <button

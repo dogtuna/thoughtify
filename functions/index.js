@@ -568,7 +568,6 @@ Project Constraints: ${projectConstraints}`;
 - Provide a full-sentence description in a "text" field written about ${finalName} in third person using their name.
 Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about ${finalName}. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
-
 {
   "name": "Name",
   "motivation": {"keyword": "short", "text": "full"},
