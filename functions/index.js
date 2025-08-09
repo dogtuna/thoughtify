@@ -505,6 +505,7 @@ export const generateLearnerPersona = onCall(
       const listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
         refreshField
       } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field with a full sentence. Avoid the following ${
+
         refreshField
       } keywords: ${
         refreshField === "motivation"
@@ -537,6 +538,7 @@ Project Constraints: ${projectConstraints}`;
 - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
 - Provide a full-sentence description in a "text" field.
 Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+
 
 {
   "name": "Name",
