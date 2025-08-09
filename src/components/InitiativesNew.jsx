@@ -32,6 +32,19 @@ const InitiativesNew = () => {
   const [personas, setPersonas] = useState([]);
   const [activePersonaIndex, setActivePersonaIndex] = useState(0);
   const [editingPersona, setEditingPersona] = useState(null);
+  const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
+  const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
+
+  const addUsedMotivation = (keywords = []) => {
+    setUsedMotivationKeywords((prev) =>
+      Array.from(new Set([...prev, ...keywords.filter(Boolean)]))
+    );
+  };
+  const addUsedChallenge = (keywords = []) => {
+    setUsedChallengeKeywords((prev) =>
+      Array.from(new Set([...prev, ...keywords.filter(Boolean)]))
+    );
+  };
 
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
@@ -57,8 +70,37 @@ const InitiativesNew = () => {
 
     loadPersonas(uid, initiativeId)
       .then((items) => {
-        setPersonas(items);
+        const normalized = items.map((p) => {
+          const persona = {
+            ...p,
+            motivation:
+              typeof p.motivation === "string"
+                ? { keyword: "General", text: p.motivation }
+                : p.motivation,
+            challenges:
+              typeof p.challenges === "string"
+                ? { keyword: "General", text: p.challenges }
+                : p.challenges,
+            motivationOptions: p.motivationOptions || [],
+            challengeOptions: p.challengeOptions || [],
+          };
+          return persona;
+        });
+        setPersonas(normalized);
         setActivePersonaIndex(0);
+        // populate used keyword sets
+        normalized.forEach((p) => {
+          const mKeys = [
+            p.motivation?.keyword,
+            ...(p.motivationOptions || []).map((o) => o.keyword),
+          ].filter(Boolean);
+          const cKeys = [
+            p.challenges?.keyword,
+            ...(p.challengeOptions || []).map((o) => o.keyword),
+          ].filter(Boolean);
+          addUsedMotivation(mKeys);
+          addUsedChallenge(cKeys);
+        });
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [initiativeId]);
@@ -198,6 +240,8 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        existingMotivationKeywords: usedMotivationKeywords,
+        existingChallengeKeywords: usedChallengeKeywords,
       });
       const personaData = personaRes.data;
       if (!personaData?.name) {
@@ -206,14 +250,23 @@ const InitiativesNew = () => {
 
       const avatarRes = await generateAvatar({
         name: personaData.name,
-        motivation: personaData.motivation || "",
-        challenges: personaData.challenges || "",
+        motivation: personaData.motivation?.text || "",
+        challenges: personaData.challenges?.text || "",
       });
 
       const personaToSave = {
         ...personaData,
         avatar: avatarRes?.data?.avatar || null,
       };
+      // record used keywords
+      addUsedMotivation([
+        personaData.motivation?.keyword,
+        ...(personaData.motivationOptions || []).map((o) => o.keyword),
+      ]);
+      addUsedChallenge([
+        personaData.challenges?.keyword,
+        ...(personaData.challengeOptions || []).map((o) => o.keyword),
+      ]);
       const uid = auth.currentUser?.uid;
       if (uid) {
         if (action === "replace" && currentPersona) {
@@ -252,6 +305,44 @@ const InitiativesNew = () => {
     setEditingPersona((prev) => ({ ...prev, [field]: value }));
   };
 
+  const selectMotivationOption = (opt) => {
+    setEditingPersona((prev) => ({ ...prev, motivation: opt }));
+  };
+  const selectChallengeOption = (opt) => {
+    setEditingPersona((prev) => ({ ...prev, challenges: opt }));
+  };
+
+  const refreshOptions = async (field) => {
+    if (!editingPersona) return;
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const { data } = await generateLearnerPersona({
+        projectBrief,
+        businessGoal,
+        audienceProfile,
+        projectConstraints,
+        existingMotivationKeywords: usedMotivationKeywords,
+        existingChallengeKeywords: usedChallengeKeywords,
+        refreshField: field,
+      });
+      if (field === "motivation") {
+        const opts = data.motivationOptions || [];
+        addUsedMotivation(opts.map((o) => o.keyword));
+        setEditingPersona((prev) => ({ ...prev, motivationOptions: opts }));
+      } else {
+        const opts = data.challengeOptions || [];
+        addUsedChallenge(opts.map((o) => o.keyword));
+        setEditingPersona((prev) => ({ ...prev, challengeOptions: opts }));
+      }
+    } catch (err) {
+      console.error("Error generating options:", err);
+      setPersonaError(err?.message || "Error generating options.");
+    } finally {
+      setPersonaLoading(false);
+    }
+  };
+
   const handleSavePersonaEdits = async () => {
     if (!editingPersona) return;
     const uid = auth.currentUser?.uid;
@@ -276,8 +367,8 @@ const InitiativesNew = () => {
     try {
       const avatarRes = await generateAvatar({
         name: editingPersona.name,
-        motivation: editingPersona.motivation || "",
-        challenges: editingPersona.challenges || "",
+        motivation: editingPersona.motivation?.text || "",
+        challenges: editingPersona.challenges?.text || "",
       });
       setEditingPersona((prev) => ({
         ...prev,
@@ -435,18 +526,82 @@ const InitiativesNew = () => {
                           value={editingPersona.name}
                           onChange={(e) => handlePersonaFieldChange("name", e.target.value)}
                         />
+                        <p>
+                          <strong>Motivation - {editingPersona.motivation?.keyword}</strong>
+                        </p>
                         <textarea
                           className="generator-input"
-                          value={editingPersona.motivation}
-                          onChange={(e) => handlePersonaFieldChange("motivation", e.target.value)}
+                          value={editingPersona.motivation?.text || ""}
+                          onChange={(e) =>
+                            handlePersonaFieldChange("motivation", {
+                              ...editingPersona.motivation,
+                              text: e.target.value,
+                            })
+                          }
                           rows={2}
                         />
+                        <div className="persona-options">
+                          {editingPersona.motivationOptions?.length > 0 && (
+                            <>
+                              <p>Other possible motivations...</p>
+                              {editingPersona.motivationOptions.map((opt) => (
+                                <button
+                                  key={opt.keyword}
+                                  type="button"
+                                  onClick={() => selectMotivationOption(opt)}
+                                  className="generator-button"
+                                >
+                                  {opt.keyword}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => refreshOptions("motivation")}
+                            className="generator-button"
+                          >
+                            Generate more
+                          </button>
+                        </div>
+                        <p>
+                          <strong>Challenges - {editingPersona.challenges?.keyword}</strong>
+                        </p>
                         <textarea
                           className="generator-input"
-                          value={editingPersona.challenges}
-                          onChange={(e) => handlePersonaFieldChange("challenges", e.target.value)}
+                          value={editingPersona.challenges?.text || ""}
+                          onChange={(e) =>
+                            handlePersonaFieldChange("challenges", {
+                              ...editingPersona.challenges,
+                              text: e.target.value,
+                            })
+                          }
                           rows={2}
                         />
+                        <div className="persona-options">
+                          {editingPersona.challengeOptions?.length > 0 && (
+                            <>
+                              <p>Other possible challenges...</p>
+                              {editingPersona.challengeOptions.map((opt) => (
+                                <button
+                                  key={opt.keyword}
+                                  type="button"
+                                  onClick={() => selectChallengeOption(opt)}
+                                  className="generator-button"
+                                >
+                                  {opt.keyword}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => refreshOptions("challenges")}
+                            className="generator-button"
+                          >
+                            Generate more
+                          </button>
+                        </div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button
                             onClick={handleRegenerateAvatar}
@@ -484,14 +639,18 @@ const InitiativesNew = () => {
                         )}
                         <h5>{currentPersona.name}</h5>
                         <p>
-                          <strong>Motivation:</strong> {currentPersona.motivation}
+                          <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
                         </p>
                         <p>
-                          <strong>Challenges:</strong> {currentPersona.challenges}
+                          <strong>Challenges - {currentPersona.challenges?.keyword}:</strong> {currentPersona.challenges?.text}
                         </p>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button
-                            onClick={() => setEditingPersona(currentPersona)}
+                            onClick={() =>
+                              setEditingPersona(
+                                JSON.parse(JSON.stringify(currentPersona))
+                              )
+                            }
                             className="generator-button"
                             type="button"
                           >

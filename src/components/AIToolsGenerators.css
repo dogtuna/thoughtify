@@ -141,3 +141,15 @@
   height: 24px;
   border-radius: 50%;
 }
+
+.persona-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.persona-options p {
+  width: 100%;
+  margin: 0;
+}
