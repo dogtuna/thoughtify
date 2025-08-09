@@ -26,7 +26,25 @@
     transition: background 0.3s;
   }
   
-  .todo-list li:hover {
-    background: #a742b2;
-  }
+.todo-list li:hover {
+  background: #a742b2;
+}
+
+.ai-tools-access {
+  margin-top: 20px;
+}
+
+.ai-tools-button {
+  background: #007bff;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.ai-tools-button:hover {
+  background: #0056b3;
+}
   

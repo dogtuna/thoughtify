@@ -112,3 +112,44 @@
   border-radius: 50%;
   margin-bottom: 10px;
 }
+
+.persona-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.persona-tab {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+
+.persona-tab.active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.persona-tab-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.persona-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.persona-options p {
+  width: 100%;
+  margin: 0;
+}

@@ -481,6 +481,9 @@ export const generateLearnerPersona = onCall(
       businessGoal,
       audienceProfile,
       projectConstraints,
+      existingMotivationKeywords = [],
+      existingChallengeKeywords = [],
+      refreshField,
     } = req.data || {};
 
     if (!projectBrief) {
@@ -496,13 +499,52 @@ export const generateLearnerPersona = onCall(
     });
 
     const randomSeed = Math.random().toString(36).substring(2, 8);
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+
+    // Refresh motivations or challenges only
+    if (refreshField === "motivation" || refreshField === "challenges") {
+      const listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
+        refreshField
+      } options in JSON with an array called "options" where each item has "keyword" and "text" fields. Avoid the following ${
+        refreshField
+      } keywords: ${
+        refreshField === "motivation"
+          ? existingMotivationKeywords.join(", ") || "none"
+          : existingChallengeKeywords.join(", ") || "none"
+      }.
+
+Project Brief: ${projectBrief}
+Business Goal: ${businessGoal}
+Audience Profile: ${audienceProfile}
+Project Constraints: ${projectConstraints}`;
+
+      const { text } = await ai.generate(listPrompt);
+
+      let data;
+      try {
+        data = parseJsonFromText(text);
+      } catch (err) {
+        console.error("Failed to parse AI response:", err, text);
+        throw new HttpsError("internal", "Invalid AI response format.");
+      }
+
+      if (refreshField === "motivation") {
+        return { motivationOptions: data.options || [] };
+      }
+      return { challengeOptions: data.options || [] };
+    }
+
+    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. Provide a primary motivation and challenge, each with a short keyword, and two additional alternative options for each. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
 {
   "name": "Name",
-  "motivation": "text",
-  "challenges": "text"
+  "motivation": {"keyword": "short", "text": "full"},
+  "motivationOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}],
+  "challenges": {"keyword": "short", "text": "full"},
+  "challengeOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}]
 }
+
+Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.
+Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
 
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
