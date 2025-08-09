@@ -481,6 +481,9 @@ export const generateLearnerPersona = onCall(
       businessGoal,
       audienceProfile,
       projectConstraints,
+      existingMotivationKeywords = [],
+      existingChallengeKeywords = [],
+      refreshField,
     } = req.data || {};
 
     if (!projectBrief) {
@@ -496,13 +499,55 @@ export const generateLearnerPersona = onCall(
     });
 
     const randomSeed = Math.random().toString(36).substring(2, 8);
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+
+    // Refresh motivations or challenges only
+    if (refreshField === "motivation" || refreshField === "challenges") {
+      const listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
+        refreshField
+      } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field with a full sentence. Avoid the following ${
+        refreshField
+      } keywords: ${
+        refreshField === "motivation"
+          ? existingMotivationKeywords.join(", ") || "none"
+          : existingChallengeKeywords.join(", ") || "none"
+      }.
+
+Project Brief: ${projectBrief}
+Business Goal: ${businessGoal}
+Audience Profile: ${audienceProfile}
+Project Constraints: ${projectConstraints}`;
+
+      const { text } = await ai.generate(listPrompt);
+
+      let data;
+      try {
+        data = parseJsonFromText(text);
+      } catch (err) {
+        console.error("Failed to parse AI response:", err, text);
+        throw new HttpsError("internal", "Invalid AI response format.");
+      }
+
+      if (refreshField === "motivation") {
+        return { motivationOptions: data.options || [] };
+      }
+      return { challengeOptions: data.options || [] };
+    }
+
+    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona with a distinct, randomly chosen name. For both the primary motivation and the primary challenge:
+- Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
+- Provide a full-sentence description in a "text" field.
+Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
 {
   "name": "Name",
-  "motivation": "text",
-  "challenges": "text"
+  "motivation": {"keyword": "short", "text": "full"},
+  "motivationOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}],
+  "challenges": {"keyword": "short", "text": "full"},
+  "challengeOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}]
 }
+
+Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.
+Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
 
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
