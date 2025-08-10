@@ -7,6 +7,31 @@ import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
 
+const APPROACHES = [
+  { value: "Bloom", label: "Bloom's Taxonomy" },
+  { value: "ABCD", label: "The ABCD Model" },
+  { value: "Mager", label: "Mager's Performance-Based Objectives" },
+  { value: "SMART", label: "The SMART Framework" },
+  { value: "Gagne", label: "Gagné's Learning Outcomes" },
+];
+
+const BLOOM_LEVELS = [
+  "Remember",
+  "Understand",
+  "Apply",
+  "Analyze",
+  "Evaluate",
+  "Create",
+];
+
+const FIELDS = {
+  ABCD: ["audience", "behavior", "condition", "degree"],
+  Bloom: ["audience", "behavior", "condition", "degree"],
+  Mager: ["performance", "condition", "criterion"],
+  SMART: ["specific", "measurable", "achievable", "relevant", "timeBound"],
+  Gagne: ["audience", "behavior", "condition", "degree"],
+};
+
 const LearningObjectivesGenerator = ({
   projectBrief,
   businessGoal,
@@ -20,6 +45,8 @@ const LearningObjectivesGenerator = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [approach, setApproach] = useState("ABCD");
+  const [bloomLevel, setBloomLevel] = useState("Analyze");
 
   const functions = getFunctions(app, "us-central1");
   const generateLearningObjectives = httpsCallable(
@@ -40,6 +67,8 @@ const LearningObjectivesGenerator = ({
         audienceProfile,
         projectConstraints,
         selectedModality,
+        approach,
+        bloomLevel,
       });
       setLearningObjectives(data);
       const uid = auth.currentUser?.uid;
@@ -70,6 +99,10 @@ const LearningObjectivesGenerator = ({
       return updated;
     });
   };
+  
+  const handleMetaChange = (field, value) => {
+    setLearningObjectives((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSave = async () => {
     const uid = auth.currentUser?.uid;
@@ -99,6 +132,41 @@ const LearningObjectivesGenerator = ({
         Back to Step 5
       </button>
       <h3>Learning Objectives</h3>
+      <div style={{ marginBottom: 10 }}>
+        <label>
+          Approach
+          <select
+            className="generator-input"
+            value={approach}
+            onChange={(e) => {
+              setApproach(e.target.value);
+              setLearningObjectives(null);
+            }}
+          >
+            {APPROACHES.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {approach === "Bloom" && (
+          <label>
+            Cognitive Level
+            <select
+              className="generator-input"
+              value={bloomLevel}
+              onChange={(e) => setBloomLevel(e.target.value)}
+            >
+              {BLOOM_LEVELS.map((lvl) => (
+                <option key={lvl} value={lvl}>
+                  {lvl}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
       {!learningObjectives && (
         <button
           type="button"
@@ -112,13 +180,18 @@ const LearningObjectivesGenerator = ({
       {error && <p className="generator-error">{error}</p>}
       {learningObjectives && (
         <div>
+          {learningObjectives.approach === "Gagne" && (
+            <label>
+              Category
+              <input
+                className="generator-input"
+                value={learningObjectives.category || ""}
+                onChange={(e) => handleMetaChange("category", e.target.value)}
+              />
+            </label>
+          )}
           <h4>Terminal Objective</h4>
-          {[
-            "audience",
-            "behavior",
-            "condition",
-            "degree",
-          ].map((field) => (
+          {FIELDS[learningObjectives.approach || approach].map((field) => (
             <label key={`terminal-${field}`}>
               {field.charAt(0).toUpperCase() + field.slice(1)}
               <textarea
@@ -137,24 +210,21 @@ const LearningObjectivesGenerator = ({
             learningObjectives.enablingObjectives.map((obj, idx) => (
               <div key={idx}>
                 <h4>Enabling Objective {idx + 1}</h4>
-                {[
-                  "audience",
-                  "behavior",
-                  "condition",
-                  "degree",
-                ].map((field) => (
-                  <label key={`enabling-${idx}-${field}`}>
-                    {field.charAt(0).toUpperCase() + field.slice(1)}
-                    <textarea
-                      className="generator-input"
-                      rows={2}
-                      value={obj?.[field] || ""}
-                      onChange={(e) =>
-                        handleChange("enabling", idx, field, e.target.value)
-                      }
-                    />
-                  </label>
-                ))}
+                {FIELDS[learningObjectives.approach || approach].map(
+                  (field) => (
+                    <label key={`enabling-${idx}-${field}`}>
+                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                      <textarea
+                        className="generator-input"
+                        rows={2}
+                        value={obj?.[field] || ""}
+                        onChange={(e) =>
+                          handleChange("enabling", idx, field, e.target.value)
+                        }
+                      />
+                    </label>
+                  )
+                )}
               </div>
             ))}
           <button
