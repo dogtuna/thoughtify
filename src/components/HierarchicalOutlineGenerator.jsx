@@ -16,6 +16,7 @@ const HierarchicalOutlineGenerator = ({
   learningObjectives,
   totalSteps,
   onBack,
+  onNext,
 }) => {
   const { courseOutline, setCourseOutline } = useProject();
   const [loading, setLoading] = useState(false);
@@ -75,9 +76,21 @@ const HierarchicalOutlineGenerator = ({
       )}
       {error && <p className="generator-error">{error}</p>}
       {courseOutline && (
-        <div className="generator-result" style={{ textAlign: "left" }}>
-          <pre>{courseOutline}</pre>
-        </div>
+        <>
+          <div className="generator-result" style={{ textAlign: "left" }}>
+            <pre>{courseOutline}</pre>
+          </div>
+          {onNext && (
+            <button
+              type="button"
+              onClick={onNext}
+              className="generator-button"
+              style={{ marginTop: 10 }}
+            >
+              Visualize Learning Path
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -94,4 +107,5 @@ HierarchicalOutlineGenerator.propTypes = {
   learningObjectives: PropTypes.object.isRequired,
   totalSteps: PropTypes.number.isRequired,
   onBack: PropTypes.func.isRequired,
+  onNext: PropTypes.func,
 };

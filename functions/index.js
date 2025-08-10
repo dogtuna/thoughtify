@@ -837,6 +837,68 @@ export const generateHierarchicalOutline = onCall(
   }
 );
 
+export const generateLearningPath = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req) => {
+    const {
+      projectBrief,
+      businessGoal,
+      audienceProfile,
+      projectConstraints,
+      selectedModality,
+      learningObjectives,
+      courseOutline,
+    } = req.data || {};
+
+    if (!projectBrief || !learningObjectives || !courseOutline) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Required information is missing."
+      );
+    }
+
+    try {
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) throw new HttpsError("internal", "No API key available.");
+
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-1.5-pro"),
+      });
+
+      const lines = [];
+      if (learningObjectives?.terminalObjective?.text) {
+        lines.push(
+          `Terminal Objective: ${learningObjectives.terminalObjective.text}`
+        );
+      }
+      (learningObjectives?.enablingObjectives || []).forEach((o, i) => {
+        if (o?.text) {
+          lines.push(`Enabling Objective ${i + 1}: ${o.text}`);
+        }
+      });
+
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nCourse Outline:\n${courseOutline}\nLearning Objectives:\n${lines.join("\n")}`;
+
+      const prompt = `You are a Senior Instructional Designer. Using the information below, create a learning path that maps the flow of modules, showing sequencing, branching, and dependencies. Return the diagram in Mermaid flowchart syntax.\n\n${baseInfo}`;
+
+      const flow = ai.defineFlow("learningPathFlow", async () => {
+        const { text } = await ai.generate(prompt);
+        return text;
+      });
+
+      const diagram = await flow();
+      return { diagram };
+    } catch (error) {
+      console.error("Error generating learning path:", error);
+      throw new HttpsError(
+        "internal",
+        "Failed to generate learning path."
+      );
+    }
+  }
+);
+
 export const generateStoryboard = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
