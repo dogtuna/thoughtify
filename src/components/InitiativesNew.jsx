@@ -18,6 +18,14 @@ const formatKeyword = (kw = "") =>
 
 const normalizePersona = (p = {}) => ({
   ...p,
+  ageRange: p.ageRange || "",
+  ageRangeOptions: p.ageRangeOptions || [],
+  educationLevel: p.educationLevel || "",
+  educationLevelOptions: p.educationLevelOptions || [],
+  techProficiency: p.techProficiency || "",
+  techProficiencyOptions: p.techProficiencyOptions || [],
+  learningPreferences: p.learningPreferences || "",
+  learningPreferencesOptions: p.learningPreferencesOptions || [],
   motivation:
     typeof p.motivation === "string"
       ? { keyword: "General", text: p.motivation }
@@ -341,6 +349,10 @@ const InitiativesNew = () => {
         name: personaData.name,
         motivation: personaData.motivation?.text || "",
         challenges: personaData.challenges?.text || "",
+        ageRange: personaData.ageRange || "",
+        techProficiency: personaData.techProficiency || "",
+        educationLevel: personaData.educationLevel || "",
+        learningPreferences: personaData.learningPreferences || "",
       });
 
       const personaToSave = {
@@ -394,22 +406,16 @@ const InitiativesNew = () => {
     setEditingPersona((prev) => ({ ...prev, [field]: value }));
   };
 
-  const selectMotivationOption = (opt) => {
-    setEditingPersona((prev) => ({ ...prev, motivation: opt }));
-  };
-  const selectChallengeOption = (opt) => {
-    setEditingPersona((prev) => ({ ...prev, challenges: opt }));
+  const selectOption = (field, opt) => {
+    setEditingPersona((prev) => ({ ...prev, [field]: opt }));
   };
 
   const refreshOptions = async (field) => {
     if (!editingPersona) return;
     setPersonaLoading(true);
     setPersonaError("");
-    if (field === "motivation") {
-      setEditingPersona((prev) => ({ ...prev, motivationOptions: [] }));
-    } else {
-      setEditingPersona((prev) => ({ ...prev, challengeOptions: [] }));
-    }
+    const optionField = `${field}Options`;
+    setEditingPersona((prev) => ({ ...prev, [optionField]: [] }));
     try {
       const { data } = await generateLearnerPersona({
         projectBrief,
@@ -421,28 +427,19 @@ const InitiativesNew = () => {
         refreshField: field,
         personaName: editingPersona.name,
       });
-      if (field === "motivation") {
-        const opts = (data.motivationOptions || []).map((o) => ({
-          ...o,
-          keyword: formatKeyword(o.keyword),
-        }));
-        if (opts.length === 0) {
-          setPersonaError("No new options available.");
-        } else {
+      let opts = data[optionField] || [];
+      if (field === "motivation" || field === "challenges") {
+        opts = opts.map((o) => ({ ...o, keyword: formatKeyword(o.keyword) }));
+        if (field === "motivation") {
           addUsedMotivation(opts.map((o) => o.keyword));
-          setEditingPersona((prev) => ({ ...prev, motivationOptions: opts }));
-        }
-      } else {
-        const opts = (data.challengeOptions || []).map((o) => ({
-          ...o,
-          keyword: formatKeyword(o.keyword),
-        }));
-        if (opts.length === 0) {
-          setPersonaError("No new options available.");
         } else {
           addUsedChallenge(opts.map((o) => o.keyword));
-          setEditingPersona((prev) => ({ ...prev, challengeOptions: opts }));
         }
+      }
+      if (opts.length === 0) {
+        setPersonaError("No new options available.");
+      } else {
+        setEditingPersona((prev) => ({ ...prev, [optionField]: opts }));
       }
     } catch (err) {
       console.error("Error generating options:", err);
@@ -478,6 +475,11 @@ const InitiativesNew = () => {
         name: editingPersona.name,
         motivation: editingPersona.motivation?.text || "",
         challenges: editingPersona.challenges?.text || "",
+        ageRange: editingPersona.ageRange || "",
+        techProficiency: editingPersona.techProficiency || "",
+        educationLevel: editingPersona.educationLevel || "",
+        learningPreferences: editingPersona.learningPreferences || "",
+        seedExtra: Date.now().toString(),
       });
       setEditingPersona((prev) => ({
         ...prev,
@@ -716,6 +718,13 @@ const InitiativesNew = () => {
 
                 {editingPersona ? (
                   <>
+                    {editingPersona.avatar && (
+                      <img
+                        src={editingPersona.avatar}
+                        alt={`${editingPersona.name} avatar`}
+                        className="persona-avatar"
+                      />
+                    )}
                     <input
                       className="generator-input"
                       value={editingPersona.name || ""}
@@ -723,6 +732,148 @@ const InitiativesNew = () => {
                         handlePersonaFieldChange("name", e.target.value)
                       }
                     />
+                    <input
+                      className="generator-input"
+                      placeholder="Age Range"
+                      value={editingPersona.ageRange || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange("ageRange", e.target.value)
+                      }
+                    />
+                    <div className="persona-options">
+                      {editingPersona.ageRangeOptions?.length > 0 && (
+                        <>
+                          <p>Other possible age ranges...</p>
+                          {editingPersona.ageRangeOptions.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => selectOption("ageRange", opt)}
+                              className="generator-button"
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => refreshOptions("ageRange")}
+                        className="generator-button"
+                      >
+                        Generate more
+                      </button>
+                    </div>
+                    <input
+                      className="generator-input"
+                      placeholder="Education Level"
+                      value={editingPersona.educationLevel || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange(
+                          "educationLevel",
+                          e.target.value
+                        )
+                      }
+                    />
+                    <div className="persona-options">
+                      {editingPersona.educationLevelOptions?.length > 0 && (
+                        <>
+                          <p>Other possible education levels...</p>
+                          {editingPersona.educationLevelOptions.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => selectOption("educationLevel", opt)}
+                              className="generator-button"
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => refreshOptions("educationLevel")}
+                        className="generator-button"
+                      >
+                        Generate more
+                      </button>
+                    </div>
+                    <input
+                      className="generator-input"
+                      placeholder="Tech Proficiency"
+                      value={editingPersona.techProficiency || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange(
+                          "techProficiency",
+                          e.target.value
+                        )
+                      }
+                    />
+                    <div className="persona-options">
+                      {editingPersona.techProficiencyOptions?.length > 0 && (
+                        <>
+                          <p>Other possible tech proficiency levels...</p>
+                          {editingPersona.techProficiencyOptions.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => selectOption("techProficiency", opt)}
+                              className="generator-button"
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => refreshOptions("techProficiency")}
+                        className="generator-button"
+                      >
+                        Generate more
+                      </button>
+                    </div>
+                    <textarea
+                      className="generator-input"
+                      placeholder="Learning Preferences"
+                      value={editingPersona.learningPreferences || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange(
+                          "learningPreferences",
+                          e.target.value
+                        )
+                      }
+                      rows={2}
+                    />
+                    <div className="persona-options">
+                      {editingPersona.learningPreferencesOptions?.length > 0 && (
+                        <>
+                          <p>Other possible learning preferences...</p>
+                          {editingPersona.learningPreferencesOptions.map(
+                            (opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() =>
+                                  selectOption("learningPreferences", opt)
+                                }
+                                className="generator-button"
+                              >
+                                {opt}
+                              </button>
+                            )
+                          )}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => refreshOptions("learningPreferences")}
+                        className="generator-button"
+                      >
+                        Generate more
+                      </button>
+                    </div>
                     <textarea
                       className="generator-input"
                       value={editingPersona.motivation?.text || ""}
@@ -742,7 +893,7 @@ const InitiativesNew = () => {
                             <button
                               key={opt.keyword}
                               type="button"
-                              onClick={() => selectMotivationOption(opt)}
+                              onClick={() => selectOption("motivation", opt)}
                               className="generator-button"
                             >
                               {opt.keyword}
@@ -777,7 +928,7 @@ const InitiativesNew = () => {
                             <button
                               key={opt.keyword}
                               type="button"
-                              onClick={() => selectChallengeOption(opt)}
+                              onClick={() => selectOption("challenges", opt)}
                               className="generator-button"
                             >
                               {opt.keyword}
@@ -837,6 +988,18 @@ const InitiativesNew = () => {
                       />
                     )}
                     <h5>{currentPersona.name}</h5>
+                    <p>
+                      <strong>Age Range:</strong> {currentPersona.ageRange}
+                    </p>
+                    <p>
+                      <strong>Education Level:</strong> {currentPersona.educationLevel}
+                    </p>
+                    <p>
+                      <strong>Tech Proficiency:</strong> {currentPersona.techProficiency}
+                    </p>
+                    <p>
+                      <strong>Learning Preferences:</strong> {currentPersona.learningPreferences}
+                    </p>
                     <p>
                       <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
                     </p>
