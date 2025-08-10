@@ -78,6 +78,7 @@ const InitiativesNew = () => {
   const [personas, setPersonas] = useState([]);
   const [activePersonaIndex, setActivePersonaIndex] = useState(0);
   const [editingPersona, setEditingPersona] = useState(null);
+  const [personaCount, setPersonaCount] = useState(0);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
@@ -180,6 +181,7 @@ const InitiativesNew = () => {
     setPersonas([]);
     setActivePersonaIndex(0);
     setEditingPersona(null);
+    setPersonaCount(0);
 
     try {
       const { data } = await generateProjectBrief({
@@ -327,6 +329,75 @@ const InitiativesNew = () => {
   };
 
   const currentPersona = personas[activePersonaIndex] || null;
+
+  const handleGeneratePersonas = async (count) => {
+    const toGenerate = Math.min(Math.max(Number(count), 0), 3);
+    if (toGenerate === 0) return;
+    if (personas.length + toGenerate > 3) {
+      setPersonaError("You can only have up to three personas.");
+      return;
+    }
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const startIndex = personas.length;
+      const newPersonas = [];
+      let existingNames = personas.map((p) => p.name);
+      for (let i = 0; i < toGenerate; i++) {
+        const personaRes = await generateLearnerPersona({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          existingMotivationKeywords: usedMotivationKeywords,
+          existingChallengeKeywords: usedChallengeKeywords,
+          existingNames,
+        });
+        const personaData = normalizePersona(personaRes.data);
+        if (!personaData?.name) {
+          throw new Error("Persona generation returned no name.");
+        }
+        const avatarRes = await generateAvatar({
+          name: personaData.name,
+          motivation: personaData.motivation?.text || "",
+          challenges: personaData.challenges?.text || "",
+          ageRange: personaData.ageRange || "",
+          techProficiency: personaData.techProficiency || "",
+          educationLevel: personaData.educationLevel || "",
+          learningPreferences: personaData.learningPreferences || "",
+        });
+        const personaToSave = {
+          ...personaData,
+          avatar: avatarRes?.data?.avatar || null,
+        };
+        addUsedMotivation([
+          personaToSave.motivation?.keyword,
+          ...(personaToSave.motivationOptions || []).map((o) => o.keyword),
+        ]);
+        addUsedChallenge([
+          personaToSave.challenges?.keyword,
+          ...(personaToSave.challengeOptions || []).map((o) => o.keyword),
+        ]);
+        existingNames.push(personaData.name);
+        const uid = auth.currentUser?.uid;
+        let savedPersona = personaToSave;
+        if (uid) {
+          const id = await savePersona(uid, initiativeId, personaToSave);
+          savedPersona = { id, ...personaToSave };
+        }
+        newPersonas.push(savedPersona);
+      }
+      if (newPersonas.length > 0) {
+        setPersonas((prev) => [...prev, ...newPersonas]);
+        setActivePersonaIndex(startIndex);
+      }
+    } catch (err) {
+      console.error("Error generating persona:", err);
+      setPersonaError(err?.message || "Error generating persona.");
+    } finally {
+      setPersonaLoading(false);
+    }
+  };
 
   const handleGeneratePersona = async (action = "add") => {
     if (action === "add" && personas.length >= 3) {
@@ -679,17 +750,42 @@ const InitiativesNew = () => {
 
           <div>
             <h3>Learner Personas</h3>
-            {personas.length === 0 && (
-              <button
-                onClick={() => handleGeneratePersona("add")}
-                disabled={personaLoading}
-                className="generator-button"
-              >
-                {personaLoading ? "Generating..." : "Generate Persona & Avatar"}
-              </button>
-            )}
-
-            {personas.length > 0 && (
+            {personas.length === 0 ? (
+              <>
+                <p>
+                  Learner personas help tailor the training to different
+                  audience segments by highlighting motivations, challenges,
+                  and preferences. They can influence project decisions and
+                  outcomes. You may generate up to three personas, but none are
+                  required.
+                </p>
+                <label>
+                  How many personas would you like to generate? (0-3)
+                </label>
+                <select
+                  value={personaCount}
+                  onChange={(e) => setPersonaCount(Number(e.target.value))}
+                  className="generator-input"
+                  style={{ maxWidth: 80, marginTop: 4 }}
+                >
+                  <option value={0}>0</option>
+                  <option value={1}>1</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                </select>
+                <div
+                  style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
+                >
+                  <button
+                    onClick={() => handleGeneratePersonas(personaCount)}
+                    disabled={personaLoading || personaCount === 0}
+                    className="generator-button"
+                  >
+                    {personaLoading ? "Generating..." : "Generate Personas"}
+                  </button>
+                </div>
+              </>
+            ) : (
               <div>
                 {personas.length > 1 && (
                   <div className="persona-tabs">
