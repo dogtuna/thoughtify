@@ -49,6 +49,7 @@ const LearningDesignDocument = ({
     }
   };
 
+
   useEffect(() => {
     if (!learningDesignDocument) {
       handleGenerate();
