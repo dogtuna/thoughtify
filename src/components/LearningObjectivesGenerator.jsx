@@ -101,7 +101,6 @@ const LearningObjectivesGenerator = ({
       return updated;
     });
   };
-
   const handleMetaChange = (field, value) => {
     setLearningObjectives((prev) => ({ ...prev, [field]: value }));
   };
