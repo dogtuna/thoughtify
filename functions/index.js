@@ -451,17 +451,29 @@ export const generateLearningStrategy = onCall(
     });
 
     const personaInstruction = personaCount
-      ? ` and create ${personaCount} learner persona${personaCount > 1 ? "s" : ""}`
+      ? ` and create ${personaCount} learner persona${
+          personaCount > 1 ? "s" : ""
+        }`
       : "";
     const returnStructure = personaCount
       ? `{
   "modalityRecommendation": "brief recommendation",
   "rationale": "why this modality fits",
+  "nuances": "project-specific nuances",
+  "alternatives": [
+    {"modality": "Alternative 1", "rationale": "why it fits", "nuances": "project nuances"},
+    {"modality": "Alternative 2", "rationale": "why it fits", "nuances": "project nuances"}
+  ],
   "learnerPersonas": [{"name":"Name","motivation":"text","challenges":"text"}]
 }`
       : `{
   "modalityRecommendation": "brief recommendation",
-  "rationale": "why this modality fits"
+  "rationale": "why this modality fits",
+  "nuances": "project-specific nuances",
+  "alternatives": [
+    {"modality": "Alternative 1", "rationale": "why it fits", "nuances": "project nuances"},
+    {"modality": "Alternative 2", "rationale": "why it fits", "nuances": "project nuances"}
+  ]
 }`;
 
     const clarificationsBlock = (() => {
@@ -471,6 +483,7 @@ export const generateLearningStrategy = onCall(
 
     const prompt =
       `You are a Senior Instructional Designer. Using the provided information, recommend the most effective training modality${personaInstruction}. ` +
+      `Also provide exactly two alternative modalities. For the recommended modality and each alternative, include a rationale and project-specific nuances to consider. ` +
       `Return a JSON object with the structure:${returnStructure} ` +
       `Do not include code fences or extra formatting.\n\n` +
       `Project Brief: ${projectBrief}\n` +
@@ -488,9 +501,17 @@ export const generateLearningStrategy = onCall(
       console.error("Failed to parse AI response:", err, text);
       throw new HttpsError("internal", "Invalid AI response format.");
     }
-    if (!strategy.modalityRecommendation || !strategy.rationale) {
+    if (
+      !strategy.modalityRecommendation ||
+      !strategy.rationale ||
+      !strategy.nuances ||
+      !Array.isArray(strategy.alternatives)
+    ) {
       console.error("AI response missing expected fields:", strategy);
-      throw new HttpsError("internal", "AI response missing learning strategy fields.");
+      throw new HttpsError(
+        "internal",
+        "AI response missing learning strategy fields."
+      );
     }
 
     return strategy;
