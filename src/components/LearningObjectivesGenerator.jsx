@@ -49,7 +49,9 @@ const LearningObjectivesGenerator = ({
   const [bloomLevel, setBloomLevel] = useState("Analyze");
 
   const functions = getFunctions(app, "us-central1");
-  const generateLearningObjectives = httpsCallable(
+  // Use a distinct variable name to avoid clashing with the exported Cloud
+  // Function identifier and prevent duplicate declarations during bundling.
+  const callGenerateLearningObjectives = httpsCallable(
     functions,
     "generateLearningObjectives"
   );
@@ -61,7 +63,7 @@ const LearningObjectivesGenerator = ({
     setLoading(true);
     setError("");
     try {
-      const { data } = await generateLearningObjectives({
+      const { data } = await callGenerateLearningObjectives({
         projectBrief,
         businessGoal,
         audienceProfile,
@@ -99,7 +101,6 @@ const LearningObjectivesGenerator = ({
       return updated;
     });
   };
-  
   const handleMetaChange = (field, value) => {
     setLearningObjectives((prev) => ({ ...prev, [field]: value }));
   };
