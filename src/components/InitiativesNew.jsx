@@ -12,6 +12,8 @@ import {
 } from "../utils/initiatives.js";
 import { useSearchParams } from "react-router-dom";
 import LearningObjectivesGenerator from "./LearningObjectivesGenerator.jsx";
+import HierarchicalOutlineGenerator from "./HierarchicalOutlineGenerator.jsx";
+import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 
 const formatKeyword = (kw = "") =>
@@ -52,7 +54,7 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
-  const TOTAL_STEPS = 6;
+  const TOTAL_STEPS = 7;
   const [step, setStep] = useState(1);
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -82,6 +84,8 @@ const InitiativesNew = () => {
   const [personaCount, setPersonaCount] = useState(0);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
+
+  const { learningObjectives } = useProject();
 
   const projectBriefRef = useRef(null);
   const nextButtonRef = useRef(null);
@@ -1227,6 +1231,20 @@ const InitiativesNew = () => {
           selectedModality={selectedModality}
           totalSteps={TOTAL_STEPS}
           onBack={() => setStep(5)}
+          onNext={() => setStep(7)}
+        />
+      )}
+
+      {step === 7 && (
+        <HierarchicalOutlineGenerator
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          learningObjectives={learningObjectives}
+          totalSteps={TOTAL_STEPS}
+          onBack={() => setStep(6)}
         />
       )}
 

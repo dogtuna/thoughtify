@@ -32,6 +32,7 @@ const LearningObjectivesGenerator = ({
   selectedModality,
   totalSteps,
   onBack,
+  onNext,
 }) => {
   const { learningObjectives, setLearningObjectives } = useProject();
   const [approach, setApproach] = useState("ABCD");
@@ -306,6 +307,16 @@ const LearningObjectivesGenerator = ({
           >
             {saving ? "Saving..." : "Save Objectives"}
           </button>
+          {onNext && (
+            <button
+              type="button"
+              onClick={onNext}
+              className="generator-button"
+              style={{ marginTop: 10 }}
+            >
+              Continue to Step 7
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -322,4 +333,5 @@ LearningObjectivesGenerator.propTypes = {
   selectedModality: PropTypes.string.isRequired,
   totalSteps: PropTypes.number.isRequired,
   onBack: PropTypes.func.isRequired,
+  onNext: PropTypes.func,
 };
