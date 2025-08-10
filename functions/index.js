@@ -660,9 +660,82 @@ Project Constraints: ${projectConstraints}`;
     }
 
     persona.name = finalName;
-    return persona;
+return persona;
   }
 );
+
+
+// Renamed internal constant to avoid any accidental duplicate declarations
+// when the file is imported by the emulator or bundler. We still export the
+// function under the public name `generateLearningObjectives` for callers.
+const generateLearningObjectivesCF = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req) => {
+    const {
+      projectBrief,
+      businessGoal,
+      audienceProfile,
+      projectConstraints,
+      selectedModality,
+      approach = "ABCD",
+      bloomLevel,
+    } = req.data || {};
+
+    if (!projectBrief) {
+      throw new HttpsError("invalid-argument", "A project brief is required.");
+    }
+
+    try {
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) throw new HttpsError("internal", "No API key available.");
+
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-1.5-pro"),
+      });
+
+      let prompt;
+      switch (approach) {
+        case "Bloom": {
+          const level = bloomLevel || "Remember";
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the ABCD format (Audience, Behavior, Condition, Degree) and use verbs appropriate for Bloom's Taxonomy cognitive level "${level}". Return JSON with this structure:\n{\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          break;
+        }
+        case "Mager": {
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow Mager's performance-based format with components Performance, Condition, Criterion. Return JSON with this structure:\n{\n  "terminalObjective": {"performance": "", "condition": "", "criterion": ""},\n  "enablingObjectives": [\n    {"performance": "", "condition": "", "criterion": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          break;
+        }
+        case "SMART": {
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound). Return JSON with this structure:\n{\n  "terminalObjective": {"specific": "", "measurable": "", "achievable": "", "relevant": "", "timeBound": ""},\n  "enablingObjectives": [\n    {"specific": "", "measurable": "", "achievable": "", "relevant": "", "timeBound": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          break;
+        }
+        case "Gagne": {
+          prompt = `You are a Senior Instructional Designer. Using the information below, determine the most appropriate category from Gagné's Five Categories of Learning Outcomes (Verbal Information, Intellectual Skills, Cognitive Strategies, Attitudes, Motor Skills). Then generate one terminal objective and several enabling objectives in the ABCD format (Audience, Behavior, Condition, Degree) tailored to that category. Return JSON with this structure:\n{\n  "category": "",\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          break;
+        }
+        case "ABCD":
+        default: {
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the ABCD format (Audience, Behavior, Condition, Degree). Return JSON with this structure:\n{\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+        }
+      }
+
+      const flow = ai.defineFlow("learningObjectivesFlow", async () => {
+        const { text } = await ai.generate(prompt);
+        return text;
+      });
+
+      const text = await flow();
+      const objectives = parseJsonFromText(text);
+      return { approach, ...objectives };
+    } catch (error) {
+      console.error("Error generating learning objectives:", error);
+      throw new HttpsError("internal", "Failed to generate learning objectives.");
+    }
+  }
+);
+
+// Maintain the original exported name expected by the client
+export { generateLearningObjectivesCF as generateLearningObjectives };
 
 export const generateStoryboard = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
