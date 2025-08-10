@@ -13,6 +13,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import LearningObjectivesGenerator from "./LearningObjectivesGenerator.jsx";
 import HierarchicalOutlineGenerator from "./HierarchicalOutlineGenerator.jsx";
+import LearningPathVisualizer from "./LearningPathVisualizer.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 
@@ -54,7 +55,7 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
-  const TOTAL_STEPS = 7;
+  const TOTAL_STEPS = 8;
   const [step, setStep] = useState(1);
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -85,7 +86,7 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
-  const { learningObjectives } = useProject();
+  const { learningObjectives, courseOutline, setLearningPath } = useProject();
 
   const projectBriefRef = useRef(null);
   const nextButtonRef = useRef(null);
@@ -121,6 +122,7 @@ const InitiativesNew = () => {
           setClarifyingAnswers(data.clarifyingAnswers || []);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
+          setLearningPath(data.learningPath || "");
         }
       })
       .catch((err) => console.error("Error loading initiative:", err));
@@ -145,7 +147,7 @@ const InitiativesNew = () => {
         });
       })
       .catch((err) => console.error("Error loading personas:", err));
-  }, [initiativeId]);
+  }, [initiativeId, setLearningPath]);
 
   useEffect(() => {
     if (!projectBriefRef.current || !nextButtonRef.current) return;
@@ -1245,6 +1247,21 @@ const InitiativesNew = () => {
           learningObjectives={learningObjectives}
           totalSteps={TOTAL_STEPS}
           onBack={() => setStep(6)}
+          onNext={() => setStep(8)}
+        />
+      )}
+
+      {step === 8 && (
+        <LearningPathVisualizer
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          learningObjectives={learningObjectives}
+          courseOutline={courseOutline}
+          totalSteps={TOTAL_STEPS}
+          onBack={() => setStep(7)}
         />
       )}
 
