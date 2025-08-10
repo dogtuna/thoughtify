@@ -51,7 +51,7 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 6;
   const [step, setStep] = useState(1);
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -63,6 +63,7 @@ const InitiativesNew = () => {
   const [clarifyingAnswers, setClarifyingAnswers] = useState([]);
 
   const [strategy, setStrategy] = useState(null);
+  const [selectedModality, setSelectedModality] = useState("");
 
   const [isEditingBrief, setIsEditingBrief] = useState(false);
 
@@ -77,13 +78,13 @@ const InitiativesNew = () => {
   const [personas, setPersonas] = useState([]);
   const [activePersonaIndex, setActivePersonaIndex] = useState(0);
   const [editingPersona, setEditingPersona] = useState(null);
+  const [personaCount, setPersonaCount] = useState(0);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
   const projectBriefRef = useRef(null);
   const nextButtonRef = useRef(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
-  const [showFixedNext, setShowFixedNext] = useState(false);
 
   const addUsedMotivation = (keywords = []) => {
     setUsedMotivationKeywords((prev) =>
@@ -114,6 +115,7 @@ const InitiativesNew = () => {
           setClarifyingQuestions(data.clarifyingQuestions || []);
           setClarifyingAnswers(data.clarifyingAnswers || []);
           setStrategy(data.strategy || null);
+          setSelectedModality(data.selectedModality || "");
         }
       })
       .catch((err) => console.error("Error loading initiative:", err));
@@ -150,13 +152,6 @@ const InitiativesNew = () => {
     return () => observer.disconnect();
   }, [projectBrief, clarifyingQuestions]);
 
-  useEffect(() => {
-    const allAnswered =
-      clarifyingQuestions.length > 0 &&
-      clarifyingAnswers.every((a) => a && a.trim());
-    setShowFixedNext(allAnswered && !strategy);
-  }, [clarifyingAnswers, clarifyingQuestions, strategy]);
-
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
 
@@ -186,6 +181,7 @@ const InitiativesNew = () => {
     setPersonas([]);
     setActivePersonaIndex(0);
     setEditingPersona(null);
+    setPersonaCount(0);
 
     try {
       const { data } = await generateProjectBrief({
@@ -282,13 +278,9 @@ const InitiativesNew = () => {
     });
   };
 
-  const handleNext = async () => {
+  const handleGenerateStrategy = async () => {
     setNextLoading(true);
     setNextError("");
-    setStrategy(null);
-    setPersonas([]);
-    setActivePersonaIndex(0);
-    setEditingPersona(null);
 
     try {
       const { data } = await generateLearningStrategy({
@@ -298,18 +290,27 @@ const InitiativesNew = () => {
         projectConstraints,
         clarifyingQuestions,
         clarifyingAnswers,
-        personaCount: 0, // strategy only (personas generated separately below)
+        personaCount: 0,
       });
 
-      if (!data?.modalityRecommendation || !data?.rationale) {
+      if (
+        !data?.modalityRecommendation ||
+        !data?.rationale ||
+        !data?.nuances ||
+        !data?.alternatives
+      ) {
         throw new Error("No learning strategy returned.");
       }
       setStrategy(data);
+      setSelectedModality(data.modalityRecommendation);
       const uid = auth.currentUser?.uid;
       if (uid) {
-        await saveInitiative(uid, initiativeId, { strategy: data });
+        await saveInitiative(uid, initiativeId, {
+          strategy: data,
+          selectedModality: data.modalityRecommendation,
+        });
       }
-      setStep(4);
+      setStep(5);
     } catch (err) {
       console.error("Error generating learning strategy:", err);
       setNextError(err?.message || "Error generating learning strategy.");
@@ -318,7 +319,85 @@ const InitiativesNew = () => {
     }
   };
 
+  const handleModalityChange = (e) => {
+    const value = e.target.value;
+    setSelectedModality(value);
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      saveInitiative(uid, initiativeId, { selectedModality: value });
+    }
+  };
+
   const currentPersona = personas[activePersonaIndex] || null;
+
+  const handleGeneratePersonas = async (count) => {
+    const toGenerate = Math.min(Math.max(Number(count), 0), 3);
+    if (toGenerate === 0) return;
+    if (personas.length + toGenerate > 3) {
+      setPersonaError("You can only have up to three personas.");
+      return;
+    }
+    setPersonaLoading(true);
+    setPersonaError("");
+    try {
+      const startIndex = personas.length;
+      const newPersonas = [];
+      let existingNames = personas.map((p) => p.name);
+      for (let i = 0; i < toGenerate; i++) {
+        const personaRes = await generateLearnerPersona({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          existingMotivationKeywords: usedMotivationKeywords,
+          existingChallengeKeywords: usedChallengeKeywords,
+          existingNames,
+        });
+        const personaData = normalizePersona(personaRes.data);
+        if (!personaData?.name) {
+          throw new Error("Persona generation returned no name.");
+        }
+        const avatarRes = await generateAvatar({
+          name: personaData.name,
+          motivation: personaData.motivation?.text || "",
+          challenges: personaData.challenges?.text || "",
+          ageRange: personaData.ageRange || "",
+          techProficiency: personaData.techProficiency || "",
+          educationLevel: personaData.educationLevel || "",
+          learningPreferences: personaData.learningPreferences || "",
+        });
+        const personaToSave = {
+          ...personaData,
+          avatar: avatarRes?.data?.avatar || null,
+        };
+        addUsedMotivation([
+          personaToSave.motivation?.keyword,
+          ...(personaToSave.motivationOptions || []).map((o) => o.keyword),
+        ]);
+        addUsedChallenge([
+          personaToSave.challenges?.keyword,
+          ...(personaToSave.challengeOptions || []).map((o) => o.keyword),
+        ]);
+        existingNames.push(personaData.name);
+        const uid = auth.currentUser?.uid;
+        let savedPersona = personaToSave;
+        if (uid) {
+          const id = await savePersona(uid, initiativeId, personaToSave);
+          savedPersona = { id, ...personaToSave };
+        }
+        newPersonas.push(savedPersona);
+      }
+      if (newPersonas.length > 0) {
+        setPersonas((prev) => [...prev, ...newPersonas]);
+        setActivePersonaIndex(startIndex);
+      }
+    } catch (err) {
+      console.error("Error generating persona:", err);
+      setPersonaError(err?.message || "Error generating persona.");
+    } finally {
+      setPersonaLoading(false);
+    }
+  };
 
   const handleGeneratePersona = async (action = "add") => {
     if (action === "add" && personas.length >= 3) {
@@ -610,7 +689,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 3 && (
-        <div className="generator-result">
+        <div className="generator-result" ref={projectBriefRef}>
           <div className="progress-indicator">Step 3 of {TOTAL_STEPS}</div>
           <h3>Project Brief</h3>
           <textarea
@@ -644,21 +723,20 @@ const InitiativesNew = () => {
             </button>
             <button
               type="button"
-              onClick={handleNext}
-              disabled={nextLoading}
+              onClick={() => setStep(4)}
               className="generator-button"
+              ref={nextButtonRef}
             >
-              {nextLoading ? "Generating..." : "Advance to Step 4"}
+              Advance to Step 4
             </button>
           </div>
-          {nextError && <p className="generator-error">{nextError}</p>}
-          {showScrollHint && !showFixedNext && (
+          {showScrollHint && (
             <div className="scroll-hint">Scroll down for Next Step ↓</div>
           )}
         </div>
       )}
 
-      {step === 4 && strategy && (
+      {step === 4 && (
         <div className="generator-result">
           <div className="progress-indicator">Step 4 of {TOTAL_STEPS}</div>
           <button
@@ -669,27 +747,45 @@ const InitiativesNew = () => {
           >
             Back to Step 3
           </button>
-          <h3>Learning Strategy</h3>
-          <p>
-            <strong>Modality Recommendation:</strong> {strategy.modalityRecommendation}
-          </p>
-          <p>
-            <strong>Rationale:</strong> {strategy.rationale}
-          </p>
 
           <div>
-            <h4>Learner Personas</h4>
-            {personas.length === 0 && (
-              <button
-                onClick={() => handleGeneratePersona("add")}
-                disabled={personaLoading}
-                className="generator-button"
-              >
-                {personaLoading ? "Generating..." : "Generate Persona & Avatar"}
-              </button>
-            )}
-
-            {personas.length > 0 && (
+            <h3>Learner Personas</h3>
+            {personas.length === 0 ? (
+              <>
+                <p>
+                  Learner personas help tailor the training to different
+                  audience segments by highlighting motivations, challenges,
+                  and preferences. They can influence project decisions and
+                  outcomes. You may generate up to three personas, but none are
+                  required.
+                </p>
+                <label>
+                  How many personas would you like to generate? (0-3)
+                </label>
+                <select
+                  value={personaCount}
+                  onChange={(e) => setPersonaCount(Number(e.target.value))}
+                  className="generator-input"
+                  style={{ maxWidth: 80, marginTop: 4 }}
+                >
+                  <option value={0}>0</option>
+                  <option value={1}>1</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                </select>
+                <div
+                  style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
+                >
+                  <button
+                    onClick={() => handleGeneratePersonas(personaCount)}
+                    disabled={personaLoading || personaCount === 0}
+                    className="generator-button"
+                  >
+                    {personaLoading ? "Generating..." : "Generate Personas"}
+                  </button>
+                </div>
+              </>
+            ) : (
               <div>
                 {personas.length > 1 && (
                   <div className="persona-tabs">
@@ -1050,19 +1146,85 @@ const InitiativesNew = () => {
               </div>
             )}
           </div>
-      {personaError && <p className="generator-error">{personaError}</p>}
+          {personaError && <p className="generator-error">{personaError}</p>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleGenerateStrategy}
+              disabled={nextLoading}
+              className="generator-button"
+            >
+              {nextLoading ? "Generating..." : "Advance to Step 5"}
+            </button>
+          </div>
+          {nextError && <p className="generator-error">{nextError}</p>}
         </div>
       )}
 
-      {showFixedNext && (
-        <button
-          className="generator-button next-step-fixed"
-          onClick={handleNext}
-          disabled={nextLoading}
-        >
-          {nextLoading ? "Generating..." : "Next Step"}
-        </button>
+      {step === 5 && strategy && (
+        <div className="generator-result">
+          <div className="progress-indicator">Step 5 of {TOTAL_STEPS}</div>
+          <button
+            type="button"
+            onClick={() => setStep(4)}
+            className="generator-button"
+            style={{ marginBottom: 10 }}
+          >
+            Back to Step 4
+          </button>
+          <h3>Select Learning Approach</h3>
+          <select
+            className="generator-input"
+            value={selectedModality}
+            onChange={handleModalityChange}
+          >
+            <option value={strategy.modalityRecommendation}>
+              {strategy.modalityRecommendation}
+            </option>
+            {strategy.alternatives?.map((alt) => (
+              <option key={alt.modality} value={alt.modality}>
+                {alt.modality}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const info =
+              selectedModality === strategy.modalityRecommendation
+                ? { rationale: strategy.rationale, nuances: strategy.nuances }
+                : strategy.alternatives?.find(
+                    (a) => a.modality === selectedModality
+                  ) || { rationale: "", nuances: "" };
+            return (
+              <>
+                <p>
+                  <strong>Rationale:</strong> {info.rationale}
+                </p>
+                <p>
+                  <strong>Nuances:</strong> {info.nuances}
+                </p>
+              </>
+            );
+          })()}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setStep(6)}
+              className="generator-button"
+            >
+              Confirm & Continue
+            </button>
+          </div>
+        </div>
       )}
+
+      {step === 6 && (
+        <div className="generator-result">
+          <div className="progress-indicator">Step 6 of {TOTAL_STEPS}</div>
+          <h3>Curriculum Blueprint</h3>
+          <p>Coming soon...</p>
+        </div>
+      )}
+
     </div>
   );
 };
