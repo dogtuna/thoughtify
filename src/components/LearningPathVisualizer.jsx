@@ -6,8 +6,6 @@ import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
-import mermaid from "@mermaid-js/mermaid";
-
 import mermaid from "mermaid";
 
 
