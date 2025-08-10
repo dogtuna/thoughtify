@@ -527,25 +527,51 @@ export const generateLearnerPersona = onCall(
     const randomSeed = Math.random().toString(36).substring(2, 8);
     const finalName = personaName || generateUniqueName(existingNames);
 
-    // Refresh motivations or challenges only
-    if (refreshField === "motivation" || refreshField === "challenges") {
-      const personaContext = finalName
-        ? `The persona's name is ${finalName}. Write each option's "text" as a third-person sentence about ${finalName}.`
-        : "Write each option's \"text\" as a third-person sentence about the learner persona.";
-      const listPrompt = `You are a Senior Instructional Designer. ${personaContext} Based on the project information below, list three fresh learner ${
-        refreshField
-      } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written in full sentences. Avoid the following ${
-        refreshField
-      } keywords: ${
-        refreshField === "motivation"
-          ? existingMotivationKeywords.join(", ") || "none"
-          : existingChallengeKeywords.join(", ") || "none"
-      }.
+    // Refresh field options only
+    const refreshableFields = [
+      "motivation",
+      "challenges",
+      "ageRange",
+      "educationLevel",
+      "techProficiency",
+      "learningPreferences",
+    ];
+    if (refreshField && refreshableFields.includes(refreshField)) {
+      let listPrompt;
+      if (refreshField === "motivation" || refreshField === "challenges") {
+        const personaContext = finalName
+          ? `The persona's name is ${finalName}. Write each option's "text" as a third-person sentence about ${finalName}.`
+          : "Write each option's \"text\" as a third-person sentence about the learner persona.";
+        listPrompt = `You are a Senior Instructional Designer. ${personaContext} Based on the project information below, list three fresh learner ${
+          refreshField
+        } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written in full sentences. Avoid the following ${
+          refreshField
+        } keywords: ${
+          refreshField === "motivation"
+            ? existingMotivationKeywords.join(", ") || "none"
+            : existingChallengeKeywords.join(", ") || "none"
+        }.
 
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
 Audience Profile: ${audienceProfile}
 Project Constraints: ${projectConstraints}`;
+      } else {
+        const fieldDescriptions = {
+          ageRange: "age range (e.g., '25-34')",
+          educationLevel: "education level (e.g., 'Bachelor's degree')",
+          techProficiency: "tech proficiency level (e.g., 'Intermediate')",
+          learningPreferences: "learning preference in a short phrase",
+        };
+        listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
+          fieldDescriptions[refreshField]
+        } options in JSON with an array called "options". Each option must be a concise phrase.
+
+Project Brief: ${projectBrief}
+Business Goal: ${businessGoal}
+Audience Profile: ${audienceProfile}
+Project Constraints: ${projectConstraints}`;
+      }
 
       const { text } = await ai.generate(listPrompt);
 
@@ -560,16 +586,34 @@ Project Constraints: ${projectConstraints}`;
       if (refreshField === "motivation") {
         return { motivationOptions: data.options || [] };
       }
-      return { challengeOptions: data.options || [] };
+      if (refreshField === "challenges") {
+        return { challengeOptions: data.options || [] };
+      }
+      const key = `${refreshField}Options`;
+      return { [key]: data.options || [] };
     }
 
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona named ${finalName}. For both the primary motivation and the primary challenge:
-- Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-- Provide a full-sentence description in a "text" field written about ${finalName} in third person using their name.
-Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about ${finalName}. Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona named ${finalName}. Provide:
+- "ageRange": the typical age range as a string (e.g., "25-34") and "ageRangeOptions" with exactly two alternatives.
+- "educationLevel": a concise education description and "educationLevelOptions" with two alternatives.
+- "techProficiency": the learner's technology skill level and "techProficiencyOptions" with two alternatives.
+- "learningPreferences": one full-sentence about ${finalName}'s preferred learning style and "learningPreferencesOptions" with two alternative full-sentence options about ${finalName}.
+- For both the primary motivation and the primary challenge:
+  - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
+  - Provide a full-sentence description in a "text" field written about ${finalName} in third person using their name.
+  - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about ${finalName}.
+Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
 {
   "name": "Name",
+  "ageRange": "25-34",
+  "ageRangeOptions": ["18-24", "35-44"],
+  "educationLevel": "Bachelor's degree",
+  "educationLevelOptions": ["High school diploma", "Master's degree"],
+  "techProficiency": "Intermediate",
+  "techProficiencyOptions": ["Beginner", "Advanced"],
+  "learningPreferences": "Full sentence about Name",
+  "learningPreferencesOptions": ["Full sentence about Name", "Full sentence about Name"],
   "motivation": {"keyword": "short", "text": "full"},
   "motivationOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}],
   "challenges": {"keyword": "short", "text": "full"},
@@ -738,11 +782,19 @@ export const generateAvatar = onCall(
     // NOTE: no "secrets" needed anymore
   },
   async (request) => {
-    const { name, motivation = "", challenges = "" } = request.data || {};
+    const {
+      name,
+      motivation = "",
+      challenges = "",
+      ageRange = "",
+      techProficiency = "",
+      educationLevel = "",
+      learningPreferences = "",
+    } = request.data || {};
     if (!name) throw new HttpsError("invalid-argument", "name is required");
 
     // deterministic seed + cache key
-    const seed = `${name}|${motivation}|${challenges}`;
+    const seed = `${name}|${motivation}|${challenges}|${ageRange}|${techProficiency}|${educationLevel}|${learningPreferences}`;
     const hash = crypto.createHash("md5").update(seed).digest("hex");
 
     const bucket = admin.storage().bucket(BUCKET_NAME);
@@ -757,10 +809,18 @@ export const generateAvatar = onCall(
     }
 
     // 2) Generate new SVG with DiceBear (notionists)
+    const ageColors = {
+      "18-24": "#E9F0FF",
+      "25-34": "#F9EAFF",
+      "35-44": "#FFF3D6",
+      "45-54": "#E8FFF3",
+      "55+": "#FDEEEF",
+    };
+    const backgroundColor = ageColors[ageRange] ? [ageColors[ageRange]] : ["#E9F0FF", "#F9EAFF", "#FFF3D6", "#E8FFF3", "#FDEEEF"];
     const svg = createAvatar(notionists, {
       seed,
       radius: 50, // rounded avatar
-      backgroundColor: ["#E9F0FF", "#F9EAFF", "#FFF3D6", "#E8FFF3", "#FDEEEF"],
+      backgroundColor,
       // backgroundType: "gradientLinear", // uncomment for gradient backgrounds
     }).toString();
 

@@ -6,7 +6,18 @@ import { httpsCallable } from "firebase/functions";
 export async function loadPersonas(uid, initiativeId) {
   const personasRef = collection(db, "users", uid, "initiatives", initiativeId, "personas");
   const snapshot = await getDocs(personasRef);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    ageRange: "",
+    educationLevel: "",
+    techProficiency: "",
+    learningPreferences: "",
+    ageRangeOptions: [],
+    educationLevelOptions: [],
+    techProficiencyOptions: [],
+    learningPreferencesOptions: [],
+    ...d.data(),
+  }));
 }
 
 // Save a persona via callable function for server-side validation
@@ -14,7 +25,17 @@ export async function savePersona(uid, initiativeId, persona) {
   const personasRef = collection(db, "users", uid, "initiatives", initiativeId, "personas");
   const personaId = persona.id || doc(personasRef).id;
   const callable = httpsCallable(functions, "savePersona");
-  await callable({ initiativeId, personaId, persona });
+  const defaults = {
+    ageRange: "",
+    educationLevel: "",
+    techProficiency: "",
+    learningPreferences: "",
+    ageRangeOptions: [],
+    educationLevelOptions: [],
+    techProficiencyOptions: [],
+    learningPreferencesOptions: [],
+  };
+  await callable({ initiativeId, personaId, persona: { ...defaults, ...persona } });
   return personaId;
 }
 
