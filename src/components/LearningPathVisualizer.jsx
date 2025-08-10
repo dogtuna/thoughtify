@@ -8,6 +8,9 @@ import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
 import mermaid from "@mermaid-js/mermaid";
 
+import mermaid from "mermaid";
+
+
 mermaid.initialize({ startOnLoad: false });
 
 const LearningPathVisualizer = ({
