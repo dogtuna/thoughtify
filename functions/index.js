@@ -790,11 +790,12 @@ export const generateAvatar = onCall(
       techProficiency = "",
       educationLevel = "",
       learningPreferences = "",
+      seedExtra = "",
     } = request.data || {};
     if (!name) throw new HttpsError("invalid-argument", "name is required");
 
     // deterministic seed + cache key
-    const seed = `${name}|${motivation}|${challenges}|${ageRange}|${techProficiency}|${educationLevel}|${learningPreferences}`;
+    const seed = `${name}|${motivation}|${challenges}|${ageRange}|${techProficiency}|${educationLevel}|${learningPreferences}|${seedExtra}`;
     const hash = crypto.createHash("md5").update(seed).digest("hex");
 
     const bucket = admin.storage().bucket(BUCKET_NAME);

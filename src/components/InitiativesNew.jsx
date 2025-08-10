@@ -479,6 +479,7 @@ const InitiativesNew = () => {
         techProficiency: editingPersona.techProficiency || "",
         educationLevel: editingPersona.educationLevel || "",
         learningPreferences: editingPersona.learningPreferences || "",
+        seedExtra: Date.now().toString(),
       });
       setEditingPersona((prev) => ({
         ...prev,
@@ -717,6 +718,13 @@ const InitiativesNew = () => {
 
                 {editingPersona ? (
                   <>
+                    {editingPersona.avatar && (
+                      <img
+                        src={editingPersona.avatar}
+                        alt={`${editingPersona.name} avatar`}
+                        className="persona-avatar"
+                      />
+                    )}
                     <input
                       className="generator-input"
                       value={editingPersona.name || ""}
