@@ -776,6 +776,67 @@ const generateLearningObjectivesCF = onCall(
 // Maintain the original exported name expected by the client
 export { generateLearningObjectivesCF as generateLearningObjectives };
 
+export const generateHierarchicalOutline = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req) => {
+    const {
+      projectBrief,
+      businessGoal,
+      audienceProfile,
+      projectConstraints,
+      selectedModality,
+      learningObjectives,
+    } = req.data || {};
+
+    if (!projectBrief || !learningObjectives) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Required information is missing."
+      );
+    }
+
+    try {
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) throw new HttpsError("internal", "No API key available.");
+
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-1.5-pro"),
+      });
+
+      const lines = [];
+      if (learningObjectives?.terminalObjective?.text) {
+        lines.push(
+          `Terminal Objective: ${learningObjectives.terminalObjective.text}`
+        );
+      }
+      (learningObjectives?.enablingObjectives || []).forEach((o, i) => {
+        if (o?.text) {
+          lines.push(`Enabling Objective ${i + 1}: ${o.text}`);
+        }
+      });
+
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nLearning Objectives:\n${lines.join("\n")}`;
+
+      const prompt = `You are a Senior Instructional Designer. Using the information below, create a detailed, hierarchical course outline that ensures all learning objectives are fully covered. Return the outline as plain text with modules and subtopics.\n\n${baseInfo}`;
+
+      const flow = ai.defineFlow("hierarchicalOutlineFlow", async () => {
+        const { text } = await ai.generate(prompt);
+        return text;
+      });
+
+      const outline = await flow();
+      return { outline };
+    } catch (error) {
+      console.error("Error generating hierarchical outline:", error);
+      throw new HttpsError(
+        "internal",
+        "Failed to generate hierarchical outline."
+      );
+    }
+  }
+);
+
 export const generateStoryboard = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
