@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app, auth } from "../firebase.js";
 import {
@@ -72,6 +72,11 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
+  const projectBriefRef = useRef(null);
+  const nextButtonRef = useRef(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [showFixedNext, setShowFixedNext] = useState(false);
+
   const addUsedMotivation = (keywords = []) => {
     setUsedMotivationKeywords((prev) =>
       Array.from(new Set([...prev, ...keywords.filter(Boolean)]))
@@ -126,6 +131,23 @@ const InitiativesNew = () => {
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [initiativeId]);
+
+  useEffect(() => {
+    if (!projectBriefRef.current || !nextButtonRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowScrollHint(!entry.isIntersecting),
+      { root: projectBriefRef.current, threshold: 1 }
+    );
+    observer.observe(nextButtonRef.current);
+    return () => observer.disconnect();
+  }, [projectBrief, clarifyingQuestions]);
+
+  useEffect(() => {
+    const allAnswered =
+      clarifyingQuestions.length > 0 &&
+      clarifyingAnswers.every((a) => a && a.trim());
+    setShowFixedNext(allAnswered && !strategy);
+  }, [clarifyingAnswers, clarifyingQuestions, strategy]);
 
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
@@ -628,6 +650,9 @@ const InitiativesNew = () => {
             </button>
           </div>
           {nextError && <p className="generator-error">{nextError}</p>}
+          {showScrollHint && !showFixedNext && (
+            <div className="scroll-hint">Scroll down for Next Step ↓</div>
+          )}
         </div>
       )}
 
@@ -864,6 +889,16 @@ const InitiativesNew = () => {
           </div>
       {personaError && <p className="generator-error">{personaError}</p>}
         </div>
+      )}
+
+      {showFixedNext && (
+        <button
+          className="generator-button next-step-fixed"
+          onClick={handleNext}
+          disabled={nextLoading}
+        >
+          {nextLoading ? "Generating..." : "Next Step"}
+        </button>
       )}
     </div>
   );
