@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useSearchParams } from "react-router-dom";
 import { app, auth } from "../firebase.js";
@@ -6,6 +6,10 @@ import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
+import mermaid from "mermaid";
+
+
+mermaid.initialize({ startOnLoad: false });
 
 const LearningDesignDocument = ({
   projectBrief,
@@ -26,7 +30,11 @@ const LearningDesignDocument = ({
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
+<<<<<<< HEAD:src/components/LearningDesignDocument.jsx
   const handleGenerate = async () => {
+=======
+  const handleGenerate = useCallback(async () => {
+>>>>>>> main:src/components/LearningPathVisualizer.jsx
     setLoading(true);
     setError("");
     setLearningDesignDocument("");
@@ -47,7 +55,53 @@ const LearningDesignDocument = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    callGenerate,
+    projectBrief,
+    businessGoal,
+    audienceProfile,
+    projectConstraints,
+    selectedModality,
+    learningObjectives,
+    courseOutline,
+    initiativeId,
+    setLearningPath,
+  ]);
+
+  const hasGenerated = useRef(false);
+
+  useEffect(() => {
+    if (!learningPath && !hasGenerated.current) {
+      hasGenerated.current = true;
+      handleGenerate();
+    }
+  }, [learningPath, handleGenerate]);
+
+  useEffect(() => {
+    if (!learningPath) return;
+    let cancelled = false;
+
+    const renderMermaid = async () => {
+      try {
+        await mermaid.parse(learningPath);
+        const { svg: renderedSvg } = await mermaid.render(
+          "learning-path-diagram",
+          learningPath
+        );
+        if (!cancelled) setSvg(renderedSvg);
+      } catch {
+        if (!cancelled) {
+          setSvg("");
+          setError("Failed to render learning path diagram.");
+        }
+      }
+    };
+
+    renderMermaid();
+    return () => {
+      cancelled = true;
+    };
+  }, [learningPath]);
 
   useEffect(() => {
     if (!learningDesignDocument) {
@@ -74,6 +128,7 @@ const LearningDesignDocument = ({
       >
         Back to Step 7
       </button>
+<<<<<<< HEAD:src/components/LearningDesignDocument.jsx
       <h3>Learning Design Document</h3>
       {!learningDesignDocument && (
         <button
@@ -85,14 +140,23 @@ const LearningDesignDocument = ({
           {loading ? "Generating..." : "Generate Document"}
         </button>
       )}
+=======
+      <h3>Learning Path Visualization</h3>
+      {loading && <p>Generating learning path...</p>}
+>>>>>>> main:src/components/LearningPathVisualizer.jsx
       {error && <p className="generator-error">{error}</p>}
       {learningDesignDocument && (
         <div className="generator-result" style={{ textAlign: "left" }}>
+<<<<<<< HEAD:src/components/LearningDesignDocument.jsx
           <textarea
             value={learningDesignDocument}
             onChange={(e) => setLearningDesignDocument(e.target.value)}
             style={{ width: "100%", minHeight: "300px" }}
           />
+=======
+          {svg && <div dangerouslySetInnerHTML={{ __html: svg }} />}
+          {error && !svg && <pre>{learningPath}</pre>}
+>>>>>>> main:src/components/LearningPathVisualizer.jsx
         </div>
       )}
     </div>
