@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app, auth } from "../firebase.js";
 import {
@@ -43,6 +43,7 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
+  const TOTAL_STEPS = 2;
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
@@ -67,6 +68,11 @@ const InitiativesNew = () => {
   const [editingPersona, setEditingPersona] = useState(null);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
+
+  const projectBriefRef = useRef(null);
+  const nextButtonRef = useRef(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [showFixedNext, setShowFixedNext] = useState(false);
 
   const addUsedMotivation = (keywords = []) => {
     setUsedMotivationKeywords((prev) =>
@@ -122,6 +128,23 @@ const InitiativesNew = () => {
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [initiativeId]);
+
+  useEffect(() => {
+    if (!projectBriefRef.current || !nextButtonRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowScrollHint(!entry.isIntersecting),
+      { root: projectBriefRef.current, threshold: 1 }
+    );
+    observer.observe(nextButtonRef.current);
+    return () => observer.disconnect();
+  }, [projectBrief, clarifyingQuestions]);
+
+  useEffect(() => {
+    const allAnswered =
+      clarifyingQuestions.length > 0 &&
+      clarifyingAnswers.every((a) => a && a.trim());
+    setShowFixedNext(allAnswered && !strategy);
+  }, [clarifyingAnswers, clarifyingQuestions, strategy]);
 
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
@@ -499,7 +522,8 @@ const InitiativesNew = () => {
       {loading && <div className="spinner" />}
 
       {projectBrief && (
-        <div className="generator-result">
+        <div className="generator-result" ref={projectBriefRef}>
+          <div className="progress-indicator">Step 1 of {TOTAL_STEPS}</div>
           <h3>Project Brief</h3>
           <textarea
             className="generator-input"
@@ -528,15 +552,24 @@ const InitiativesNew = () => {
             </div>
           )}
 
-          <button onClick={handleNext} disabled={nextLoading} className="generator-button">
+          <button
+            onClick={handleNext}
+            disabled={nextLoading}
+            className="generator-button"
+            ref={nextButtonRef}
+          >
             {nextLoading ? "Generating..." : "Next Step"}
           </button>
           {nextError && <p className="generator-error">{nextError}</p>}
+          {showScrollHint && !showFixedNext && (
+            <div className="scroll-hint">Scroll down for Next Step ↓</div>
+          )}
         </div>
       )}
 
       {strategy && (
         <div className="generator-result">
+          <div className="progress-indicator">Step 2 of {TOTAL_STEPS}</div>
           <h3>Learning Strategy</h3>
           <p>
             <strong>Modality Recommendation:</strong> {strategy.modalityRecommendation}
@@ -775,6 +808,16 @@ const InitiativesNew = () => {
             )}
           </div>
         </div>
+      )}
+
+      {showFixedNext && (
+        <button
+          className="generator-button next-step-fixed"
+          onClick={handleNext}
+          disabled={nextLoading}
+        >
+          {nextLoading ? "Generating..." : "Next Step"}
+        </button>
       )}
     </div>
   );
