@@ -64,7 +64,7 @@ const LearningObjectivesGenerator = ({
       const result = {
         approach: data.approach,
         bloomLevel: data.bloomLevel,
-        category: data.category,
+        ...(data.category ? { category: data.category } : {}),
         terminalObjective: transform(data.terminalObjective),
         enablingObjectives: (data.enablingObjectives || []).map(transform),
       };
@@ -107,7 +107,7 @@ const LearningObjectivesGenerator = ({
         selectedModality,
         approach: learningObjectives.approach,
         bloomLevel: learningObjectives.bloomLevel,
-        category: learningObjectives.category,
+        ...(learningObjectives.category ? { category: learningObjectives.category } : {}),
         refresh: { type, index, existing: getAllTexts() },
       });
       const obj = transform(data.options || []);
