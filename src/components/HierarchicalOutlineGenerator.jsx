@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useSearchParams } from "react-router-dom";
 import { app, auth } from "../firebase.js";
@@ -40,10 +40,6 @@ const HierarchicalOutlineGenerator = ({
         learningObjectives,
       });
       setCourseOutline(data.outline);
-      const uid = auth.currentUser?.uid;
-      if (uid) {
-        await saveInitiative(uid, initiativeId, { courseOutline: data.outline });
-      }
     } catch (err) {
       console.error("Error generating hierarchical outline:", err);
       setError(err?.message || "Error generating hierarchical outline.");
@@ -51,6 +47,20 @@ const HierarchicalOutlineGenerator = ({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!courseOutline) {
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseOutline]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      saveInitiative(uid, initiativeId, { courseOutline });
+    }
+  }, [courseOutline, initiativeId]);
 
   return (
     <div className="generator-result">
@@ -78,7 +88,11 @@ const HierarchicalOutlineGenerator = ({
       {courseOutline && (
         <>
           <div className="generator-result" style={{ textAlign: "left" }}>
-            <pre>{courseOutline}</pre>
+            <textarea
+              value={courseOutline}
+              onChange={(e) => setCourseOutline(e.target.value)}
+              style={{ width: "100%", minHeight: "300px" }}
+            />
           </div>
           {onNext && (
             <button
