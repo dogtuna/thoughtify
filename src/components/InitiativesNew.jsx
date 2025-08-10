@@ -43,6 +43,8 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
+  const TOTAL_STEPS = 4;
+  const [step, setStep] = useState(1);
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
@@ -53,6 +55,8 @@ const InitiativesNew = () => {
   const [clarifyingAnswers, setClarifyingAnswers] = useState([]);
 
   const [strategy, setStrategy] = useState(null);
+
+  const [isEditingBrief, setIsEditingBrief] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [nextLoading, setNextLoading] = useState(false);
@@ -161,11 +165,6 @@ const InitiativesNew = () => {
         projectConstraints,
       });
 
-      if (!data?.projectBrief) {
-        throw new Error("No project brief returned.");
-      }
-
-      setProjectBrief(data.projectBrief);
       const qs = data.clarifyingQuestions || [];
       setClarifyingQuestions(qs);
       setClarifyingAnswers(qs.map(() => ""));
@@ -177,11 +176,52 @@ const InitiativesNew = () => {
           audienceProfile,
           sourceMaterial,
           projectConstraints,
-          projectBrief: data.projectBrief,
           clarifyingQuestions: qs,
           clarifyingAnswers: qs.map(() => ""),
         });
       }
+      setStep(2);
+    } catch (err) {
+      console.error("Error generating clarifying questions:", err);
+      setError(err?.message || "Error generating clarifying questions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateBrief = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data } = await generateProjectBrief({
+        businessGoal,
+        audienceProfile,
+        sourceMaterial,
+        projectConstraints,
+        clarifyingQuestions,
+        clarifyingAnswers,
+      });
+
+      if (!data?.projectBrief) {
+        throw new Error("No project brief returned.");
+      }
+
+      setProjectBrief(data.projectBrief);
+
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveInitiative(uid, initiativeId, {
+          businessGoal,
+          audienceProfile,
+          sourceMaterial,
+          projectConstraints,
+          projectBrief: data.projectBrief,
+          clarifyingQuestions,
+          clarifyingAnswers,
+        });
+      }
+      setStep(3);
     } catch (err) {
       console.error("Error generating project brief:", err);
       setError(err?.message || "Error generating project brief.");
@@ -239,6 +279,7 @@ const InitiativesNew = () => {
       if (uid) {
         await saveInitiative(uid, initiativeId, { strategy: data });
       }
+      setStep(4);
     } catch (err) {
       console.error("Error generating learning strategy:", err);
       setNextError(err?.message || "Error generating learning strategy.");
@@ -460,83 +501,147 @@ const InitiativesNew = () => {
     <div className="generator-container">
       <h2>Initiatives - Project Intake & Analysis</h2>
 
-      <form onSubmit={handleSubmit} className="generator-form">
-        <input
-          type="text"
-          placeholder="Business Goal"
-          value={businessGoal}
-          onChange={(e) => setBusinessGoal(e.target.value)}
-          className="generator-input"
-        />
-        <textarea
-          placeholder="Audience Profile"
-          value={audienceProfile}
-          onChange={(e) => setAudienceProfile(e.target.value)}
-          className="generator-input"
-          rows={3}
-        />
-        <textarea
-          placeholder="Source Material or links"
-          value={sourceMaterial}
-          onChange={(e) => setSourceMaterial(e.target.value)}
-          className="generator-input"
-          rows={4}
-        />
-        <input type="file" onChange={handleFileUpload} className="generator-input" />
-        <textarea
-          placeholder="Project Constraints"
-          value={projectConstraints}
-          onChange={(e) => setProjectConstraints(e.target.value)}
-          className="generator-input"
-          rows={2}
-        />
-        <button type="submit" disabled={loading} className="generator-button">
-          {loading ? "Analyzing..." : "Generate Project Brief"}
-        </button>
-      </form>
+      {step === 1 && (
+        <form onSubmit={handleSubmit} className="generator-form">
+          <div className="progress-indicator">Step 1 of {TOTAL_STEPS}</div>
+          <label>
+            Goal
+            <input
+              type="text"
+              value={businessGoal}
+              onChange={(e) => setBusinessGoal(e.target.value)}
+              className="generator-input"
+            />
+          </label>
+          <label>
+            Audience Profile
+            <textarea
+              value={audienceProfile}
+              onChange={(e) => setAudienceProfile(e.target.value)}
+              className="generator-input"
+              rows={3}
+            />
+          </label>
+          <label>
+            Source Material or Links
+            <textarea
+              value={sourceMaterial}
+              onChange={(e) => setSourceMaterial(e.target.value)}
+              className="generator-input"
+              rows={4}
+            />
+          </label>
+          <label>
+            Source File
+            <input type="file" onChange={handleFileUpload} className="generator-input" />
+          </label>
+          <label>
+            Project Constraints
+            <textarea
+              value={projectConstraints}
+              onChange={(e) => setProjectConstraints(e.target.value)}
+              className="generator-input"
+              rows={2}
+            />
+          </label>
+          <button type="submit" disabled={loading} className="generator-button">
+            {loading ? "Analyzing..." : "Advance to Step 2"}
+          </button>
+          {error && <p className="generator-error">{error}</p>}
+        </form>
+      )}
 
-      {error && <p className="generator-error">{error}</p>}
-      {loading && <div className="spinner" />}
-
-      {projectBrief && (
+      {step === 2 && (
         <div className="generator-result">
+          <div className="progress-indicator">Step 2 of {TOTAL_STEPS}</div>
+          <p>
+            Answering the questions below is optional, but it will help ensure the brief is as good as possible.
+          </p>
+          {clarifyingQuestions.map((q, idx) => (
+            <div key={idx}>
+              <p>{q}</p>
+              <textarea
+                className="generator-input"
+                value={clarifyingAnswers[idx] || ""}
+                onChange={(e) => handleAnswerChange(idx, e.target.value)}
+                rows={2}
+              />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => setStep(1)} className="generator-button">
+              Back to Step 1
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateBrief}
+              disabled={loading}
+              className="generator-button"
+            >
+              {loading ? "Generating..." : "Generate Brief"}
+            </button>
+          </div>
+          {error && <p className="generator-error">{error}</p>}
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="generator-result">
+          <div className="progress-indicator">Step 3 of {TOTAL_STEPS}</div>
           <h3>Project Brief</h3>
           <textarea
             className="generator-input"
             value={projectBrief}
             onChange={(e) => setProjectBrief(e.target.value)}
+            readOnly={!isEditingBrief}
             rows={10}
           />
-          <button onClick={handleDownload} className="generator-button">
-            Download Brief
-          </button>
-
-          {clarifyingQuestions.length > 0 && (
-            <div>
-              <h4>Clarifying Questions</h4>
-              {clarifyingQuestions.map((q, idx) => (
-                <div key={idx}>
-                  <p>{q}</p>
-                  <textarea
-                    className="generator-input"
-                    value={clarifyingAnswers[idx] || ""}
-                    onChange={(e) => handleAnswerChange(idx, e.target.value)}
-                    rows={2}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button onClick={handleNext} disabled={nextLoading} className="generator-button">
-            {nextLoading ? "Generating..." : "Next Step"}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => setStep(2)} className="generator-button">
+              Back to Step 2
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isEditingBrief) {
+                  const uid = auth.currentUser?.uid;
+                  if (uid) {
+                    saveInitiative(uid, initiativeId, { projectBrief });
+                  }
+                }
+                setIsEditingBrief((prev) => !prev);
+              }}
+              className="generator-button"
+            >
+              {isEditingBrief ? "Save Brief" : "Edit Brief"}
+            </button>
+            <button type="button" onClick={handleDownload} className="generator-button">
+              Download Brief
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={nextLoading}
+              className="generator-button"
+            >
+              {nextLoading ? "Generating..." : "Advance to Step 4"}
+            </button>
+          </div>
           {nextError && <p className="generator-error">{nextError}</p>}
         </div>
       )}
 
-      {strategy && (
+      {step === 4 && strategy && (
         <div className="generator-result">
+          <div className="progress-indicator">Step 4 of {TOTAL_STEPS}</div>
+          <button
+            type="button"
+            onClick={() => setStep(3)}
+            className="generator-button"
+            style={{ marginBottom: 10 }}
+          >
+            Back to Step 3
+          </button>
           <h3>Learning Strategy</h3>
           <p>
             <strong>Modality Recommendation:</strong> {strategy.modalityRecommendation}
@@ -578,202 +683,186 @@ const InitiativesNew = () => {
                             className="persona-tab-avatar"
                           />
                         )}
-                        <span>{p.name}</span>
+                        {p.name}
                       </button>
                     ))}
                   </div>
                 )}
 
-                {currentPersona && (
-                  <div className="persona-card">
-                    {editingPersona ? (
-                      <>
-                        {editingPersona.avatar && (
-                          <img
-                            src={editingPersona.avatar}
-                            alt={`${editingPersona.name} avatar`}
-                            className="persona-avatar"
-                          />
-                        )}
-                        <input
-                          className="generator-input"
-                          value={editingPersona.name}
-                          onChange={(e) => handlePersonaFieldChange("name", e.target.value)}
-                        />
-                        <p>
-                          <strong>Motivation - {editingPersona.motivation?.keyword}</strong>
-                        </p>
-                        <textarea
-                          className="generator-input"
-                          value={editingPersona.motivation?.text || ""}
-                          onChange={(e) =>
-                            handlePersonaFieldChange("motivation", {
-                              ...editingPersona.motivation,
-                              text: e.target.value,
-                            })
-                          }
-                          rows={2}
-                        />
-                        <div className="persona-options">
-                          {editingPersona.motivationOptions?.length > 0 && (
-                            <>
-                              <p>Other possible motivations...</p>
-                              {editingPersona.motivationOptions.map((opt) => (
-                                <button
-                                  key={opt.keyword}
-                                  type="button"
-                                  onClick={() => selectMotivationOption(opt)}
-                                  className="generator-button"
-                                >
-                                  {opt.keyword}
-                                </button>
-                              ))}
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => refreshOptions("motivation")}
-                            className="generator-button"
-                          >
-                            Generate more
-                          </button>
-                        </div>
-                        <p>
-                          <strong>Challenges - {editingPersona.challenges?.keyword}</strong>
-                        </p>
-                        <textarea
-                          className="generator-input"
-                          value={editingPersona.challenges?.text || ""}
-                          onChange={(e) =>
-                            handlePersonaFieldChange("challenges", {
-                              ...editingPersona.challenges,
-                              text: e.target.value,
-                            })
-                          }
-                          rows={2}
-                        />
-                        <div className="persona-options">
-                          {editingPersona.challengeOptions?.length > 0 && (
-                            <>
-                              <p>Other possible challenges...</p>
-                              {editingPersona.challengeOptions.map((opt) => (
-                                <button
-                                  key={opt.keyword}
-                                  type="button"
-                                  onClick={() => selectChallengeOption(opt)}
-                                  className="generator-button"
-                                >
-                                  {opt.keyword}
-                                </button>
-                              ))}
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => refreshOptions("challenges")}
-                            className="generator-button"
-                          >
-                            Generate more
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
-                            onClick={handleRegenerateAvatar}
-                            disabled={personaLoading}
-                            className="generator-button"
-                            type="button"
-                          >
-                            {personaLoading ? "Generating..." : "Regenerate Avatar"}
-                          </button>
-                          <button
-                            onClick={handleSavePersonaEdits}
-                            disabled={personaLoading}
-                            className="generator-button"
-                            type="button"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => handleDeletePersona(activePersonaIndex)}
-                            disabled={personaLoading}
-                            className="generator-button"
-                            type="button"
-                          >
-                            Delete
-                          </button>
-                          <button
-                            onClick={() => setEditingPersona(null)}
-                            className="generator-button"
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {currentPersona.avatar && (
-                          <img
-                            src={currentPersona.avatar}
-                            alt={`${currentPersona.name} avatar`}
-                            className="persona-avatar"
-                          />
-                        )}
-                        <h5>{currentPersona.name}</h5>
-                        <p>
-                          <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
-                        </p>
-                        <p>
-                          <strong>Challenges - {currentPersona.challenges?.keyword}:</strong> {currentPersona.challenges?.text}
-                        </p>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
-                            onClick={() =>
-                              setEditingPersona(
-                                JSON.parse(JSON.stringify(currentPersona))
-                              )
-                            }
-                            className="generator-button"
-                            type="button"
-                          >
-                            Edit Persona
-                          </button>
-                          <button
-                            onClick={() => handleGeneratePersona("replace")}
-                            disabled={personaLoading}
-                            className="generator-button"
-                            type="button"
-                          >
-                            {personaLoading ? "Generating..." : "Replace Persona"}
-                          </button>
-                          <button
-                            onClick={() => handleDeletePersona(activePersonaIndex)}
-                            disabled={personaLoading}
-                            className="generator-button"
-                            type="button"
-                          >
-                            Delete Persona
-                          </button>
-                          {personas.length < 3 && (
+                {editingPersona ? (
+                  <>
+                    <input
+                      className="generator-input"
+                      value={editingPersona.name || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange("name", e.target.value)
+                      }
+                    />
+                    <textarea
+                      className="generator-input"
+                      value={editingPersona.motivation?.text || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange("motivation", {
+                          ...editingPersona.motivation,
+                          text: e.target.value,
+                        })
+                      }
+                      rows={2}
+                    />
+                    <div className="persona-options">
+                      {editingPersona.motivationOptions?.length > 0 && (
+                        <>
+                          <p>Other possible motivations...</p>
+                          {editingPersona.motivationOptions.map((opt) => (
                             <button
-                              onClick={() => handleGeneratePersona("add")}
-                              disabled={personaLoading}
-                              className="generator-button"
+                              key={opt.keyword}
                               type="button"
+                              onClick={() => selectMotivationOption(opt)}
+                              className="generator-button"
                             >
-                              {personaLoading ? "Generating..." : "Add Persona"}
+                              {opt.keyword}
                             </button>
-                          )}
-                        </div>
-                      </>
+                          ))}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => refreshOptions("motivation")}
+                        className="generator-button"
+                      >
+                        Generate more
+                      </button>
+                    </div>
+                    <textarea
+                      className="generator-input"
+                      value={editingPersona.challenges?.text || ""}
+                      onChange={(e) =>
+                        handlePersonaFieldChange("challenges", {
+                          ...editingPersona.challenges,
+                          text: e.target.value,
+                        })
+                      }
+                      rows={2}
+                    />
+                    <div className="persona-options">
+                      {editingPersona.challengeOptions?.length > 0 && (
+                        <>
+                          <p>Other possible challenges...</p>
+                          {editingPersona.challengeOptions.map((opt) => (
+                            <button
+                              key={opt.keyword}
+                              type="button"
+                              onClick={() => selectChallengeOption(opt)}
+                              className="generator-button"
+                            >
+                              {opt.keyword}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => refreshOptions("challenges")}
+                        className="generator-button"
+                      >
+                        Generate more
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        onClick={handleRegenerateAvatar}
+                        disabled={personaLoading}
+                        className="generator-button"
+                        type="button"
+                      >
+                        {personaLoading ? "Generating..." : "Regenerate Avatar"}
+                      </button>
+                      <button
+                        onClick={handleSavePersonaEdits}
+                        disabled={personaLoading}
+                        className="generator-button"
+                        type="button"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => handleDeletePersona(activePersonaIndex)}
+                        disabled={personaLoading}
+                        className="generator-button"
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setEditingPersona(null)}
+                        className="generator-button"
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {currentPersona.avatar && (
+                      <img
+                        src={currentPersona.avatar}
+                        alt={`${currentPersona.name} avatar`}
+                        className="persona-avatar"
+                      />
                     )}
-                  </div>
+                    <h5>{currentPersona.name}</h5>
+                    <p>
+                      <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
+                    </p>
+                    <p>
+                      <strong>Challenges - {currentPersona.challenges?.keyword}:</strong> {currentPersona.challenges?.text}
+                    </p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() =>
+                          setEditingPersona(
+                            JSON.parse(JSON.stringify(currentPersona))
+                          )
+                        }
+                        className="generator-button"
+                        type="button"
+                      >
+                        Edit Persona
+                      </button>
+                      <button
+                        onClick={() => handleGeneratePersona("replace")}
+                        disabled={personaLoading}
+                        className="generator-button"
+                        type="button"
+                      >
+                        {personaLoading ? "Generating..." : "Replace Persona"}
+                      </button>
+                      <button
+                        onClick={() => handleDeletePersona(activePersonaIndex)}
+                        disabled={personaLoading}
+                        className="generator-button"
+                        type="button"
+                      >
+                        Delete Persona
+                      </button>
+                      {personas.length < 3 && (
+                        <button
+                          onClick={() => handleGeneratePersona("add")}
+                          disabled={personaLoading}
+                          className="generator-button"
+                          type="button"
+                        >
+                          {personaLoading ? "Generating..." : "Add Persona"}
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
-
-                {personaError && <p className="generator-error">{personaError}</p>}
               </div>
             )}
           </div>
+      {personaError && <p className="generator-error">{personaError}</p>}
         </div>
       )}
     </div>
