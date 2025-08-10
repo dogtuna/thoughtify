@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useSearchParams } from "react-router-dom";
 import { app, auth } from "../firebase.js";
@@ -6,6 +6,9 @@ import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
+import mermaid from "@mermaid-js/mermaid";
+
+mermaid.initialize({ startOnLoad: false });
 
 const LearningPathVisualizer = ({
   projectBrief,
@@ -27,42 +30,7 @@ const LearningPathVisualizer = ({
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
-  useEffect(() => {
-    if (!learningPath) return;
-    let cancelled = false;
-
-    const renderMermaid = async () => {
-      try {
-        if (!window.mermaid) {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src =
-              "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
-            script.onload = resolve;
-            script.onerror = reject;
-            document.body.appendChild(script);
-          });
-          window.mermaid.initialize({ startOnLoad: false });
-        }
-        window.mermaid.render(
-          "learning-path-diagram",
-          learningPath,
-          (svgCode) => {
-            if (!cancelled) setSvg(svgCode);
-          }
-        );
-      } catch {
-        if (!cancelled) setSvg("");
-      }
-    };
-
-    renderMermaid();
-    return () => {
-      cancelled = true;
-    };
-  }, [learningPath]);
-
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError("");
     setLearningPath("");
@@ -87,7 +55,53 @@ const LearningPathVisualizer = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    callGenerate,
+    projectBrief,
+    businessGoal,
+    audienceProfile,
+    projectConstraints,
+    selectedModality,
+    learningObjectives,
+    courseOutline,
+    initiativeId,
+    setLearningPath,
+  ]);
+
+  const hasGenerated = useRef(false);
+
+  useEffect(() => {
+    if (!learningPath && !hasGenerated.current) {
+      hasGenerated.current = true;
+      handleGenerate();
+    }
+  }, [learningPath, handleGenerate]);
+
+  useEffect(() => {
+    if (!learningPath) return;
+    let cancelled = false;
+
+    const renderMermaid = async () => {
+      try {
+        await mermaid.parse(learningPath);
+        const { svg: renderedSvg } = await mermaid.render(
+          "learning-path-diagram",
+          learningPath
+        );
+        if (!cancelled) setSvg(renderedSvg);
+      } catch {
+        if (!cancelled) {
+          setSvg("");
+          setError("Failed to render learning path diagram.");
+        }
+      }
+    };
+
+    renderMermaid();
+    return () => {
+      cancelled = true;
+    };
+  }, [learningPath]);
 
   return (
     <div className="generator-result">
@@ -101,24 +115,12 @@ const LearningPathVisualizer = ({
         Back to Step 7
       </button>
       <h3>Learning Path Visualization</h3>
-      {!learningPath && (
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={loading}
-          className="generator-button"
-        >
-          {loading ? "Generating..." : "Generate Learning Path"}
-        </button>
-      )}
+      {loading && <p>Generating learning path...</p>}
       {error && <p className="generator-error">{error}</p>}
       {learningPath && (
         <div className="generator-result" style={{ textAlign: "left" }}>
-          {svg ? (
-            <div dangerouslySetInnerHTML={{ __html: svg }} />
-          ) : (
-            <pre>{learningPath}</pre>
-          )}
+          {svg && <div dangerouslySetInnerHTML={{ __html: svg }} />}
+          {error && !svg && <pre>{learningPath}</pre>}
         </div>
       )}
     </div>
