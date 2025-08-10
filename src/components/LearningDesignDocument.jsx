@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useSearchParams } from "react-router-dom";
 import { app, auth } from "../firebase.js";
@@ -6,9 +6,6 @@ import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
-
-
-mermaid.initialize({ startOnLoad: false });
 
 const LearningDesignDocument = ({
   projectBrief,
@@ -50,53 +47,8 @@ const LearningDesignDocument = ({
     } finally {
       setLoading(false);
     }
-  }, [
-    callGenerate,
-    projectBrief,
-    businessGoal,
-    audienceProfile,
-    projectConstraints,
-    selectedModality,
-    learningObjectives,
-    courseOutline,
-    initiativeId,
-    setLearningPath,
-  ]);
+  };
 
-  const hasGenerated = useRef(false);
-
-  useEffect(() => {
-    if (!learningPath && !hasGenerated.current) {
-      hasGenerated.current = true;
-      handleGenerate();
-    }
-  }, [learningPath, handleGenerate]);
-
-  useEffect(() => {
-    if (!learningPath) return;
-    let cancelled = false;
-
-    const renderMermaid = async () => {
-      try {
-        await mermaid.parse(learningPath);
-        const { svg: renderedSvg } = await mermaid.render(
-          "learning-path-diagram",
-          learningPath
-        );
-        if (!cancelled) setSvg(renderedSvg);
-      } catch {
-        if (!cancelled) {
-          setSvg("");
-          setError("Failed to render learning path diagram.");
-        }
-      }
-    };
-
-    renderMermaid();
-    return () => {
-      cancelled = true;
-    };
-  }, [learningPath]);
 
   useEffect(() => {
     if (!learningDesignDocument) {
@@ -124,17 +76,22 @@ const LearningDesignDocument = ({
         Back to Step 7
       </button>
       <h3>Learning Design Document</h3>
-      {!learningDesignDocument && (
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={loading}
-          className="generator-button"
-        >
-          {loading ? "Generating..." : "Generate Document"}
-        </button>
+      {!learningDesignDocument && !error && (
+        <p>{loading ? "Generating..." : "Preparing document..."}</p>
       )}
-      {error && <p className="generator-error">{error}</p>}
+      {error && (
+        <div>
+          <p className="generator-error">{error}</p>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={loading}
+            className="generator-button"
+          >
+            {loading ? "Generating..." : "Try Again"}
+          </button>
+        </div>
+      )}
       {learningDesignDocument && (
         <div className="generator-result" style={{ textAlign: "left" }}>
           <textarea
