@@ -11,7 +11,7 @@ import mermaid from "mermaid";
 
 mermaid.initialize({ startOnLoad: false });
 
-const LearningPathVisualizer = ({
+const LearningDesignDocument = ({
   projectBrief,
   businessGoal,
   audienceProfile,
@@ -22,19 +22,22 @@ const LearningPathVisualizer = ({
   totalSteps,
   onBack,
 }) => {
-  const { learningPath, setLearningPath } = useProject();
+  const { learningDesignDocument, setLearningDesignDocument } = useProject();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [svg, setSvg] = useState("");
   const functions = getFunctions(app, "us-central1");
-  const callGenerate = httpsCallable(functions, "generateLearningPath");
+  const callGenerate = httpsCallable(functions, "generateLearningDesignDocument");
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
+<<<<<<< HEAD:src/components/LearningDesignDocument.jsx
+  const handleGenerate = async () => {
+=======
   const handleGenerate = useCallback(async () => {
+>>>>>>> main:src/components/LearningPathVisualizer.jsx
     setLoading(true);
     setError("");
-    setLearningPath("");
+    setLearningDesignDocument("");
     try {
       const { data } = await callGenerate({
         projectBrief,
@@ -45,14 +48,10 @@ const LearningPathVisualizer = ({
         learningObjectives,
         courseOutline,
       });
-      setLearningPath(data.diagram);
-      const uid = auth.currentUser?.uid;
-      if (uid) {
-        await saveInitiative(uid, initiativeId, { learningPath: data.diagram });
-      }
+      setLearningDesignDocument(data.document);
     } catch (err) {
-      console.error("Error generating learning path:", err);
-      setError(err?.message || "Error generating learning path.");
+      console.error("Error generating learning design document:", err);
+      setError(err?.message || "Error generating learning design document.");
     } finally {
       setLoading(false);
     }
@@ -104,6 +103,20 @@ const LearningPathVisualizer = ({
     };
   }, [learningPath]);
 
+  useEffect(() => {
+    if (!learningDesignDocument) {
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learningDesignDocument]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      saveInitiative(uid, initiativeId, { learningDesignDocument });
+    }
+  }, [learningDesignDocument, initiativeId]);
+
   return (
     <div className="generator-result">
       <div className="progress-indicator">Step 8 of {totalSteps}</div>
@@ -115,22 +128,44 @@ const LearningPathVisualizer = ({
       >
         Back to Step 7
       </button>
+<<<<<<< HEAD:src/components/LearningDesignDocument.jsx
+      <h3>Learning Design Document</h3>
+      {!learningDesignDocument && (
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={loading}
+          className="generator-button"
+        >
+          {loading ? "Generating..." : "Generate Document"}
+        </button>
+      )}
+=======
       <h3>Learning Path Visualization</h3>
       {loading && <p>Generating learning path...</p>}
+>>>>>>> main:src/components/LearningPathVisualizer.jsx
       {error && <p className="generator-error">{error}</p>}
-      {learningPath && (
+      {learningDesignDocument && (
         <div className="generator-result" style={{ textAlign: "left" }}>
+<<<<<<< HEAD:src/components/LearningDesignDocument.jsx
+          <textarea
+            value={learningDesignDocument}
+            onChange={(e) => setLearningDesignDocument(e.target.value)}
+            style={{ width: "100%", minHeight: "300px" }}
+          />
+=======
           {svg && <div dangerouslySetInnerHTML={{ __html: svg }} />}
           {error && !svg && <pre>{learningPath}</pre>}
+>>>>>>> main:src/components/LearningPathVisualizer.jsx
         </div>
       )}
     </div>
   );
 };
 
-export default LearningPathVisualizer;
+export default LearningDesignDocument;
 
-LearningPathVisualizer.propTypes = {
+LearningDesignDocument.propTypes = {
   projectBrief: PropTypes.string.isRequired,
   businessGoal: PropTypes.string.isRequired,
   audienceProfile: PropTypes.string.isRequired,
@@ -141,4 +176,3 @@ LearningPathVisualizer.propTypes = {
   totalSteps: PropTypes.number.isRequired,
   onBack: PropTypes.func.isRequired,
 };
-

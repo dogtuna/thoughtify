@@ -101,7 +101,7 @@ const HierarchicalOutlineGenerator = ({
               className="generator-button"
               style={{ marginTop: 10 }}
             >
-              Visualize Learning Path
+              Generate Learning Design Document
             </button>
           )}
         </>
