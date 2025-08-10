@@ -6,7 +6,10 @@ import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
+import mermaid from "@mermaid-js/mermaid";
+
 import mermaid from "mermaid";
+
 
 mermaid.initialize({ startOnLoad: false });
 
@@ -83,6 +86,7 @@ const LearningPathVisualizer = ({
 
     const renderMermaid = async () => {
       try {
+        await mermaid.parse(learningPath);
         const { svg: renderedSvg } = await mermaid.render(
           "learning-path-diagram",
           learningPath
