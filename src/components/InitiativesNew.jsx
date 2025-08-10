@@ -13,7 +13,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import LearningObjectivesGenerator from "./LearningObjectivesGenerator.jsx";
 import HierarchicalOutlineGenerator from "./HierarchicalOutlineGenerator.jsx";
-import LearningPathVisualizer from "./LearningPathVisualizer.jsx";
+import LearningDesignDocument from "./LearningDesignDocument.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 
@@ -86,7 +86,7 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
-  const { learningObjectives, courseOutline, setLearningPath } = useProject();
+  const { learningObjectives, courseOutline, setLearningDesignDocument } = useProject();
 
   const projectBriefRef = useRef(null);
   const nextButtonRef = useRef(null);
@@ -122,7 +122,7 @@ const InitiativesNew = () => {
           setClarifyingAnswers(data.clarifyingAnswers || []);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
-          setLearningPath(data.learningPath || "");
+          setLearningDesignDocument(data.learningDesignDocument || "");
         }
       })
       .catch((err) => console.error("Error loading initiative:", err));
@@ -147,7 +147,7 @@ const InitiativesNew = () => {
         });
       })
       .catch((err) => console.error("Error loading personas:", err));
-  }, [initiativeId, setLearningPath]);
+  }, [initiativeId, setLearningDesignDocument]);
 
   useEffect(() => {
     if (!projectBriefRef.current || !nextButtonRef.current) return;
@@ -1252,7 +1252,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 8 && (
-        <LearningPathVisualizer
+        <LearningDesignDocument
           projectBrief={projectBrief}
           businessGoal={businessGoal}
           audienceProfile={audienceProfile}

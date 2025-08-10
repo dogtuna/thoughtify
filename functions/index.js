@@ -837,7 +837,7 @@ export const generateHierarchicalOutline = onCall(
   }
 );
 
-export const generateLearningPath = onCall(
+export const generateLearningDesignDocument = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req) => {
     const {
@@ -880,20 +880,20 @@ export const generateLearningPath = onCall(
 
       const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nCourse Outline:\n${courseOutline}\nLearning Objectives:\n${lines.join("\n")}`;
 
-      const prompt = `You are a Senior Instructional Designer. Using the information below, create a learning path that maps the flow of modules, showing sequencing, branching, and dependencies. Return the diagram in Mermaid flowchart syntax.\n\n${baseInfo}`;
+      const prompt = `You are a Senior Instructional Designer. Using the information below, create a comprehensive Learning Design Document that serves as the single source of truth for the project. Include the following sections: 1. Front Matter & Executive Summary (Project Title, Version Control table, Project Overview, Key Stakeholders) 2. Audience Analysis (Learner Demographics, Prior Knowledge & Skills, Learner Motivation, Technical Environment, Learner Personas) 3. Business Goals & Learning Objectives (Business Goal, Terminal Learning Objective, Enabling Learning Objectives) 4. Instructional Strategy (Delivery Modality, Instructional Approach, Tone & Style, Interaction Strategy) 5. Curriculum Blueprint (Hierarchical Outline, Objective Mapping, Content Summary, Estimated Seat Time) 6. Assessment & Evaluation Strategy (Formative Assessment, Summative Assessment, Evaluation Plan for Kirkpatrick Levels 1-4, xAPI Strategy if applicable). Present the document in clear markdown with headings and subheadings.\n\n${baseInfo}`;
 
-      const flow = ai.defineFlow("learningPathFlow", async () => {
+      const flow = ai.defineFlow("learningDesignDocumentFlow", async () => {
         const { text } = await ai.generate(prompt);
         return text;
       });
 
-      const diagram = await flow();
-      return { diagram };
+      const document = await flow();
+      return { document };
     } catch (error) {
-      console.error("Error generating learning path:", error);
+      console.error("Error generating learning design document:", error);
       throw new HttpsError(
         "internal",
-        "Failed to generate learning path."
+        "Failed to generate learning design document."
       );
     }
   }

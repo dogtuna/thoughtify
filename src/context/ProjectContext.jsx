@@ -11,7 +11,7 @@ export const ProjectProvider = ({ children }) => {
   const [storyboard, setStoryboard] = useState("");
   const [assessment, setAssessment] = useState("");
   const [learningObjectives, setLearningObjectives] = useState(null);
-  const [learningPath, setLearningPath] = useState("");
+  const [learningDesignDocument, setLearningDesignDocument] = useState("");
 
   const value = {
     courseOutline,
@@ -28,8 +28,8 @@ export const ProjectProvider = ({ children }) => {
     setAssessment,
     learningObjectives,
     setLearningObjectives,
-    learningPath,
-    setLearningPath,
+    learningDesignDocument,
+    setLearningDesignDocument,
   };
 
   return (
