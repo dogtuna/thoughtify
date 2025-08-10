@@ -63,6 +63,7 @@
     max-height: 750px;
     overflow-y: auto;
     text-align: left;
+    position: relative;
   }
   
   .generator-result h3 {
@@ -152,4 +153,29 @@
 .persona-options p {
   width: 100%;
   margin: 0;
+}
+
+.progress-indicator {
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.scroll-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.next-step-fixed {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
 }
