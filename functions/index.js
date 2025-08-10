@@ -679,6 +679,8 @@ const generateLearningObjectivesCF = onCall(
       selectedModality,
       approach = "ABCD",
       bloomLevel,
+      category,
+      refresh,
     } = req.data || {};
 
     if (!projectBrief) {
@@ -694,28 +696,67 @@ const generateLearningObjectivesCF = onCall(
         model: gemini("gemini-1.5-pro"),
       });
 
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+
+      if (refresh) {
+        const { type, index, existing = [] } = refresh;
+        const existingList = existing.map((o) => `- ${o}`).join("\n");
+        let prompt;
+        switch (approach) {
+          case "Bloom": {
+            const level = bloomLevel || "Remember";
+            prompt = `You are a Senior Instructional Designer. Using the information below, generate three new unique ${type} objectives for the learning initiative using Bloom's Taxonomy at the cognitive level "${level}". None of the objectives may match the following:\n${existingList}\nReturn JSON with this structure:\n{\n  "options": ["", "", ""]\n}\n\n${baseInfo}`;
+            break;
+          }
+          case "Mager": {
+            prompt = `You are a Senior Instructional Designer. Using the information below, generate three new unique ${type} objectives following Mager's performance-based format (Performance, Condition, Criterion). Avoid these objectives:\n${existingList}\nReturn JSON with this structure:\n{\n  "options": ["", "", ""]\n}\n\n${baseInfo}`;
+            break;
+          }
+          case "SMART": {
+            prompt = `You are a Senior Instructional Designer. Using the information below, generate three new unique ${type} objectives adhering to the SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound). Avoid these objectives:\n${existingList}\nReturn JSON with this structure:\n{\n  "options": ["", "", ""]\n}\n\n${baseInfo}`;
+            break;
+          }
+          case "Gagne": {
+            const cat = category || "";
+            prompt = `You are a Senior Instructional Designer. Using the information below, generate three new unique ${type} objectives for the ${cat} category from Gagné's Five Categories of Learning Outcomes. Avoid these objectives:\n${existingList}\nReturn JSON with this structure:\n{\n  "options": ["", "", ""]\n}\n\n${baseInfo}`;
+            break;
+          }
+          case "ABCD":
+          default: {
+            prompt = `You are a Senior Instructional Designer. Using the information below, generate three new unique ${type} objectives using the ABCD model (Audience, Behavior, Condition, Degree). Avoid these objectives:\n${existingList}\nReturn JSON with this structure:\n{\n  "options": ["", "", ""]\n}\n\n${baseInfo}`;
+          }
+        }
+        const flow = ai.defineFlow("learningObjectivesRefreshFlow", async () => {
+          const { text } = await ai.generate(prompt);
+          return text;
+        });
+        const text = await flow();
+        const { options } = parseJsonFromText(text);
+        return { refreshType: type, refreshIndex: index, options };
+      }
+
       let prompt;
       switch (approach) {
         case "Bloom": {
           const level = bloomLevel || "Remember";
-          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the ABCD format (Audience, Behavior, Condition, Degree) and use verbs appropriate for Bloom's Taxonomy cognitive level "${level}". Return JSON with this structure:\n{\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and three enabling objectives for the learning initiative. Use verbs appropriate for Bloom's Taxonomy cognitive level "${level}". Provide three unique variations for each objective and ensure all objectives are distinct. Return JSON with this structure:\n{\n  "terminalObjective": ["", "", ""],\n  "enablingObjectives": [\n    ["", "", ""],\n    ["", "", ""],\n    ["", "", ""]\n  ]\n}\n\n${baseInfo}`;
           break;
         }
         case "Mager": {
-          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow Mager's performance-based format with components Performance, Condition, Criterion. Return JSON with this structure:\n{\n  "terminalObjective": {"performance": "", "condition": "", "criterion": ""},\n  "enablingObjectives": [\n    {"performance": "", "condition": "", "criterion": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and three enabling objectives following Mager's performance-based format (Performance, Condition, Criterion). Provide three unique variations for each objective and ensure all objectives are distinct. Return JSON with this structure:\n{\n  "terminalObjective": ["", "", ""],\n  "enablingObjectives": [\n    ["", "", ""],\n    ["", "", ""],\n    ["", "", ""]\n  ]\n}\n\n${baseInfo}`;
           break;
         }
         case "SMART": {
-          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound). Return JSON with this structure:\n{\n  "terminalObjective": {"specific": "", "measurable": "", "achievable": "", "relevant": "", "timeBound": ""},\n  "enablingObjectives": [\n    {"specific": "", "measurable": "", "achievable": "", "relevant": "", "timeBound": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and three enabling objectives that adhere to the SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound). Provide three unique variations for each objective and ensure all objectives are distinct. Return JSON with this structure:\n{\n  "terminalObjective": ["", "", ""],\n  "enablingObjectives": [\n    ["", "", ""],\n    ["", "", ""],\n    ["", "", ""]\n  ]\n}\n\n${baseInfo}`;
           break;
         }
         case "Gagne": {
-          prompt = `You are a Senior Instructional Designer. Using the information below, determine the most appropriate category from Gagné's Five Categories of Learning Outcomes (Verbal Information, Intellectual Skills, Cognitive Strategies, Attitudes, Motor Skills). Then generate one terminal objective and several enabling objectives in the ABCD format (Audience, Behavior, Condition, Degree) tailored to that category. Return JSON with this structure:\n{\n  "category": "",\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          prompt = `You are a Senior Instructional Designer. Using the information below, determine the most appropriate category from Gagné's Five Categories of Learning Outcomes (Verbal Information, Intellectual Skills, Cognitive Strategies, Attitudes, Motor Skills). Then generate one terminal objective and three enabling objectives suited to that category. Provide three unique variations for each objective and ensure all objectives are distinct. Return JSON with this structure:\n{\n  "category": "",\n  "terminalObjective": ["", "", ""],\n  "enablingObjectives": [\n    ["", "", ""],\n    ["", "", ""],\n    ["", "", ""]\n  ]\n}\n\n${baseInfo}`;
           break;
         }
         case "ABCD":
         default: {
-          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the ABCD format (Audience, Behavior, Condition, Degree). Return JSON with this structure:\n{\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+          prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and three enabling objectives using the ABCD model (Audience, Behavior, Condition, Degree). Provide three unique variations for each objective and ensure all objectives are distinct. Return JSON with this structure:\n{\n  "terminalObjective": ["", "", ""],\n  "enablingObjectives": [\n    ["", "", ""],\n    ["", "", ""],\n    ["", "", ""]\n  ]\n}\n\n${baseInfo}`;
         }
       }
 
@@ -723,17 +764,15 @@ const generateLearningObjectivesCF = onCall(
         const { text } = await ai.generate(prompt);
         return text;
       });
-
       const text = await flow();
       const objectives = parseJsonFromText(text);
-      return { approach, ...objectives };
+      return { approach, bloomLevel, ...objectives };
     } catch (error) {
       console.error("Error generating learning objectives:", error);
       throw new HttpsError("internal", "Failed to generate learning objectives.");
     }
   }
 );
-
 // Maintain the original exported name expected by the client
 export { generateLearningObjectivesCF as generateLearningObjectives };
 
