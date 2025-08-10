@@ -11,6 +11,7 @@ import {
   saveInitiative,
 } from "../utils/initiatives.js";
 import { useSearchParams } from "react-router-dom";
+import LearningObjectivesGenerator from "./LearningObjectivesGenerator.jsx";
 import "./AIToolsGenerators.css";
 
 const formatKeyword = (kw = "") =>
@@ -1218,11 +1219,15 @@ const InitiativesNew = () => {
       )}
 
       {step === 6 && (
-        <div className="generator-result">
-          <div className="progress-indicator">Step 6 of {TOTAL_STEPS}</div>
-          <h3>Curriculum Blueprint</h3>
-          <p>Coming soon...</p>
-        </div>
+        <LearningObjectivesGenerator
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          totalSteps={TOTAL_STEPS}
+          onBack={() => setStep(5)}
+        />
       )}
 
     </div>

@@ -664,6 +664,47 @@ Project Constraints: ${projectConstraints}`;
   }
 );
 
+export const generateLearningObjectives = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req) => {
+    const {
+      projectBrief,
+      businessGoal,
+      audienceProfile,
+      projectConstraints,
+      selectedModality,
+    } = req.data || {};
+
+    if (!projectBrief) {
+      throw new HttpsError("invalid-argument", "A project brief is required.");
+    }
+
+    try {
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) throw new HttpsError("internal", "No API key available.");
+
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-1.5-pro"),
+      });
+
+      const prompt = `You are a Senior Instructional Designer. Using the information below, generate one terminal objective and several enabling objectives for the learning initiative. Each objective must follow the ABCD format (Audience, Behavior, Condition, Degree). Return JSON with this structure:\n{\n  "terminalObjective": {"audience": "", "behavior": "", "condition": "", "degree": ""},\n  "enablingObjectives": [\n    {"audience": "", "behavior": "", "condition": "", "degree": ""}\n  ]\n}\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+
+      const flow = ai.defineFlow("learningObjectivesFlow", async () => {
+        const { text } = await ai.generate(prompt);
+        return text;
+      });
+
+      const text = await flow();
+      const objectives = parseJsonFromText(text);
+      return objectives;
+    } catch (error) {
+      console.error("Error generating learning objectives:", error);
+      throw new HttpsError("internal", "Failed to generate learning objectives.");
+    }
+  }
+);
+
 export const generateStoryboard = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
