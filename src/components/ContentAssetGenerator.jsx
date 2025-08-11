@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../firebase.js";
+import { useSearchParams } from "react-router-dom";
+import { app, auth } from "../firebase.js";
+import { saveContentAssets } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 
@@ -16,6 +18,8 @@ const ContentAssetGenerator = () => {
   } = useProject();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchParams] = useSearchParams();
+  const initiativeId = searchParams.get("initiativeId") || "default";
 
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateContentAssets");
@@ -30,6 +34,15 @@ const ContentAssetGenerator = () => {
       const { data } = await callGenerate(learningDesignDocument);
       setDraftContent(data.drafts || {});
       setMediaAssets(data.mediaAssets || []);
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await saveContentAssets(
+          uid,
+          initiativeId,
+          data.drafts || {},
+          data.mediaAssets || []
+        );
+      }
     } catch (err) {
       console.error("Error generating content assets:", err);
       setError(err?.message || "Error generating content assets.");
