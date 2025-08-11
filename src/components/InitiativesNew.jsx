@@ -219,10 +219,10 @@ const InitiativesNew = () => {
 
   const extractTextFromPdf = async (buffer) => {
     const pdfjs = await import(
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.mjs"
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.mjs"
     );
     pdfjs.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.mjs";
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.mjs";
     const pdf = await pdfjs.getDocument({ data: buffer }).promise;
     let text = "";
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
