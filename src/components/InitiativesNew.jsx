@@ -217,17 +217,34 @@ const InitiativesNew = () => {
   const generateLearnerPersona = httpsCallable(functions, "generateLearnerPersona");
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
-  const handleFiles = (files) => {
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setSourceMaterials((prev) => [
-          ...prev,
-          { name: file.name, content: reader.result },
-        ]);
-      };
-      reader.readAsText(file);
-    });
+  const extractTextFromPdf = (buffer) => {
+    const raw = new TextDecoder("latin1").decode(buffer);
+    const regex = /\(([^()]+)\)\s*Tj/g;
+    let match;
+    let text = "";
+    while ((match = regex.exec(raw)) !== null) {
+      text += `${match[1]} `;
+    }
+    return text.trim();
+  };
+
+  const handleFiles = async (files) => {
+    for (const file of Array.from(files)) {
+      try {
+        if (file.name.toLowerCase().endsWith(".pdf")) {
+          const buffer = await file.arrayBuffer();
+          const text = extractTextFromPdf(buffer);
+          if (!text) throw new Error("Unable to extract text");
+          setSourceMaterials((prev) => [...prev, { name: file.name, content: text }]);
+        } else {
+          const text = await file.text();
+          setSourceMaterials((prev) => [...prev, { name: file.name, content: text }]);
+        }
+      } catch (err) {
+        console.error("Failed to read file", err);
+        setError(`Failed to process ${file.name}`);
+      }
+    }
   };
 
   const handleFileInput = (e) => {
