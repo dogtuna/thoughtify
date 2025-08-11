@@ -388,7 +388,7 @@ export const generateProjectBrief = onCall(
       model: gemini("gemini-1.5-pro"),
     });
 
-    const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief and list any questions that require clarification before moving forward.
+    const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief written in a clear, narrative style like a blog post, using distinct paragraphs for readability. Also list any questions that require clarification before moving forward.
 Return a valid JSON object with the structure:{
   "projectBrief": "text of the brief",
   "clarifyingQuestions": ["question1", "question2"]
