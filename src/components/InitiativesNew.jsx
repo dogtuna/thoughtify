@@ -20,39 +20,69 @@ import "./AIToolsGenerators.css";
 const formatKeyword = (kw = "") =>
   kw ? kw.charAt(0).toUpperCase() + kw.slice(1) : "";
 
-const normalizePersona = (p = {}) => ({
-  ...p,
-  ageRange: p.ageRange || "",
-  ageRangeOptions: p.ageRangeOptions || [],
-  educationLevel: p.educationLevel || "",
-  educationLevelOptions: p.educationLevelOptions || [],
-  techProficiency: p.techProficiency || "",
-  techProficiencyOptions: p.techProficiencyOptions || [],
-  learningPreferences: p.learningPreferences || "",
-  learningPreferencesOptions: p.learningPreferencesOptions || [],
-  motivation:
-    typeof p.motivation === "string"
-      ? { keyword: "General", text: p.motivation }
-      : {
-          keyword: formatKeyword(p.motivation?.keyword) || "General",
-          text: p.motivation?.text || "",
-        },
-  challenges:
-    typeof p.challenges === "string"
-      ? { keyword: "General", text: p.challenges }
-      : {
-          keyword: formatKeyword(p.challenges?.keyword) || "General",
-          text: p.challenges?.text || "",
-        },
-  motivationOptions: (p.motivationOptions || []).map((o) => ({
-    ...o,
-    keyword: formatKeyword(o.keyword),
-  })),
-  challengeOptions: (p.challengeOptions || []).map((o) => ({
-    ...o,
-    keyword: formatKeyword(o.keyword),
-  })),
-});
+const normalizePersona = (p = {}) => {
+  const formatOption = (o = {}) => ({
+    keyword: formatKeyword(o.keyword) || "General",
+    text: o.text || "",
+  });
+
+  const motivations = (p.motivations || []).map((m) => ({
+    ...formatOption(m),
+    selected: true,
+  }));
+  const motivationExtras = (p.motivationOptions || []).map((m) => ({
+    ...formatOption(m),
+    selected: false,
+  }));
+
+  // If no motivations stored, fall back to old fields and randomize selection
+  if (motivations.length === 0 && (p.motivation || motivationExtras.length)) {
+    const combined = [
+      p.motivation ? formatOption(p.motivation) : null,
+      ...motivationExtras.map((m) => ({ ...m })),
+    ].filter(Boolean);
+    const rand = Math.floor(Math.random() * combined.length);
+    combined.forEach((opt, i) => (opt.selected = i === rand));
+    motivations.push(...combined.filter((o) => o.selected));
+    motivationExtras.length = 0;
+    motivationExtras.push(...combined.filter((o) => !o.selected));
+  }
+
+  const challenges = (p.challengesList || []).map((c) => ({
+    ...formatOption(c),
+    selected: true,
+  }));
+  const challengeExtras = (p.challengeOptions || []).map((c) => ({
+    ...formatOption(c),
+    selected: false,
+  }));
+
+  if (challenges.length === 0 && (p.challenges || challengeExtras.length)) {
+    const combined = [
+      p.challenges ? formatOption(p.challenges) : null,
+      ...challengeExtras.map((c) => ({ ...c })),
+    ].filter(Boolean);
+    const rand = Math.floor(Math.random() * combined.length);
+    combined.forEach((opt, i) => (opt.selected = i === rand));
+    challenges.push(...combined.filter((o) => o.selected));
+    challengeExtras.length = 0;
+    challengeExtras.push(...combined.filter((o) => !o.selected));
+  }
+
+  return {
+    ...p,
+    ageRange: p.ageRange || "",
+    ageRangeOptions: p.ageRangeOptions || [],
+    educationLevel: p.educationLevel || "",
+    educationLevelOptions: p.educationLevelOptions || [],
+    techProficiency: p.techProficiency || "",
+    techProficiencyOptions: p.techProficiencyOptions || [],
+    learningPreferences: p.learningPreferences || "",
+    learningPreferencesOptions: p.learningPreferencesOptions || [],
+    motivationChoices: [...motivations, ...motivationExtras],
+    challengeChoices: [...challenges, ...challengeExtras],
+  };
+};
 
 const InitiativesNew = () => {
   const steps = [
@@ -535,17 +565,49 @@ const InitiativesNew = () => {
           educationLevel: personaData.educationLevel || "",
           learningPreferences: personaData.learningPreferences || "",
         });
+        const { motivationChoices = [], challengeChoices = [], ...rest } =
+          personaData;
+        const motivations = motivationChoices
+          .filter((m) => m.selected)
+          .map(({ selected, ...o }) => {
+            void selected;
+            return o;
+          });
+        const motivationOptions = motivationChoices
+          .filter((m) => !m.selected)
+          .map(({ selected, ...o }) => {
+            void selected;
+            return o;
+          });
+        const challengesList = challengeChoices
+          .filter((c) => c.selected)
+          .map(({ selected, ...o }) => {
+            void selected;
+            return o;
+          });
+        const challengeOptions = challengeChoices
+          .filter((c) => !c.selected)
+          .map(({ selected, ...o }) => {
+            void selected;
+            return o;
+          });
         const personaToSave = {
-          ...personaData,
+          ...rest,
+          motivations,
+          motivation: motivations[0] || null,
+          motivationOptions,
+          challengesList,
+          challenges: challengesList[0] || null,
+          challengeOptions,
           avatar: avatarRes?.data?.avatar || null,
         };
         addUsedMotivation([
-          personaToSave.motivation?.keyword,
-          ...(personaToSave.motivationOptions || []).map((o) => o.keyword),
+          ...motivations.map((o) => o.keyword),
+          ...motivationOptions.map((o) => o.keyword),
         ]);
         addUsedChallenge([
-          personaToSave.challenges?.keyword,
-          ...(personaToSave.challengeOptions || []).map((o) => o.keyword),
+          ...challengesList.map((o) => o.keyword),
+          ...challengeOptions.map((o) => o.keyword),
         ]);
         existingNames.push(personaData.name);
         const uid = auth.currentUser?.uid;
@@ -554,7 +616,7 @@ const InitiativesNew = () => {
           const id = await savePersona(uid, initiativeId, personaToSave);
           savedPersona = { id, ...personaToSave };
         }
-        newPersonas.push(savedPersona);
+        newPersonas.push(normalizePersona(savedPersona));
       }
       if (newPersonas.length > 0) {
         setPersonas((prev) => [...prev, ...newPersonas]);
@@ -604,18 +666,50 @@ const InitiativesNew = () => {
         learningPreferences: personaData.learningPreferences || "",
       });
 
+      const { motivationChoices = [], challengeChoices = [], ...rest } =
+        personaData;
+      const motivations = motivationChoices
+        .filter((m) => m.selected)
+        .map(({ selected, ...o }) => {
+          void selected;
+          return o;
+        });
+      const motivationOptions = motivationChoices
+        .filter((m) => !m.selected)
+        .map(({ selected, ...o }) => {
+          void selected;
+          return o;
+        });
+      const challengesList = challengeChoices
+        .filter((c) => c.selected)
+        .map(({ selected, ...o }) => {
+          void selected;
+          return o;
+        });
+      const challengeOptions = challengeChoices
+        .filter((c) => !c.selected)
+        .map(({ selected, ...o }) => {
+          void selected;
+          return o;
+        });
       const personaToSave = {
-        ...personaData,
+        ...rest,
+        motivations,
+        motivation: motivations[0] || null,
+        motivationOptions,
+        challengesList,
+        challenges: challengesList[0] || null,
+        challengeOptions,
         avatar: avatarRes?.data?.avatar || null,
       };
       // record used keywords
       addUsedMotivation([
-        personaToSave.motivation?.keyword,
-        ...(personaToSave.motivationOptions || []).map((o) => o.keyword),
+        ...motivations.map((o) => o.keyword),
+        ...motivationOptions.map((o) => o.keyword),
       ]);
       addUsedChallenge([
-        personaToSave.challenges?.keyword,
-        ...(personaToSave.challengeOptions || []).map((o) => o.keyword),
+        ...challengesList.map((o) => o.keyword),
+        ...challengeOptions.map((o) => o.keyword),
       ]);
       const uid = auth.currentUser?.uid;
       if (uid) {
@@ -623,11 +717,15 @@ const InitiativesNew = () => {
           const id = currentPersona.id;
           await savePersona(uid, initiativeId, { ...personaToSave, id });
           setPersonas((prev) =>
-            prev.map((p, i) => (i === activePersonaIndex ? { id, ...personaToSave } : p))
+            prev.map((p, i) =>
+              i === activePersonaIndex
+                ? normalizePersona({ id, ...personaToSave })
+                : p
+            )
           );
         } else {
           const id = await savePersona(uid, initiativeId, personaToSave);
-          const newPersona = { id, ...personaToSave };
+          const newPersona = normalizePersona({ id, ...personaToSave });
           const newIndex = personas.length;
           setPersonas((prev) => [...prev, newPersona]);
           setActivePersonaIndex(newIndex);
@@ -635,11 +733,13 @@ const InitiativesNew = () => {
       } else {
         if (action === "replace" && currentPersona) {
           setPersonas((prev) =>
-            prev.map((p, i) => (i === activePersonaIndex ? { ...personaToSave } : p))
+            prev.map((p, i) =>
+              i === activePersonaIndex ? normalizePersona(personaToSave) : p
+            )
           );
         } else {
           const newIndex = personas.length;
-          setPersonas((prev) => [...prev, personaToSave]);
+          setPersonas((prev) => [...prev, normalizePersona(personaToSave)]);
           setActivePersonaIndex(newIndex);
         }
       }
@@ -655,16 +755,26 @@ const InitiativesNew = () => {
     setEditingPersona((prev) => ({ ...prev, [field]: value }));
   };
 
-  const selectOption = (field, opt) => {
-    setEditingPersona((prev) => ({ ...prev, [field]: opt }));
+  const toggleChoice = (field, index) => {
+    const key = field === "motivation" ? "motivationChoices" : "challengeChoices";
+    setEditingPersona((prev) => {
+      const updated = [...(prev[key] || [])];
+      const selectedCount = updated.filter((c) => c.selected).length;
+      if (updated[index]) {
+        if (updated[index].selected) {
+          updated[index].selected = false;
+        } else if (selectedCount < 3) {
+          updated[index].selected = true;
+        }
+      }
+      return { ...prev, [key]: updated };
+    });
   };
 
-  const refreshOptions = async (field) => {
+  const refreshChoices = async (field) => {
     if (!editingPersona) return;
     setPersonaLoading(true);
     setPersonaError("");
-    const optionField = `${field}Options`;
-    setEditingPersona((prev) => ({ ...prev, [optionField]: [] }));
     try {
       const { data } = await generateLearnerPersona({
         projectBrief,
@@ -674,22 +784,38 @@ const InitiativesNew = () => {
         sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
-        refreshField: field,
+        refreshField: field === "motivation" ? "motivation" : "challenges",
         personaName: editingPersona.name,
       });
-      let opts = data[optionField] || [];
-      if (field === "motivation" || field === "challenges") {
-        opts = opts.map((o) => ({ ...o, keyword: formatKeyword(o.keyword) }));
-        if (field === "motivation") {
-          addUsedMotivation(opts.map((o) => o.keyword));
-        } else {
-          addUsedChallenge(opts.map((o) => o.keyword));
-        }
-      }
-      if (opts.length === 0) {
+      const list =
+        field === "motivation"
+          ? data.motivationOptions || []
+          : data.challengeOptions || [];
+      const formatted = list.map((o) => ({
+        keyword: formatKeyword(o.keyword),
+        text: o.text,
+        selected: false,
+      }));
+      if (formatted.length === 0) {
         setPersonaError("No new options available.");
       } else {
-        setEditingPersona((prev) => ({ ...prev, [optionField]: opts }));
+        setEditingPersona((prev) => {
+          const key = field === "motivation" ? "motivationChoices" : "challengeChoices";
+          const updated = [...(prev[key] || [])];
+          const unselectedIdx = [];
+          updated.forEach((c, i) => {
+            if (!c.selected) unselectedIdx.push(i);
+          });
+          unselectedIdx.forEach((idx, i) => {
+            if (formatted[i]) updated[idx] = formatted[i];
+          });
+          if (field === "motivation") {
+            addUsedMotivation(formatted.map((o) => o.keyword));
+          } else {
+            addUsedChallenge(formatted.map((o) => o.keyword));
+          }
+          return { ...prev, [key]: updated };
+        });
       }
     } catch (err) {
       console.error("Error generating options:", err);
@@ -702,12 +828,58 @@ const InitiativesNew = () => {
   const handleSavePersonaEdits = async () => {
     if (!editingPersona) return;
     const uid = auth.currentUser?.uid;
+    const { id, motivationChoices = [], challengeChoices = [], ...rest } =
+      editingPersona;
+    const motivations = motivationChoices
+      .filter((m) => m.selected)
+      .map(({ selected, ...o }) => {
+        void selected;
+        return o;
+      });
+    const motivationOptions = motivationChoices
+      .filter((m) => !m.selected)
+      .map(({ selected, ...o }) => {
+        void selected;
+        return o;
+      });
+    const challengesList = challengeChoices
+      .filter((c) => c.selected)
+      .map(({ selected, ...o }) => {
+        void selected;
+        return o;
+      });
+    const challengeOptions = challengeChoices
+      .filter((c) => !c.selected)
+      .map(({ selected, ...o }) => {
+        void selected;
+        return o;
+      });
+    const personaToSave = {
+      id,
+      ...rest,
+      motivations,
+      motivation: motivations[0] || null,
+      motivationOptions,
+      challengesList,
+      challenges: challengesList[0] || null,
+      challengeOptions,
+    };
     try {
       if (uid) {
-        await savePersona(uid, initiativeId, editingPersona);
+        await savePersona(uid, initiativeId, personaToSave);
       }
+      addUsedMotivation([
+        ...motivations.map((o) => o.keyword),
+        ...motivationOptions.map((o) => o.keyword),
+      ]);
+      addUsedChallenge([
+        ...challengesList.map((o) => o.keyword),
+        ...challengeOptions.map((o) => o.keyword),
+      ]);
       setPersonas((prev) =>
-        prev.map((p, i) => (i === activePersonaIndex ? editingPersona : p))
+        prev.map((p, i) =>
+          i === activePersonaIndex ? normalizePersona(personaToSave) : p
+        )
       );
       setEditingPersona(null);
     } catch (err) {
@@ -716,31 +888,9 @@ const InitiativesNew = () => {
     }
   };
 
-  const handleRegenerateAvatar = async () => {
-    if (!editingPersona) return;
-    setPersonaLoading(true);
-    setPersonaError("");
-    try {
-      const avatarRes = await generateAvatar({
-        name: editingPersona.name,
-        motivation: editingPersona.motivation?.text || "",
-        challenges: editingPersona.challenges?.text || "",
-        ageRange: editingPersona.ageRange || "",
-        techProficiency: editingPersona.techProficiency || "",
-        educationLevel: editingPersona.educationLevel || "",
-        learningPreferences: editingPersona.learningPreferences || "",
-        seedExtra: Date.now().toString(),
-      });
-      setEditingPersona((prev) => ({
-        ...prev,
-        avatar: avatarRes?.data?.avatar || null,
-      }));
-    } catch (err) {
-      console.error("Error generating avatar:", err);
-      setPersonaError(err?.message || "Error generating avatar.");
-    } finally {
-      setPersonaLoading(false);
-    }
+  const handleRegeneratePersonaEdit = async () => {
+    await handleGeneratePersona("replace");
+    setEditingPersona(null);
   };
 
   const handleDeletePersona = async (index) => {
@@ -938,13 +1088,22 @@ const InitiativesNew = () => {
       {step === 3 && (
         <div className="generator-result" ref={projectBriefRef}>
           <h3>Project Brief</h3>
-          <textarea
-            className="generator-input"
-            value={projectBrief}
-            onChange={(e) => setProjectBrief(e.target.value)}
-            readOnly={!isEditingBrief}
-            rows={10}
-          />
+          {isEditingBrief ? (
+            <textarea
+              className="generator-input project-brief-textarea"
+              value={projectBrief}
+              onChange={(e) => setProjectBrief(e.target.value)}
+              rows={10}
+            />
+          ) : (
+            <div className="project-brief-display">
+              {projectBrief
+                .split("\n")
+                .map((para, idx) => (
+                  <p key={idx}>{para}</p>
+                ))}
+            </div>
+          )}
           <div className="button-row">
             <button
               type="button"
@@ -953,28 +1112,26 @@ const InitiativesNew = () => {
             >
               Back
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="generator-button save-button"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (isEditingBrief) {
-                  const uid = auth.currentUser?.uid;
-                  if (uid) {
-                    saveInitiative(uid, initiativeId, { projectBrief });
-                  }
-                }
-                setIsEditingBrief((prev) => !prev);
-              }}
-              className="generator-button"
-            >
-              {isEditingBrief ? "Save Brief" : "Edit Brief"}
-            </button>
+            {isEditingBrief ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleSave();
+                  setIsEditingBrief(false);
+                }}
+                className="generator-button save-button"
+              >
+                Save
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingBrief(true)}
+                className="generator-button edit-button"
+              >
+                Edit
+              </button>
+            )}
             <button
               type="button"
               onClick={handleDownload}
@@ -999,23 +1156,6 @@ const InitiativesNew = () => {
 
       {step === 4 && (
         <div className="generator-result">
-          <div className="button-row">
-            <button
-              type="button"
-              onClick={() => setStep(3)}
-              className="generator-button back-button"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="generator-button save-button"
-            >
-              Save
-            </button>
-          </div>
-
           <div>
             <h3>Learner Personas</h3>
             {personas.length === 0 ? (
@@ -1082,263 +1222,155 @@ const InitiativesNew = () => {
 
                 {editingPersona ? (
                   <>
-                    {editingPersona.avatar && (
-                      <img
-                        src={editingPersona.avatar}
-                        alt={`${editingPersona.name} avatar`}
-                        className="persona-avatar"
-                      />
-                    )}
-                    <input
-                      className="generator-input"
-                      value={editingPersona.name || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange("name", e.target.value)
-                      }
-                    />
-                    <input
-                      className="generator-input"
-                      placeholder="Age Range"
-                      value={editingPersona.ageRange || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange("ageRange", e.target.value)
-                      }
-                    />
-                    <div className="persona-options">
-                      {editingPersona.ageRangeOptions?.length > 0 && (
-                        <>
-                          <p>Other possible age ranges...</p>
-                          {editingPersona.ageRangeOptions.map((opt) => (
-                            <button
-                              key={opt}
-                              type="button"
-                              onClick={() => selectOption("ageRange", opt)}
-                              className="generator-button"
-                            >
+                    <div className="persona-edit-grid">
+                      <div className="grid-item">
+                        {editingPersona.avatar && (
+                          <img
+                            src={editingPersona.avatar}
+                            alt={`${editingPersona.name} avatar`}
+                            className="persona-avatar"
+                          />
+                        )}
+                        <input
+                          className="generator-input"
+                          value={editingPersona.name || ""}
+                          onChange={(e) =>
+                            handlePersonaFieldChange("name", e.target.value)
+                          }
+                        />
+                        <textarea
+                          className="generator-input"
+                          placeholder="Brief Bio"
+                          value={editingPersona.learningPreferences || ""}
+                          onChange={(e) =>
+                            handlePersonaFieldChange(
+                              "learningPreferences",
+                              e.target.value
+                            )
+                          }
+                          rows={2}
+                        />
+                      </div>
+                      <div className="grid-item">
+                        <select
+                          className="generator-input"
+                          value={editingPersona.ageRange}
+                          onChange={(e) =>
+                            handlePersonaFieldChange("ageRange", e.target.value)
+                          }
+                        >
+                          {[editingPersona.ageRange,
+                            ...editingPersona.ageRangeOptions].map((opt) => (
+                            <option key={opt} value={opt}>
                               {opt}
-                            </button>
+                            </option>
                           ))}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => refreshOptions("ageRange")}
-                        className="generator-button"
-                      >
-                        Generate more
-                      </button>
-                    </div>
-                    <input
-                      className="generator-input"
-                      placeholder="Education Level"
-                      value={editingPersona.educationLevel || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange(
-                          "educationLevel",
-                          e.target.value
-                        )
-                      }
-                    />
-                    <div className="persona-options">
-                      {editingPersona.educationLevelOptions?.length > 0 && (
-                        <>
-                          <p>Other possible education levels...</p>
-                          {editingPersona.educationLevelOptions.map((opt) => (
-                            <button
-                              key={opt}
-                              type="button"
-                              onClick={() => selectOption("educationLevel", opt)}
-                              className="generator-button"
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => refreshOptions("educationLevel")}
-                        className="generator-button"
-                      >
-                        Generate more
-                      </button>
-                    </div>
-                    <input
-                      className="generator-input"
-                      placeholder="Tech Proficiency"
-                      value={editingPersona.techProficiency || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange(
-                          "techProficiency",
-                          e.target.value
-                        )
-                      }
-                    />
-                    <div className="persona-options">
-                      {editingPersona.techProficiencyOptions?.length > 0 && (
-                        <>
-                          <p>Other possible tech proficiency levels...</p>
-                          {editingPersona.techProficiencyOptions.map((opt) => (
-                            <button
-                              key={opt}
-                              type="button"
-                              onClick={() => selectOption("techProficiency", opt)}
-                              className="generator-button"
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => refreshOptions("techProficiency")}
-                        className="generator-button"
-                      >
-                        Generate more
-                      </button>
-                    </div>
-                    <textarea
-                      className="generator-input"
-                      placeholder="Learning Preferences"
-                      value={editingPersona.learningPreferences || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange(
-                          "learningPreferences",
-                          e.target.value
-                        )
-                      }
-                      rows={2}
-                    />
-                    <div className="persona-options">
-                      {editingPersona.learningPreferencesOptions?.length > 0 && (
-                        <>
-                          <p>Other possible learning preferences...</p>
-                          {editingPersona.learningPreferencesOptions.map(
+                        </select>
+                        <select
+                          className="generator-input"
+                          value={editingPersona.educationLevel}
+                          onChange={(e) =>
+                            handlePersonaFieldChange(
+                              "educationLevel",
+                              e.target.value
+                            )
+                          }
+                        >
+                          {[editingPersona.educationLevel,
+                            ...editingPersona.educationLevelOptions].map(
                             (opt) => (
-                              <button
-                                key={opt}
-                                type="button"
-                                onClick={() =>
-                                  selectOption("learningPreferences", opt)
-                                }
-                                className="generator-button"
-                              >
+                              <option key={opt} value={opt}>
                                 {opt}
-                              </button>
+                              </option>
                             )
                           )}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => refreshOptions("learningPreferences")}
-                        className="generator-button"
-                      >
-                        Generate more
-                      </button>
-                    </div>
-                    <textarea
-                      className="generator-input"
-                      value={editingPersona.motivation?.text || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange("motivation", {
-                          ...editingPersona.motivation,
-                          text: e.target.value,
-                        })
-                      }
-                      rows={2}
-                    />
-                    <div className="persona-options">
-                      {editingPersona.motivationOptions?.length > 0 && (
-                        <>
-                          <p>Other possible motivations...</p>
-                          {editingPersona.motivationOptions.map((opt) => (
+                        </select>
+                        <select
+                          className="generator-input"
+                          value={editingPersona.techProficiency}
+                          onChange={(e) =>
+                            handlePersonaFieldChange(
+                              "techProficiency",
+                              e.target.value
+                            )
+                          }
+                        >
+                          {[editingPersona.techProficiency,
+                            ...editingPersona.techProficiencyOptions].map(
+                            (opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+                      <div className="grid-item">
+                        <div className="pill-row">
+                          {editingPersona.motivationChoices?.map((m, i) => (
                             <button
-                              key={opt.keyword}
+                              key={i}
                               type="button"
-                              onClick={() => selectOption("motivation", opt)}
-                              className="generator-button"
+                              className={`pill ${m.selected ? "selected" : ""}`}
+                              onClick={() => toggleChoice("motivation", i)}
                             >
-                              {opt.keyword}
+                              {m.keyword}
                             </button>
                           ))}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => refreshOptions("motivation")}
-                        className="generator-button"
-                      >
-                        Generate more
-                      </button>
-                    </div>
-                    <textarea
-                      className="generator-input"
-                      value={editingPersona.challenges?.text || ""}
-                      onChange={(e) =>
-                        handlePersonaFieldChange("challenges", {
-                          ...editingPersona.challenges,
-                          text: e.target.value,
-                        })
-                      }
-                      rows={2}
-                    />
-                    <div className="persona-options">
-                      {editingPersona.challengeOptions?.length > 0 && (
-                        <>
-                          <p>Other possible challenges...</p>
-                          {editingPersona.challengeOptions.map((opt) => (
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => refreshChoices("motivation")}
+                          className="generator-button"
+                        >
+                          Generate more
+                        </button>
+                      </div>
+                      <div className="grid-item">
+                        <div className="pill-row">
+                          {editingPersona.challengeChoices?.map((c, i) => (
                             <button
-                              key={opt.keyword}
+                              key={i}
                               type="button"
-                              onClick={() => selectOption("challenges", opt)}
-                              className="generator-button"
+                              className={`pill ${c.selected ? "selected" : ""}`}
+                              onClick={() => toggleChoice("challenge", i)}
                             >
-                              {opt.keyword}
+                              {c.keyword}
                             </button>
                           ))}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => refreshOptions("challenges")}
-                        className="generator-button"
-                      >
-                        Generate more
-                      </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => refreshChoices("challenge")}
+                          className="generator-button"
+                        >
+                          Generate more
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div className="button-row">
                       <button
-                        onClick={handleRegenerateAvatar}
+                        onClick={() => handleRegeneratePersonaEdit()}
                         disabled={personaLoading}
                         className="generator-button"
                         type="button"
                       >
-                        {personaLoading ? "Generating..." : "Regenerate Avatar"}
+                        {personaLoading ? "Generating..." : "Regenerate Persona"}
+                      </button>
+                      <button
+                        onClick={() => setEditingPersona(null)}
+                        className="generator-button cancel-button"
+                        type="button"
+                      >
+                        Cancel
                       </button>
                       <button
                         onClick={handleSavePersonaEdits}
                         disabled={personaLoading}
-                        className="generator-button"
+                        className="generator-button save-button"
                         type="button"
                       >
                         Save
-                      </button>
-                      <button
-                        onClick={() => handleDeletePersona(activePersonaIndex)}
-                        disabled={personaLoading}
-                        className="generator-button"
-                        type="button"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setEditingPersona(null)}
-                        className="generator-button"
-                        type="button"
-                      >
-                        Cancel
                       </button>
                     </div>
                   </>
@@ -1416,6 +1448,13 @@ const InitiativesNew = () => {
           </div>
           {personaError && <p className="generator-error">{personaError}</p>}
           <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
             <button
               type="button"
               onClick={handleSave}

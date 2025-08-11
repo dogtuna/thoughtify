@@ -163,7 +163,24 @@
   }
 
   .save-button {
-    border-image: linear-gradient(45deg, #00BFFF, #00FFEA) 1;
+    border-image: linear-gradient(45deg, #006400, #00FF00) 1;
+  }
+
+  .edit-button {
+    border-image: linear-gradient(45deg, #1E90FF, #00BFFF) 1;
+  }
+
+  .project-brief-display {
+    max-width: 80%;
+    margin: 0 auto;
+    text-align: left;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .project-brief-textarea {
+    width: 80%;
+    max-width: 80%;
   }
 
   .button-row {
@@ -342,5 +359,47 @@
   height: 20px;
   border-width: 3px;
   margin: 0;
+}
+
+.persona-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .persona-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.persona-edit-grid .grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.pill {
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.pill.selected {
+  border-image: linear-gradient(45deg, #8C259E, #D071F9) 1;
+}
+
+.cancel-button {
+  border-image: linear-gradient(45deg, #B22222, #FF4500) 1;
 }
 
