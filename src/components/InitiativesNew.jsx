@@ -217,16 +217,18 @@ const InitiativesNew = () => {
   const generateLearnerPersona = httpsCallable(functions, "generateLearnerPersona");
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
-  const extractTextFromPdf = (buffer) => {
-    const raw = new TextDecoder("latin1").decode(buffer);
-    const regex = /(?:\(([^()\\]+(?:\\.[^()\\]*)*)\)|\[([^\]]+)\])\s*T[Jj]/g;
-    let match;
+  const extractTextFromPdf = async (buffer) => {
+    const pdfjs = await import(
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.mjs"
+    );
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.mjs";
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
     let text = "";
-    while ((match = regex.exec(raw)) !== null) {
-      const content = (match[1] || match[2] || "")
-        .replace(/\\([()\\nrtbf])/g, "$1")
-        .replace(/\s+/g, " ");
-      text += `${content} `;
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const content = await page.getTextContent();
+      text += content.items.map((item) => item.str).join(" ") + "\n";
     }
     return text.trim();
   };
@@ -283,7 +285,7 @@ const InitiativesNew = () => {
       try {
         if (file.name.toLowerCase().endsWith(".pdf")) {
           const buffer = await file.arrayBuffer();
-          let text = extractTextFromPdf(buffer);
+          let text = await extractTextFromPdf(buffer);
           if (!text) text = await file.text();
           setSourceMaterials((prev) => [
             ...prev,
