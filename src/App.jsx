@@ -12,6 +12,7 @@ import StudyMaterialGenerator from "./components/StudyMaterialGenerator";
 import AssessmentGenerator from "./components/AssessmentGenerator";
 import LessonContentGenerator from "./components/LessonContentGenerator";
 import StoryboardGenerator from "./components/StoryboardGenerator";
+import ContentAssetGenerator from "./components/ContentAssetGenerator";
 import InitiativesNew from "./components/InitiativesNew";
 import InitiativesList from "./components/InitiativesList";
 import LeadershipAssessmentWizard from "./components/LeadershipAssessmentWizard";
@@ -95,6 +96,7 @@ export default function App() {
           <Route path="assessment" element={<AssessmentGenerator />} />
           <Route path="lesson-content" element={<LessonContentGenerator />} />
           <Route path="storyboard" element={<StoryboardGenerator />} />
+          <Route path="content-assets" element={<ContentAssetGenerator />} />
         </Route>
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

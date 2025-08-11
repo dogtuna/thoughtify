@@ -30,6 +30,9 @@ const AIToolsLayout = () => {
             <li>
               <Link to="storyboard">Storyboard Generator</Link>
             </li>
+            <li>
+              <Link to="content-assets">Content & Asset Generator</Link>
+            </li>
           </ul>
         </nav>
       </aside>

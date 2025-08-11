@@ -4,6 +4,8 @@ import { app } from "../firebase.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 
+const TOTAL_STEPS = 9;
+
 const ContentAssetGenerator = () => {
   const {
     learningDesignDocument,
@@ -57,6 +59,7 @@ const ContentAssetGenerator = () => {
 
   return (
     <div className="generator-container">
+      <div className="progress-indicator">Step 9 of {TOTAL_STEPS}</div>
       <h2>Content & Asset Generator</h2>
       <button
         onClick={handleGenerate}

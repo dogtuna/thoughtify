@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { app, auth } from "../firebase.js";
 import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
@@ -19,6 +19,7 @@ const LearningDesignDocument = ({
   onBack,
 }) => {
   const { learningDesignDocument, setLearningDesignDocument } = useProject();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const functions = getFunctions(app, "us-central1");
@@ -74,6 +75,16 @@ const LearningDesignDocument = ({
         style={{ marginBottom: 10 }}
       >
         Back to Step 7
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`)
+        }
+        className="generator-button"
+        style={{ marginBottom: 10, marginLeft: 10 }}
+      >
+        Next: Content & Assets
       </button>
       <h3>Learning Design Document</h3>
       {!learningDesignDocument && !error && (
