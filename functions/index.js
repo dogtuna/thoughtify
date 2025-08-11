@@ -518,6 +518,70 @@ export const generateLearningStrategy = onCall(
   }
 );
 
+export const generateContentAssets = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (req) => {
+    const ldd = req.data;
+    if (!ldd) {
+      throw new HttpsError(
+        "invalid-argument",
+        "A Learning Design Document is required."
+      );
+    }
+
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) throw new HttpsError("internal", "No API key available.");
+
+    const ai = genkit({
+      plugins: [googleAI({ apiKey: key })],
+      model: gemini("gemini-2.5-pro"),
+    });
+
+    const prompt =
+      `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\n` +
+      `LDD:\n${JSON.stringify(ldd, null, 2)}\n\n` +
+      `Respond ONLY with valid JSON matching this structure:\n{\n  "lessonContent": [],\n  "videoScripts": [],\n  "facilitatorGuides": [],\n  "participantWorkbooks": [],\n  "knowledgeBaseArticles": [],\n  "mediaAssets": []\n}\n` +
+      `Each array should contain entries for the corresponding components. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
+
+    try {
+      const { text } = await ai.generate(prompt);
+
+      let result;
+      try {
+        result = parseJsonFromText(text);
+      } catch (err) {
+        console.error("Failed to parse AI response:", err, text);
+        throw new HttpsError("internal", "Invalid AI response format.");
+      }
+
+      const {
+        lessonContent = [],
+        videoScripts = [],
+        facilitatorGuides = [],
+        participantWorkbooks = [],
+        knowledgeBaseArticles = [],
+        mediaAssets = [],
+      } = result;
+
+      const drafts = {
+        lessonContent,
+        videoScripts,
+        facilitatorGuides,
+        participantWorkbooks,
+        knowledgeBaseArticles,
+      };
+
+      return { drafts, mediaAssets };
+    } catch (error) {
+      console.error("Error generating content assets:", error);
+      throw new HttpsError(
+        "internal",
+        "Failed to generate content assets."
+      );
+    }
+  }
+);
+
 export const generateLearnerPersona = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req) => {
