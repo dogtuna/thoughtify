@@ -1223,7 +1223,7 @@ const InitiativesNew = () => {
                 {editingPersona ? (
                   <>
                     <div className="persona-edit-grid">
-                      <div className="grid-item">
+                      <div className="grid-item glass-card">
                         {editingPersona.avatar && (
                           <img
                             src={editingPersona.avatar}
@@ -1251,7 +1251,7 @@ const InitiativesNew = () => {
                           rows={2}
                         />
                       </div>
-                      <div className="grid-item">
+                      <div className="grid-item glass-card">
                         <select
                           className="generator-input"
                           value={editingPersona.ageRange}
@@ -1305,7 +1305,8 @@ const InitiativesNew = () => {
                           )}
                         </select>
                       </div>
-                      <div className="grid-item">
+                      <div className="grid-item glass-card">
+                        <h5>Motivation</h5>
                         <div className="pill-row">
                           {editingPersona.motivationChoices?.map((m, i) => (
                             <button
@@ -1318,15 +1319,18 @@ const InitiativesNew = () => {
                             </button>
                           ))}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => refreshChoices("motivation")}
-                          className="generator-button"
-                        >
-                          Generate more
-                        </button>
+                        {(editingPersona.motivationChoices?.filter((m) => m.selected) || []).length < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => refreshChoices("motivation")}
+                            className="generator-button"
+                          >
+                            Generate more
+                          </button>
+                        )}
                       </div>
-                      <div className="grid-item">
+                      <div className="grid-item glass-card">
+                        <h5>Challenges</h5>
                         <div className="pill-row">
                           {editingPersona.challengeChoices?.map((c, i) => (
                             <button
@@ -1339,13 +1343,15 @@ const InitiativesNew = () => {
                             </button>
                           ))}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => refreshChoices("challenge")}
-                          className="generator-button"
-                        >
-                          Generate more
-                        </button>
+                        {(editingPersona.challengeChoices?.filter((c) => c.selected) || []).length < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => refreshChoices("challenge")}
+                            className="generator-button"
+                          >
+                            Generate more
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="button-row">
