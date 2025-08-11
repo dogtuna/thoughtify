@@ -219,6 +219,7 @@ const InitiativesNew = () => {
 
   const extractTextFromPdf = async (buffer) => {
     const pdfjs = await import(
+      /* @vite-ignore */
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.mjs"
     );
     pdfjs.GlobalWorkerOptions.workerSrc =
