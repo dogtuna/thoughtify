@@ -433,6 +433,7 @@ export const generateLearningStrategy = onCall(
       businessGoal,
       audienceProfile,
       projectConstraints,
+      sourceMaterial = "",
       clarifyingQuestions = [],
       clarifyingAnswers = [],
       personaCount = 3,
@@ -489,7 +490,8 @@ export const generateLearningStrategy = onCall(
       `Project Brief: ${projectBrief}\n` +
       `Business Goal: ${businessGoal}\n` +
       `Audience Profile: ${audienceProfile}\n` +
-      `Project Constraints: ${projectConstraints}` +
+      `Project Constraints: ${projectConstraints}\n` +
+      `Source Material: ${sourceMaterial}` +
       clarificationsBlock;
 
     const { text } = await ai.generate(prompt);
@@ -627,6 +629,7 @@ export const generateLearnerPersona = onCall(
       businessGoal,
       audienceProfile,
       projectConstraints,
+      sourceMaterial = "",
       existingMotivationKeywords = [],
       existingChallengeKeywords = [],
       refreshField,
@@ -677,7 +680,7 @@ export const generateLearnerPersona = onCall(
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
 Audience Profile: ${audienceProfile}
-Project Constraints: ${projectConstraints}`;
+Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       } else {
         const fieldDescriptions = {
           ageRange: "age range (e.g., '25-34')",
@@ -692,7 +695,7 @@ Project Constraints: ${projectConstraints}`;
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
 Audience Profile: ${audienceProfile}
-Project Constraints: ${projectConstraints}`;
+Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       }
 
       const { text } = await ai.generate(listPrompt);
@@ -745,10 +748,10 @@ Return a JSON object exactly like this, no code fences, and vary the persona eac
 Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.
 Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
 
-Project Brief: ${projectBrief}
-Business Goal: ${businessGoal}
-Audience Profile: ${audienceProfile}
-Project Constraints: ${projectConstraints}`;
+  Project Brief: ${projectBrief}
+  Business Goal: ${businessGoal}
+  Audience Profile: ${audienceProfile}
+  Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
 
     const { text } = await ai.generate(textPrompt);
 
@@ -778,6 +781,7 @@ const generateLearningObjectivesCF = onCall(
       audienceProfile,
       projectConstraints,
       selectedModality,
+      sourceMaterial = "",
       approach = "ABCD",
       bloomLevel,
       category,
@@ -797,7 +801,7 @@ const generateLearningObjectivesCF = onCall(
         model: gemini("gemini-1.5-pro"),
       });
 
-      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}`;
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nSource Material: ${sourceMaterial}`;
 
       if (refresh) {
         const { type, index, existing = [] } = refresh;
@@ -887,6 +891,7 @@ export const generateHierarchicalOutline = onCall(
       projectConstraints,
       selectedModality,
       learningObjectives,
+      sourceMaterial = "",
     } = req.data || {};
 
     if (!projectBrief || !learningObjectives) {
@@ -917,7 +922,7 @@ export const generateHierarchicalOutline = onCall(
         }
       });
 
-      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nLearning Objectives:\n${lines.join("\n")}`;
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nSource Material: ${sourceMaterial}\nLearning Objectives:\n${lines.join("\n")}`;
 
       const prompt = `You are a Senior Instructional Designer. Using the information below, create a detailed, hierarchical course outline that ensures all learning objectives are fully covered. Return the outline as plain text with modules and subtopics.\n\n${baseInfo}`;
 
@@ -949,6 +954,7 @@ export const generateLearningDesignDocument = onCall(
       selectedModality,
       learningObjectives,
       courseOutline,
+      sourceMaterial = "",
     } = req.data || {};
 
     if (!projectBrief || !learningObjectives || !courseOutline) {
@@ -979,7 +985,7 @@ export const generateLearningDesignDocument = onCall(
         }
       });
 
-      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nCourse Outline:\n${courseOutline}\nLearning Objectives:\n${lines.join("\n")}`;
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nSource Material: ${sourceMaterial}\nCourse Outline:\n${courseOutline}\nLearning Objectives:\n${lines.join("\n")}`;
 
       const prompt = `You are a Senior Instructional Designer. Using the information below, create a comprehensive Learning Design Document that serves as the single source of truth for the project. Include the following sections: 1. Front Matter & Executive Summary (Project Title, Version Control table, Project Overview, Key Stakeholders) 2. Audience Analysis (Learner Demographics, Prior Knowledge & Skills, Learner Motivation, Technical Environment, Learner Personas) 3. Business Goals & Learning Objectives (Business Goal, Terminal Learning Objective, Enabling Learning Objectives) 4. Instructional Strategy (Delivery Modality, Instructional Approach, Tone & Style, Interaction Strategy) 5. Curriculum Blueprint (Hierarchical Outline, Objective Mapping, Content Summary, Estimated Seat Time) 6. Assessment & Evaluation Strategy (Formative Assessment, Summative Assessment, Evaluation Plan for Kirkpatrick Levels 1-4, xAPI Strategy if applicable). Present the document in clear markdown with headings and subheadings.\n\n${baseInfo}`;
 
