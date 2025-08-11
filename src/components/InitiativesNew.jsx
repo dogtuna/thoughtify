@@ -938,13 +938,22 @@ const InitiativesNew = () => {
       {step === 3 && (
         <div className="generator-result" ref={projectBriefRef}>
           <h3>Project Brief</h3>
-          <textarea
-            className="generator-input"
-            value={projectBrief}
-            onChange={(e) => setProjectBrief(e.target.value)}
-            readOnly={!isEditingBrief}
-            rows={10}
-          />
+          {isEditingBrief ? (
+            <textarea
+              className="generator-input project-brief-textarea"
+              value={projectBrief}
+              onChange={(e) => setProjectBrief(e.target.value)}
+              rows={10}
+            />
+          ) : (
+            <div className="project-brief-display">
+              {projectBrief
+                .split("\n")
+                .map((para, idx) => (
+                  <p key={idx}>{para}</p>
+                ))}
+            </div>
+          )}
           <div className="button-row">
             <button
               type="button"
@@ -953,28 +962,26 @@ const InitiativesNew = () => {
             >
               Back
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="generator-button save-button"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (isEditingBrief) {
-                  const uid = auth.currentUser?.uid;
-                  if (uid) {
-                    saveInitiative(uid, initiativeId, { projectBrief });
-                  }
-                }
-                setIsEditingBrief((prev) => !prev);
-              }}
-              className="generator-button"
-            >
-              {isEditingBrief ? "Save Brief" : "Edit Brief"}
-            </button>
+            {isEditingBrief ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleSave();
+                  setIsEditingBrief(false);
+                }}
+                className="generator-button save-button"
+              >
+                Save
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingBrief(true)}
+                className="generator-button edit-button"
+              >
+                Edit
+              </button>
+            )}
             <button
               type="button"
               onClick={handleDownload}
