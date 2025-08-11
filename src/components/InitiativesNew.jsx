@@ -55,8 +55,18 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
-  const TOTAL_STEPS = 9;
+  const steps = [
+    "Project Info",
+    "Clarify",
+    "Brief",
+    "Personas",
+    "Approach",
+    "Objectives",
+    "Outline",
+    "Design",
+  ];
   const [step, setStep] = useState(1);
+  const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
@@ -86,11 +96,17 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
-  const { learningObjectives, courseOutline, setLearningDesignDocument } = useProject();
+  const {
+    learningObjectives,
+    courseOutline,
+    learningDesignDocument,
+    setLearningDesignDocument,
+  } = useProject();
 
   const projectBriefRef = useRef(null);
   const nextButtonRef = useRef(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
 
   const addUsedMotivation = (keywords = []) => {
     setUsedMotivationKeywords((prev) =>
@@ -106,6 +122,31 @@ const InitiativesNew = () => {
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
+  const handleSave = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      await saveInitiative(uid, initiativeId, {
+        projectName,
+        businessGoal,
+        audienceProfile,
+        sourceMaterial,
+        projectConstraints,
+        projectBrief,
+        clarifyingQuestions,
+        clarifyingAnswers,
+        strategy,
+        selectedModality,
+        learningDesignDocument,
+      });
+      setSaveStatus("Saved");
+      setTimeout(() => setSaveStatus(""), 3000);
+    } catch (err) {
+      console.error("Error saving initiative:", err);
+      setSaveStatus("Error Saving");
+    }
+  };
+
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -113,6 +154,7 @@ const InitiativesNew = () => {
     loadInitiative(uid, initiativeId)
       .then((data) => {
         if (data) {
+          setProjectName(data.projectName || "");
           setBusinessGoal(data.businessGoal || "");
           setAudienceProfile(data.audienceProfile || "");
           setSourceMaterial(data.sourceMaterial || "");
@@ -205,6 +247,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           businessGoal,
           audienceProfile,
           sourceMaterial,
@@ -245,6 +288,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           businessGoal,
           audienceProfile,
           sourceMaterial,
@@ -313,6 +357,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           strategy: data,
           selectedModality: data.modalityRecommendation,
         });
@@ -609,53 +654,85 @@ const InitiativesNew = () => {
 
   return (
     <div className="generator-container">
-      <h2>Initiatives - Project Intake & Analysis</h2>
+      <h2>Thoughtify Project Architect</h2>
+      <p className="generator-subheading">
+        Your AI Partner for End-to-End Course Creation
+      </p>
+      <div className="step-tracker">
+        <div className="steps">
+          {steps.map((label, idx) => (
+            <div
+              key={label}
+              className={`step-item ${
+                idx + 1 === step ? "active" : idx + 1 < step ? "completed" : ""
+              }`}
+              onClick={() => setStep(idx + 1)}
+            >
+              <div className="step-circle">
+                {idx + 1 < step ? "\u2713" : idx + 1}
+              </div>
+              <div className="step-label">{label}</div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="generator-button save-button"
+        >
+          Save
+        </button>
+      </div>
+      {saveStatus && <p className="save-status">{saveStatus}</p>}
 
       {step === 1 && (
         <form onSubmit={handleSubmit} className="generator-form">
-          <div className="progress-indicator">Step 1 of {TOTAL_STEPS}</div>
-          <label>
-            Goal
-            <input
-              type="text"
-              value={businessGoal}
-              onChange={(e) => setBusinessGoal(e.target.value)}
-              className="generator-input"
-            />
-          </label>
-          <label>
-            Audience Profile
-            <textarea
-              value={audienceProfile}
-              onChange={(e) => setAudienceProfile(e.target.value)}
-              className="generator-input"
-              rows={3}
-            />
-          </label>
-          <label>
-            Source Material or Links
-            <textarea
-              value={sourceMaterial}
-              onChange={(e) => setSourceMaterial(e.target.value)}
-              className="generator-input"
-              rows={4}
-            />
-          </label>
-          <label>
-            Source File
-            <input type="file" onChange={handleFileUpload} className="generator-input" />
-          </label>
-          <label>
-            Project Constraints
-            <textarea
-              value={projectConstraints}
-              onChange={(e) => setProjectConstraints(e.target.value)}
-              className="generator-input"
-              rows={2}
-            />
-          </label>
+          <h3>Project Intake</h3>
+          <p>Tell us about your project. The more detail, the better.</p>
+          <div className="intake-grid">
+            <div className="intake-left">
+              <label>
+                Project Name (e.g., &apos;Q3 Sales Onboarding&apos;)
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="generator-input"
+                />
+              </label>
+              <label>
+                What is the primary business goal? (e.g., &apos;Reduce support tickets for Product X by 20%&apos;)
+                <input
+                  type="text"
+                  value={businessGoal}
+                  onChange={(e) => setBusinessGoal(e.target.value)}
+                  className="generator-input"
+                />
+              </label>
+              <label>
+                Who is the target audience? (e.g., &apos;New sales hires, age 22-28, with no prior industry experience&apos;)
+                <textarea
+                  value={audienceProfile}
+                  onChange={(e) => setAudienceProfile(e.target.value)}
+                  className="generator-input"
+                  rows={3}
+                />
+              </label>
+            </div>
+            <label className="upload-card">
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                className="file-input"
+                accept=".pdf,.docx,.txt"
+              />
+              <div className="upload-title">Upload Source Material (Optional)</div>
+              <div className="upload-subtitle">Click to upload or drag and drop</div>
+              <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+            </label>
+          </div>
           <button type="submit" disabled={loading} className="generator-button">
-            {loading ? "Analyzing..." : "Advance to Step 2"}
+            {loading ? "Analyzing..." : "Next"}
           </button>
           {error && <p className="generator-error">{error}</p>}
         </form>
@@ -663,7 +740,6 @@ const InitiativesNew = () => {
 
       {step === 2 && (
         <div className="generator-result">
-          <div className="progress-indicator">Step 2 of {TOTAL_STEPS}</div>
           <p>
             Answering the questions below is optional, but it will help ensure the brief is as good as possible.
           </p>
@@ -680,7 +756,7 @@ const InitiativesNew = () => {
           ))}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => setStep(1)} className="generator-button">
-              Back to Step 1
+              Back
             </button>
             <button
               type="button"
@@ -697,7 +773,6 @@ const InitiativesNew = () => {
 
       {step === 3 && (
         <div className="generator-result" ref={projectBriefRef}>
-          <div className="progress-indicator">Step 3 of {TOTAL_STEPS}</div>
           <h3>Project Brief</h3>
           <textarea
             className="generator-input"
@@ -708,7 +783,7 @@ const InitiativesNew = () => {
           />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => setStep(2)} className="generator-button">
-              Back to Step 2
+              Back
             </button>
             <button
               type="button"
@@ -734,7 +809,7 @@ const InitiativesNew = () => {
               className="generator-button"
               ref={nextButtonRef}
             >
-              Advance to Step 4
+              Next
             </button>
           </div>
           {showScrollHint && (
@@ -745,14 +820,13 @@ const InitiativesNew = () => {
 
       {step === 4 && (
         <div className="generator-result">
-          <div className="progress-indicator">Step 4 of {TOTAL_STEPS}</div>
           <button
             type="button"
             onClick={() => setStep(3)}
             className="generator-button"
             style={{ marginBottom: 10 }}
           >
-            Back to Step 3
+            Back
           </button>
 
           <div>
@@ -1161,7 +1235,7 @@ const InitiativesNew = () => {
               disabled={nextLoading}
               className="generator-button"
             >
-              {nextLoading ? "Generating..." : "Advance to Step 5"}
+              {nextLoading ? "Generating..." : "Next"}
             </button>
           </div>
           {nextError && <p className="generator-error">{nextError}</p>}
@@ -1170,14 +1244,13 @@ const InitiativesNew = () => {
 
       {step === 5 && strategy && (
         <div className="generator-result">
-          <div className="progress-indicator">Step 5 of {TOTAL_STEPS}</div>
           <button
             type="button"
             onClick={() => setStep(4)}
             className="generator-button"
             style={{ marginBottom: 10 }}
           >
-            Back to Step 4
+            Back
           </button>
           <h3>Select Learning Approach</h3>
           <select
@@ -1231,7 +1304,6 @@ const InitiativesNew = () => {
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
-          totalSteps={TOTAL_STEPS}
           onBack={() => setStep(5)}
           onNext={() => setStep(7)}
         />
@@ -1245,7 +1317,6 @@ const InitiativesNew = () => {
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
           learningObjectives={learningObjectives}
-          totalSteps={TOTAL_STEPS}
           onBack={() => setStep(6)}
           onNext={() => setStep(8)}
         />
@@ -1260,7 +1331,6 @@ const InitiativesNew = () => {
           selectedModality={selectedModality}
           learningObjectives={learningObjectives}
           courseOutline={courseOutline}
-          totalSteps={TOTAL_STEPS}
           onBack={() => setStep(7)}
         />
       )}

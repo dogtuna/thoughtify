@@ -6,10 +6,75 @@
     padding: 20px;
     border-radius: 12px;
     margin: 20px auto;
-    max-width: 800px;
+    width: 100%;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     text-align: center;
     color: white;
+  }
+
+.generator-subheading {
+    margin-top: 4px;
+    opacity: 0.8;
+  }
+
+.step-tracker {
+    position: relative;
+    margin: 20px 0;
+    padding-right: 60px;
+  }
+
+.steps {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0.5;
+  }
+
+.step-item.active,
+.step-item.completed {
+    opacity: 1;
+  }
+
+.step-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #8C259E;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+.step-item.completed .step-circle {
+    background: #8C259E;
+    color: white;
+  }
+
+.step-label {
+    font-size: 12px;
+  }
+
+.save-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+.save-status {
+    margin-top: -10px;
+    margin-bottom: 10px;
   }
   
   /* Form styling */
@@ -28,6 +93,57 @@
     background: rgba(255, 255, 255, 0.1);
     color: white;
     font-size: 16px;
+  }
+
+  .intake-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .intake-left {
+    flex: 1;
+    min-width: 250px;
+  }
+
+  .upload-card {
+    flex: 1;
+    min-width: 250px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .upload-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .file-input {
+    display: none;
+  }
+
+  .upload-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .upload-subtitle {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .upload-hint {
+    font-size: 12px;
+    opacity: 0.8;
   }
   
   .generator-button {
