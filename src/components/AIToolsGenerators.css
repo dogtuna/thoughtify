@@ -392,6 +392,12 @@
   text-align: center;
 }
 
+/* Ensure inputs don't overflow their grid item */
+.persona-edit-grid .grid-item .generator-input {
+  max-width: 100%;
+  margin: 10px 0;
+}
+
 @media (max-width: 600px) {
   .persona-edit-grid .grid-item {
     flex-basis: 100%;
@@ -404,6 +410,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 10px 0;
+  justify-content: center;
 }
 
 .pill {
