@@ -289,6 +289,7 @@
   height: 120px;
   border-radius: 50%;
   margin-bottom: 10px;
+  border: 4px solid purple;
 }
 
 .persona-tabs {
@@ -373,24 +374,29 @@
 }
 
 .persona-edit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 20px;
-  justify-items: center;
-}
-
-@media (max-width: 600px) {
-  .persona-edit-grid {
-    grid-template-columns: 1fr;
-  }
+  justify-content: center;
 }
 
 .persona-edit-grid .grid-item {
+  flex: 1 1 42%;
+  max-width: 42%;
+  box-sizing: border-box;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
   text-align: center;
+}
+
+@media (max-width: 600px) {
+  .persona-edit-grid .grid-item {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
 }
 
 .pill-row {

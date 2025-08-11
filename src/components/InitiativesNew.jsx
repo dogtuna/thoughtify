@@ -1453,30 +1453,32 @@ const InitiativesNew = () => {
             )}
           </div>
           {personaError && <p className="generator-error">{personaError}</p>}
-          <div className="button-row">
-            <button
-              type="button"
-              onClick={() => setStep(3)}
-              className="generator-button back-button"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="generator-button save-button"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateStrategy}
-              disabled={nextLoading}
-              className="generator-button next-button"
-            >
-              {nextLoading ? "Generating..." : "Next"}
-            </button>
-          </div>
+          {!editingPersona && (
+            <div className="button-row">
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="generator-button back-button"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="generator-button save-button"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateStrategy}
+                disabled={nextLoading}
+                className="generator-button next-button"
+              >
+                {nextLoading ? "Generating..." : "Next"}
+              </button>
+            </div>
+          )}
           {nextError && <p className="generator-error">{nextError}</p>}
         </div>
       )}
