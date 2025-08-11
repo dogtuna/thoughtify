@@ -69,7 +69,9 @@ const InitiativesNew = () => {
   const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
-  const [sourceMaterial, setSourceMaterial] = useState("");
+  const [sourceMaterials, setSourceMaterials] = useState([]);
+  const getCombinedSource = () =>
+    sourceMaterials.map((f) => f.content).join("\n");
   const [projectConstraints, setProjectConstraints] = useState("");
 
   const [projectBrief, setProjectBrief] = useState("");
@@ -130,7 +132,7 @@ const InitiativesNew = () => {
         projectName,
         businessGoal,
         audienceProfile,
-        sourceMaterial,
+        sourceMaterials,
         projectConstraints,
         projectBrief,
         clarifyingQuestions,
@@ -157,7 +159,13 @@ const InitiativesNew = () => {
           setProjectName(data.projectName || "");
           setBusinessGoal(data.businessGoal || "");
           setAudienceProfile(data.audienceProfile || "");
-          setSourceMaterial(data.sourceMaterial || "");
+          setSourceMaterials(
+            Array.isArray(data.sourceMaterials)
+              ? data.sourceMaterials
+              : data.sourceMaterial
+              ? [{ name: "Imported", content: data.sourceMaterial }]
+              : []
+          );
           setProjectConstraints(data.projectConstraints || "");
           setProjectBrief(data.projectBrief || "");
           setClarifyingQuestions(data.clarifyingQuestions || []);
@@ -209,14 +217,35 @@ const InitiativesNew = () => {
   const generateLearnerPersona = httpsCallable(functions, "generateLearnerPersona");
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSourceMaterial((prev) => `${prev}\n${reader.result}`);
-    };
-    reader.readAsText(file);
+  const handleFiles = (files) => {
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSourceMaterials((prev) => [
+          ...prev,
+          { name: file.name, content: reader.result },
+        ]);
+      };
+      reader.readAsText(file);
+    });
+  };
+
+  const handleFileInput = (e) => {
+    const { files } = e.target;
+    if (files) handleFiles(files);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const removeFile = (index) => {
+    setSourceMaterials((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -236,7 +265,7 @@ const InitiativesNew = () => {
       const { data } = await generateProjectBrief({
         businessGoal,
         audienceProfile,
-        sourceMaterial,
+        sourceMaterial: getCombinedSource(),
         projectConstraints,
       });
 
@@ -250,7 +279,7 @@ const InitiativesNew = () => {
           projectName,
           businessGoal,
           audienceProfile,
-          sourceMaterial,
+          sourceMaterials,
           projectConstraints,
           clarifyingQuestions: qs,
           clarifyingAnswers: qs.map(() => ""),
@@ -273,7 +302,7 @@ const InitiativesNew = () => {
       const { data } = await generateProjectBrief({
         businessGoal,
         audienceProfile,
-        sourceMaterial,
+        sourceMaterial: getCombinedSource(),
         projectConstraints,
         clarifyingQuestions,
         clarifyingAnswers,
@@ -291,7 +320,7 @@ const InitiativesNew = () => {
           projectName,
           businessGoal,
           audienceProfile,
-          sourceMaterial,
+          sourceMaterials,
           projectConstraints,
           projectBrief: data.projectBrief,
           clarifyingQuestions,
@@ -342,6 +371,7 @@ const InitiativesNew = () => {
         clarifyingQuestions,
         clarifyingAnswers,
         personaCount: 0,
+        sourceMaterial: getCombinedSource(),
       });
 
       if (
@@ -401,6 +431,7 @@ const InitiativesNew = () => {
           businessGoal,
           audienceProfile,
           projectConstraints,
+          sourceMaterial: getCombinedSource(),
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
           existingNames,
@@ -467,6 +498,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         existingNames,
@@ -553,6 +585,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         refreshField: field,
@@ -659,7 +692,10 @@ const InitiativesNew = () => {
         Your AI Partner for End-to-End Course Creation
       </p>
       <div className="step-tracker">
-        <div className="steps">
+        <div
+          className="steps"
+          style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}
+        >
           {steps.map((label, idx) => (
             <div
               key={label}
@@ -675,13 +711,6 @@ const InitiativesNew = () => {
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={handleSave}
-          className="generator-button save-button"
-        >
-          Save
-        </button>
       </div>
       {saveStatus && <p className="save-status">{saveStatus}</p>}
 
@@ -692,48 +721,86 @@ const InitiativesNew = () => {
           <div className="intake-grid">
             <div className="intake-left">
               <label>
-                Project Name (e.g., &apos;Q3 Sales Onboarding&apos;)
+                Project Name
                 <input
                   type="text"
                   value={projectName}
+                  placeholder="e.g., 'Q3 Sales Onboarding'"
                   onChange={(e) => setProjectName(e.target.value)}
                   className="generator-input"
                 />
               </label>
               <label>
-                What is the primary business goal? (e.g., &apos;Reduce support tickets for Product X by 20%&apos;)
+                What is the primary business goal?
                 <input
                   type="text"
                   value={businessGoal}
+                  placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
                   onChange={(e) => setBusinessGoal(e.target.value)}
                   className="generator-input"
                 />
               </label>
               <label>
-                Who is the target audience? (e.g., &apos;New sales hires, age 22-28, with no prior industry experience&apos;)
+                Who is the target audience?
                 <textarea
                   value={audienceProfile}
+                  placeholder="e.g., 'New sales hires, age 22-28, with no prior industry experience'"
                   onChange={(e) => setAudienceProfile(e.target.value)}
                   className="generator-input"
                   rows={3}
                 />
               </label>
             </div>
-            <label className="upload-card">
+            <div
+              className="upload-card"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
               <input
                 type="file"
-                onChange={handleFileUpload}
+                onChange={handleFileInput}
                 className="file-input"
                 accept=".pdf,.docx,.txt"
+                multiple
               />
               <div className="upload-title">Upload Source Material (Optional)</div>
               <div className="upload-subtitle">Click to upload or drag and drop</div>
               <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
-            </label>
+            </div>
           </div>
-          <button type="submit" disabled={loading} className="generator-button">
-            {loading ? "Analyzing..." : "Next"}
-          </button>
+          {sourceMaterials.length > 0 && (
+            <ul className="file-list">
+              {sourceMaterials.map((f, idx) => (
+                <li key={idx}>
+                  {f.name}
+                  <button
+                    type="button"
+                    className="remove-file"
+                    onClick={() => removeFile(idx)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+              disabled={loading}
+            >
+              Save
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="generator-button next-button"
+            >
+              {loading ? "Analyzing..." : "Next"}
+            </button>
+          </div>
           {error && <p className="generator-error">{error}</p>}
         </form>
       )}
@@ -754,15 +821,26 @@ const InitiativesNew = () => {
               />
             </div>
           ))}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setStep(1)} className="generator-button">
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="generator-button back-button"
+            >
               Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
             </button>
             <button
               type="button"
               onClick={handleGenerateBrief}
               disabled={loading}
-              className="generator-button"
+              className="generator-button next-button"
             >
               {loading ? "Generating..." : "Generate Brief"}
             </button>
@@ -781,9 +859,20 @@ const InitiativesNew = () => {
             readOnly={!isEditingBrief}
             rows={10}
           />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setStep(2)} className="generator-button">
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="generator-button back-button"
+            >
               Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
             </button>
             <button
               type="button"
@@ -800,13 +889,17 @@ const InitiativesNew = () => {
             >
               {isEditingBrief ? "Save Brief" : "Edit Brief"}
             </button>
-            <button type="button" onClick={handleDownload} className="generator-button">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="generator-button"
+            >
               Download Brief
             </button>
             <button
               type="button"
               onClick={() => setStep(4)}
-              className="generator-button"
+              className="generator-button next-button"
               ref={nextButtonRef}
             >
               Next
@@ -820,14 +913,22 @@ const InitiativesNew = () => {
 
       {step === 4 && (
         <div className="generator-result">
-          <button
-            type="button"
-            onClick={() => setStep(3)}
-            className="generator-button"
-            style={{ marginBottom: 10 }}
-          >
-            Back
-          </button>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
+          </div>
 
           <div>
             <h3>Learner Personas</h3>
@@ -1228,12 +1329,19 @@ const InitiativesNew = () => {
             )}
           </div>
           {personaError && <p className="generator-error">{personaError}</p>}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
             <button
               type="button"
               onClick={handleGenerateStrategy}
               disabled={nextLoading}
-              className="generator-button"
+              className="generator-button next-button"
             >
               {nextLoading ? "Generating..." : "Next"}
             </button>
@@ -1244,14 +1352,6 @@ const InitiativesNew = () => {
 
       {step === 5 && strategy && (
         <div className="generator-result">
-          <button
-            type="button"
-            onClick={() => setStep(4)}
-            className="generator-button"
-            style={{ marginBottom: 10 }}
-          >
-            Back
-          </button>
           <h3>Select Learning Approach</h3>
           <select
             className="generator-input"
@@ -1285,11 +1385,25 @@ const InitiativesNew = () => {
               </>
             );
           })()}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
             <button
               type="button"
               onClick={() => setStep(6)}
-              className="generator-button"
+              className="generator-button next-button"
             >
               Confirm & Continue
             </button>
@@ -1304,6 +1418,7 @@ const InitiativesNew = () => {
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
+          sourceMaterials={sourceMaterials}
           onBack={() => setStep(5)}
           onNext={() => setStep(7)}
         />
@@ -1317,6 +1432,7 @@ const InitiativesNew = () => {
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
           learningObjectives={learningObjectives}
+          sourceMaterials={sourceMaterials}
           onBack={() => setStep(6)}
           onNext={() => setStep(8)}
         />
@@ -1331,6 +1447,7 @@ const InitiativesNew = () => {
           selectedModality={selectedModality}
           learningObjectives={learningObjectives}
           courseOutline={courseOutline}
+          sourceMaterials={sourceMaterials}
           onBack={() => setStep(7)}
         />
       )}

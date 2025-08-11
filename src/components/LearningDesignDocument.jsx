@@ -15,6 +15,7 @@ const LearningDesignDocument = ({
   selectedModality,
   learningObjectives,
   courseOutline,
+  sourceMaterials,
   onBack,
 }) => {
   const { learningDesignDocument, setLearningDesignDocument } = useProject();
@@ -39,6 +40,7 @@ const LearningDesignDocument = ({
         selectedModality,
         learningObjectives,
         courseOutline,
+        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
       setLearningDesignDocument(data.document);
     } catch (err) {
@@ -64,26 +66,24 @@ const LearningDesignDocument = ({
     }
   }, [learningDesignDocument, initiativeId]);
 
+  const handleManualSave = async () => {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      await saveInitiative(uid, initiativeId, { learningDesignDocument });
+    }
+  };
+
   return (
     <div className="generator-result">
-      <button
-        type="button"
-        onClick={onBack}
-        className="generator-button"
-        style={{ marginBottom: 10 }}
-      >
-        Back
-      </button>
-      <button
-        type="button"
-        onClick={() =>
-          navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`)
-        }
-        className="generator-button"
-        style={{ marginBottom: 10, marginLeft: 10 }}
-      >
-        Next: Content & Assets
-      </button>
+      <div className="button-row">
+        <button
+          type="button"
+          onClick={onBack}
+          className="generator-button back-button"
+        >
+          Back
+        </button>
+      </div>
       <h3>Learning Design Document</h3>
       {!learningDesignDocument && !error && (
         <p>{loading ? "Generating..." : "Preparing document..."}</p>
@@ -95,7 +95,7 @@ const LearningDesignDocument = ({
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="generator-button"
+            className="generator-button next-button"
           >
             {loading ? "Generating..." : "Try Again"}
           </button>
@@ -110,6 +110,24 @@ const LearningDesignDocument = ({
           />
         </div>
       )}
+      <div className="button-row">
+        <button
+          type="button"
+          onClick={handleManualSave}
+          className="generator-button save-button"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`)
+          }
+          className="generator-button next-button"
+        >
+          Next: Content & Assets
+        </button>
+      </div>
     </div>
   );
 };
@@ -124,5 +142,6 @@ LearningDesignDocument.propTypes = {
   selectedModality: PropTypes.string.isRequired,
   learningObjectives: PropTypes.object.isRequired,
   courseOutline: PropTypes.string.isRequired,
+  sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
 };

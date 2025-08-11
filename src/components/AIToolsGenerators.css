@@ -20,14 +20,12 @@
 .step-tracker {
     position: relative;
     margin: 20px 0;
-    padding-right: 60px;
   }
 
 .steps {
-    display: flex;
-    justify-content: center;
+    display: grid;
     gap: 12px;
-    flex-wrap: wrap;
+    justify-content: center;
   }
 
 .step-item {
@@ -36,6 +34,7 @@
     align-items: center;
     cursor: pointer;
     opacity: 0.5;
+    text-align: center;
   }
 
 .step-item.active,
@@ -62,14 +61,6 @@
 
 .step-label {
     font-size: 12px;
-  }
-
-.save-button {
-    position: absolute;
-    right: 0;
-    top: 0;
-    padding: 6px 12px;
-    font-size: 14px;
   }
 
 .save-status {
@@ -147,20 +138,60 @@
   }
   
   .generator-button {
-    margin-top: 10px;
     padding: 10px 20px;
-    background-color: #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
     color: white;
-    border: none;
     border-radius: 6px;
+    border: 2px solid transparent;
     cursor: pointer;
     font-size: 16px;
     font-weight: bold;
   }
-  
+
   .generator-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .back-button {
+    border-image: linear-gradient(45deg, #8C259E, #D071F9) 1;
+  }
+
+  .next-button {
+    border-image: linear-gradient(45deg, #FF8C00, #FFD700) 1;
+  }
+
+  .save-button {
+    border-image: linear-gradient(45deg, #00F5FF, #FF00FF, #00FF7F) 1;
+  }
+
+  .button-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  .file-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 10px;
+  }
+
+  .file-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .remove-file {
+    background: none;
+    border: none;
+    color: #E64A78;
+    cursor: pointer;
   }
   
   /* Error message styling */

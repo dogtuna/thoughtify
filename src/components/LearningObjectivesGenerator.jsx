@@ -30,6 +30,7 @@ const LearningObjectivesGenerator = ({
   audienceProfile,
   projectConstraints,
   selectedModality,
+  sourceMaterials,
   onBack,
   onNext,
 }) => {
@@ -58,6 +59,7 @@ const LearningObjectivesGenerator = ({
         audienceProfile,
         projectConstraints,
         selectedModality,
+        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
         approach,
         bloomLevel,
       });
@@ -105,9 +107,12 @@ const LearningObjectivesGenerator = ({
         audienceProfile,
         projectConstraints,
         selectedModality,
+        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
         approach: learningObjectives.approach,
         bloomLevel: learningObjectives.bloomLevel,
-        ...(learningObjectives.category ? { category: learningObjectives.category } : {}),
+        ...(learningObjectives.category
+          ? { category: learningObjectives.category }
+          : {}),
         refresh: { type, index, existing: getAllTexts() },
       });
       const obj = transform(data.options || []);
@@ -230,14 +235,15 @@ const LearningObjectivesGenerator = ({
 
   return (
     <div className="generator-result">
-      <button
-        type="button"
-        onClick={onBack}
-        className="generator-button"
-        style={{ marginBottom: 10 }}
-      >
-        Back
-      </button>
+      <div className="button-row">
+        <button
+          type="button"
+          onClick={onBack}
+          className="generator-button back-button"
+        >
+          Back
+        </button>
+      </div>
       <h3>Learning Objectives</h3>
       <div style={{ marginBottom: 10 }}>
         <label>
@@ -279,7 +285,7 @@ const LearningObjectivesGenerator = ({
           type="button"
           onClick={handleGenerate}
           disabled={loading}
-          className="generator-button"
+          className="generator-button next-button"
         >
           {loading ? "Generating..." : "Generate Objectives"}
         </button>
@@ -296,25 +302,25 @@ const LearningObjectivesGenerator = ({
           {(learningObjectives.enablingObjectives || []).map((obj, idx) =>
             renderObjective(obj, "enabling", idx)
           )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="generator-button"
-            style={{ marginTop: 10 }}
-          >
-            {saving ? "Saving..." : "Save Objectives"}
-          </button>
-          {onNext && (
+          <div className="button-row">
             <button
               type="button"
-              onClick={onNext}
-              className="generator-button"
-              style={{ marginTop: 10 }}
+              onClick={handleSave}
+              disabled={saving}
+              className="generator-button save-button"
             >
-              Next
+              {saving ? "Saving..." : "Save Objectives"}
             </button>
-          )}
+            {onNext && (
+              <button
+                type="button"
+                onClick={onNext}
+                className="generator-button next-button"
+              >
+                Next
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -329,6 +335,7 @@ LearningObjectivesGenerator.propTypes = {
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
+  sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
   onNext: PropTypes.func,
 };

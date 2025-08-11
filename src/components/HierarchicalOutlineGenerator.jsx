@@ -14,6 +14,7 @@ const HierarchicalOutlineGenerator = ({
   projectConstraints,
   selectedModality,
   learningObjectives,
+  sourceMaterials,
   onBack,
   onNext,
 }) => {
@@ -37,6 +38,7 @@ const HierarchicalOutlineGenerator = ({
         projectConstraints,
         selectedModality,
         learningObjectives,
+        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
       setCourseOutline(data.outline);
     } catch (err) {
@@ -61,23 +63,31 @@ const HierarchicalOutlineGenerator = ({
     }
   }, [courseOutline, initiativeId]);
 
+  const handleManualSave = async () => {
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      await saveInitiative(uid, initiativeId, { courseOutline });
+    }
+  };
+
   return (
     <div className="generator-result">
-      <button
-        type="button"
-        onClick={onBack}
-        className="generator-button"
-        style={{ marginBottom: 10 }}
-      >
-        Back
-      </button>
+      <div className="button-row">
+        <button
+          type="button"
+          onClick={onBack}
+          className="generator-button back-button"
+        >
+          Back
+        </button>
+      </div>
       <h3>Hierarchical Course Outline</h3>
       {!courseOutline && (
         <button
           type="button"
           onClick={handleGenerate}
           disabled={loading}
-          className="generator-button"
+          className="generator-button next-button"
         >
           {loading ? "Generating..." : "Generate Outline"}
         </button>
@@ -92,16 +102,24 @@ const HierarchicalOutlineGenerator = ({
               style={{ width: "100%", minHeight: "300px" }}
             />
           </div>
-          {onNext && (
+          <div className="button-row">
             <button
               type="button"
-              onClick={onNext}
-              className="generator-button"
-              style={{ marginTop: 10 }}
+              onClick={handleManualSave}
+              className="generator-button save-button"
             >
-              Generate Learning Design Document
+              Save
             </button>
-          )}
+            {onNext && (
+              <button
+                type="button"
+                onClick={onNext}
+                className="generator-button next-button"
+              >
+                Generate Learning Design Document
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -117,6 +135,7 @@ HierarchicalOutlineGenerator.propTypes = {
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
   learningObjectives: PropTypes.object.isRequired,
+  sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
   onNext: PropTypes.func,
 };
