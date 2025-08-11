@@ -163,7 +163,7 @@
   }
 
   .save-button {
-    border-image: linear-gradient(45deg, #00F5FF, #FF00FF, #00FF7F) 1;
+    border-image: linear-gradient(45deg, #00BFFF, #00FFEA) 1;
   }
 
   .button-row {
@@ -178,6 +178,8 @@
     list-style: none;
     padding: 0;
     margin-top: 10px;
+    width: 100%;
+    text-align: left;
   }
 
   .file-list li {

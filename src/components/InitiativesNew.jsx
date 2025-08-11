@@ -219,13 +219,63 @@ const InitiativesNew = () => {
 
   const extractTextFromPdf = (buffer) => {
     const raw = new TextDecoder("latin1").decode(buffer);
-    const regex = /\(([^()]+)\)\s*Tj/g;
+    const regex = /(?:\(([^()\\]+(?:\\.[^()\\]*)*)\)|\[([^\]]+)\])\s*T[Jj]/g;
     let match;
     let text = "";
     while ((match = regex.exec(raw)) !== null) {
-      text += `${match[1]} `;
+      const content = (match[1] || match[2] || "")
+        .replace(/\\([()\\nrtbf])/g, "$1")
+        .replace(/\s+/g, " ");
+      text += `${content} `;
     }
     return text.trim();
+  };
+
+  const extractTextFromDocx = async (buffer) => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.DecompressionStream === "undefined"
+    )
+      return "";
+    const view = new DataView(buffer);
+    const decoder = new TextDecoder();
+    let offset = buffer.byteLength - 22;
+    while (offset >= 0 && view.getUint32(offset, true) !== 0x06054b50) {
+      offset--;
+    }
+    if (offset < 0) return "";
+    const entries = view.getUint16(offset + 8, true);
+    const cdOffset = view.getUint32(offset + 16, true);
+    offset = cdOffset;
+    for (let i = 0; i < entries; i++) {
+      if (view.getUint32(offset, true) !== 0x02014b50) break;
+      const nameLen = view.getUint16(offset + 28, true);
+      const extraLen = view.getUint16(offset + 30, true);
+      const commentLen = view.getUint16(offset + 32, true);
+      const localOffset = view.getUint32(offset + 42, true);
+      const name = decoder.decode(
+        new Uint8Array(buffer, offset + 46, nameLen)
+      );
+      if (name === "word/document.xml") {
+        const lhNameLen = view.getUint16(localOffset + 26, true);
+        const lhExtraLen = view.getUint16(localOffset + 28, true);
+        const compSize = view.getUint32(localOffset + 18, true);
+        const dataStart = localOffset + 30 + lhNameLen + lhExtraLen;
+        const compressed = buffer.slice(dataStart, dataStart + compSize);
+        const ds = new window.DecompressionStream("deflate-raw");
+        const stream = new Response(
+          new Blob([compressed]).stream().pipeThrough(ds)
+        );
+        const xml = await stream.text();
+        return xml
+          .replace(/<w:p[^>]*>/g, "\n")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+      offset += 46 + nameLen + extraLen + commentLen;
+    }
+    return "";
   };
 
   const handleFiles = async (files) => {
@@ -233,12 +283,25 @@ const InitiativesNew = () => {
       try {
         if (file.name.toLowerCase().endsWith(".pdf")) {
           const buffer = await file.arrayBuffer();
-          const text = extractTextFromPdf(buffer);
-          if (!text) throw new Error("Unable to extract text");
-          setSourceMaterials((prev) => [...prev, { name: file.name, content: text }]);
+          let text = extractTextFromPdf(buffer);
+          if (!text) text = await file.text();
+          setSourceMaterials((prev) => [
+            ...prev,
+            { name: file.name, content: text },
+          ]);
+        } else if (file.name.toLowerCase().endsWith(".docx")) {
+          const buffer = await file.arrayBuffer();
+          const text = await extractTextFromDocx(buffer);
+          setSourceMaterials((prev) => [
+            ...prev,
+            { name: file.name, content: text },
+          ]);
         } else {
           const text = await file.text();
-          setSourceMaterials((prev) => [...prev, { name: file.name, content: text }]);
+          setSourceMaterials((prev) => [
+            ...prev,
+            { name: file.name, content: text },
+          ]);
         }
       } catch (err) {
         console.error("Failed to read file", err);
@@ -783,24 +846,24 @@ const InitiativesNew = () => {
               <div className="upload-title">Upload Source Material (Optional)</div>
               <div className="upload-subtitle">Click to upload or drag and drop</div>
               <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+              {sourceMaterials.length > 0 && (
+                <ul className="file-list">
+                  {sourceMaterials.map((f, idx) => (
+                    <li key={idx}>
+                      {f.name}
+                      <button
+                        type="button"
+                        className="remove-file"
+                        onClick={() => removeFile(idx)}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
-          {sourceMaterials.length > 0 && (
-            <ul className="file-list">
-              {sourceMaterials.map((f, idx) => (
-                <li key={idx}>
-                  {f.name}
-                  <button
-                    type="button"
-                    className="remove-file"
-                    onClick={() => removeFile(idx)}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
           <div className="button-row">
             <button
               type="button"
