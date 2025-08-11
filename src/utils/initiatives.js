@@ -27,6 +27,21 @@ export async function saveInitiative(uid, initiativeId, data) {
   return initiativeId;
 }
 
+export async function saveContentAssets(
+  uid,
+  initiativeId,
+  draftContent = {},
+  mediaAssets = []
+) {
+  const ref = doc(db, "users", uid, "initiatives", initiativeId);
+  await setDoc(
+    ref,
+    { draftContent, mediaAssets, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+  return initiativeId;
+}
+
 export async function deleteInitiative(uid, initiativeId) {
   const ref = doc(db, "users", uid, "initiatives", initiativeId);
   await deleteDoc(ref);
