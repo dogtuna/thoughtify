@@ -14,7 +14,6 @@ const HierarchicalOutlineGenerator = ({
   projectConstraints,
   selectedModality,
   learningObjectives,
-  totalSteps,
   onBack,
   onNext,
 }) => {
@@ -64,14 +63,13 @@ const HierarchicalOutlineGenerator = ({
 
   return (
     <div className="generator-result">
-      <div className="progress-indicator">Step 7 of {totalSteps}</div>
       <button
         type="button"
         onClick={onBack}
         className="generator-button"
         style={{ marginBottom: 10 }}
       >
-        Back to Step 6
+        Back
       </button>
       <h3>Hierarchical Course Outline</h3>
       {!courseOutline && (
@@ -119,7 +117,6 @@ HierarchicalOutlineGenerator.propTypes = {
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
   learningObjectives: PropTypes.object.isRequired,
-  totalSteps: PropTypes.number.isRequired,
   onBack: PropTypes.func.isRequired,
   onNext: PropTypes.func,
 };

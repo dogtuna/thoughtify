@@ -30,7 +30,6 @@ const LearningObjectivesGenerator = ({
   audienceProfile,
   projectConstraints,
   selectedModality,
-  totalSteps,
   onBack,
   onNext,
 }) => {
@@ -231,14 +230,13 @@ const LearningObjectivesGenerator = ({
 
   return (
     <div className="generator-result">
-      <div className="progress-indicator">Step 6 of {totalSteps}</div>
       <button
         type="button"
         onClick={onBack}
         className="generator-button"
         style={{ marginBottom: 10 }}
       >
-        Back to Step 5
+        Back
       </button>
       <h3>Learning Objectives</h3>
       <div style={{ marginBottom: 10 }}>
@@ -314,7 +312,7 @@ const LearningObjectivesGenerator = ({
               className="generator-button"
               style={{ marginTop: 10 }}
             >
-              Continue to Step 7
+              Next
             </button>
           )}
         </div>
@@ -331,7 +329,6 @@ LearningObjectivesGenerator.propTypes = {
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
-  totalSteps: PropTypes.number.isRequired,
   onBack: PropTypes.func.isRequired,
   onNext: PropTypes.func,
 };
