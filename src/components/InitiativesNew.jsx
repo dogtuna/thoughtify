@@ -218,21 +218,24 @@ const InitiativesNew = () => {
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
   const extractTextFromPdf = async (buffer) => {
-    const pdfjs = await import(
-      /* @vite-ignore */
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.mjs"
-    );
-    pdfjs.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.mjs";
-    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
-    let text = "";
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      text += content.items.map((item) => item.str).join(" ") + "\n";
-    }
-    return text.trim();
-  };
+  const BASE = "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.54";
+  const pdfjs = await import(
+    /* @vite-ignore */
+    `${BASE}/build/pdf.mjs`
+  );
+
+  // Set the worker source to the matching ESM worker file
+  pdfjs.GlobalWorkerOptions.workerSrc = `${BASE}/build/pdf.worker.mjs`;
+
+  const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+  let text = "";
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    text += content.items.map((item) => item.str).join(" ") + "\n";
+  }
+  return text.trim();
+};
 
   const extractTextFromDocx = async (buffer) => {
     if (
