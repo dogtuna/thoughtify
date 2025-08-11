@@ -1223,7 +1223,7 @@ const InitiativesNew = () => {
                 {editingPersona ? (
                   <>
                     <div className="persona-edit-grid">
-                      <div className="grid-item glass-card">
+                      <div className="grid-item glass-card top-row">
                         {editingPersona.avatar && (
                           <img
                             src={editingPersona.avatar}
@@ -1248,64 +1248,73 @@ const InitiativesNew = () => {
                               e.target.value
                             )
                           }
-                          rows={2}
+                          rows={3}
                         />
                       </div>
-                      <div className="grid-item glass-card">
-                        <select
-                          className="generator-input"
-                          value={editingPersona.ageRange}
-                          onChange={(e) =>
-                            handlePersonaFieldChange("ageRange", e.target.value)
-                          }
-                        >
-                          {[editingPersona.ageRange,
-                            ...editingPersona.ageRangeOptions].map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="generator-input"
-                          value={editingPersona.educationLevel}
-                          onChange={(e) =>
-                            handlePersonaFieldChange(
-                              "educationLevel",
-                              e.target.value
-                            )
-                          }
-                        >
-                          {[editingPersona.educationLevel,
-                            ...editingPersona.educationLevelOptions].map(
-                            (opt) => (
+                      <div className="grid-item glass-card top-row">
+                        <div className="field-group">
+                          <label>Age Group</label>
+                          <select
+                            className="generator-input"
+                            value={editingPersona.ageRange}
+                            onChange={(e) =>
+                              handlePersonaFieldChange("ageRange", e.target.value)
+                            }
+                          >
+                            {[editingPersona.ageRange,
+                              ...editingPersona.ageRangeOptions].map((opt) => (
                               <option key={opt} value={opt}>
                                 {opt}
                               </option>
-                            )
-                          )}
-                        </select>
-                        <select
-                          className="generator-input"
-                          value={editingPersona.techProficiency}
-                          onChange={(e) =>
-                            handlePersonaFieldChange(
-                              "techProficiency",
-                              e.target.value
-                            )
-                          }
-                        >
-                          {[editingPersona.techProficiency,
-                            ...editingPersona.techProficiencyOptions].map(
-                            (opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            )
-                          )}
-                        </select>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field-group">
+                          <label>Education Level</label>
+                          <select
+                            className="generator-input"
+                            value={editingPersona.educationLevel}
+                            onChange={(e) =>
+                              handlePersonaFieldChange(
+                                "educationLevel",
+                                e.target.value
+                              )
+                            }
+                          >
+                            {[editingPersona.educationLevel,
+                              ...editingPersona.educationLevelOptions].map(
+                              (opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </div>
+                        <div className="field-group">
+                          <label>Tech Proficiency</label>
+                          <select
+                            className="generator-input"
+                            value={editingPersona.techProficiency}
+                            onChange={(e) =>
+                              handlePersonaFieldChange(
+                                "techProficiency",
+                                e.target.value
+                              )
+                            }
+                          >
+                            {[editingPersona.techProficiency,
+                              ...editingPersona.techProficiencyOptions].map(
+                              (opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </div>
                       </div>
-                      <div className="grid-item glass-card">
+                      <div className="grid-item glass-card bottom-row">
                         <h5>Motivation</h5>
                         <div className="pill-row">
                           {editingPersona.motivationChoices?.map((m, i) => (
@@ -1329,7 +1338,7 @@ const InitiativesNew = () => {
                           </button>
                         )}
                       </div>
-                      <div className="grid-item glass-card">
+                      <div className="grid-item glass-card bottom-row">
                         <h5>Challenges</h5>
                         <div className="pill-row">
                           {editingPersona.challengeChoices?.map((c, i) => (
