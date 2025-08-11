@@ -7,6 +7,7 @@ import admin from "firebase-admin";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
+import cors from "cors";
 import { createAvatar } from "@dicebear/core";
 import { notionists } from "@dicebear/collection";
 import crypto from "crypto";
@@ -28,6 +29,8 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+const corsHandler = cors({ origin: ["https://thoughtify.training"] });
 
 const FIRST_NAMES = [
   "Anika", "Leo", "Maya", "Jonah", "Sophia", "Ethan", "Lila",
@@ -518,67 +521,117 @@ export const generateLearningStrategy = onCall(
   }
 );
 
-export const generateContentAssets = onCall(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
-  async (req) => {
-    const ldd = req.data;
-    if (!ldd) {
-      throw new HttpsError(
-        "invalid-argument",
-        "A Learning Design Document is required."
-      );
-    }
-
-    const key = process.env.GOOGLE_GENAI_API_KEY;
-    if (!key) throw new HttpsError("internal", "No API key available.");
-
-    const ai = genkit({
-      plugins: [googleAI({ apiKey: key })],
-      model: gemini("gemini-2.5-pro"),
-    });
-
-    const prompt =
-      `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\n` +
-      `LDD:\n${JSON.stringify(ldd, null, 2)}\n\n` +
-      `Respond ONLY with valid JSON matching this structure:\n{\n  "lessonContent": [],\n  "videoScripts": [],\n  "facilitatorGuides": [],\n  "participantWorkbooks": [],\n  "knowledgeBaseArticles": [],\n  "mediaAssets": []\n}\n` +
-      `Each array should contain entries for the corresponding components. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
-
-    try {
-      const { text } = await ai.generate(prompt);
-
-      let result;
-      try {
-        result = parseJsonFromText(text);
-      } catch (err) {
-        console.error("Failed to parse AI response:", err, text);
-        throw new HttpsError("internal", "Invalid AI response format.");
+export const generateContentAssets = onRequest(
+  {
+    region: "us-central1",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    timeoutSeconds: 540,
+  },
+    (req, res) => {
+    corsHandler(req, res, async () => {
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
       }
 
-      const {
-        lessonContent = [],
-        videoScripts = [],
-        facilitatorGuides = [],
-        participantWorkbooks = [],
-        knowledgeBaseArticles = [],
-        mediaAssets = [],
-      } = result;
+      const { ldd, component, components, jobId } = req.body || {};
+      if (!ldd) {
+        res.status(400).json({ error: "A Learning Design Document is required." });
+        return;
+      }
 
-      const drafts = {
-        lessonContent,
-        videoScripts,
-        facilitatorGuides,
-        participantWorkbooks,
-        knowledgeBaseArticles,
-      };
+      const key = process.env.GOOGLE_GENAI_API_KEY;
+      if (!key) {
+        res.status(500).json({ error: "No API key available." });
+        return;
+      }
 
-      return { drafts, mediaAssets };
-    } catch (error) {
-      console.error("Error generating content assets:", error);
-      throw new HttpsError(
-        "internal",
-        "Failed to generate content assets."
-      );
-    }
+      const ai = genkit({
+        plugins: [googleAI({ apiKey: key })],
+        model: gemini("gemini-2.5-pro"),
+      });
+
+      const ALL_COMPONENTS = [
+        "lessonContent",
+        "videoScripts",
+        "facilitatorGuides",
+        "participantWorkbooks",
+        "knowledgeBaseArticles",
+      ];
+
+      let targets = [];
+      if (Array.isArray(components) && components.length > 0) {
+        targets = components;
+      } else if (typeof component === "string") {
+        targets = [component];
+      } else {
+        targets = ALL_COMPONENTS;
+      }
+
+      const drafts = {};
+      let mediaAssets = [];
+
+      try {
+        for (const comp of targets) {
+          if (jobId) {
+            await db
+              .collection("contentAssetJobs")
+              .doc(jobId)
+              .set({ current: comp }, { merge: true });
+          }
+
+          const prompt =
+            `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft ${comp} materials and any associated media asset descriptions.\n\n` +
+            `LDD:\n${JSON.stringify(ldd, null, 2)}\n\n` +
+            `Respond ONLY with valid JSON matching this structure:\n{\n  "${comp}": [],\n  "mediaAssets": []\n}\n` +
+            `Each ${comp} entry should be suitable as draft content. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
+
+          const { text } = await ai.generate(prompt);
+
+          let result;
+          try {
+            result = parseJsonFromText(text);
+          } catch (err) {
+            console.error("Failed to parse AI response:", err, text);
+            res.status(500).json({ error: "Invalid AI response format." });
+            return;
+          }
+
+          drafts[comp] = result[comp] || [];
+          if (Array.isArray(result.mediaAssets)) {
+            mediaAssets = mediaAssets.concat(result.mediaAssets);
+          }
+
+          if (jobId) {
+            await db
+              .collection("contentAssetJobs")
+              .doc(jobId)
+              .set(
+                {
+                  current: null,
+                  completed: admin.firestore.FieldValue.arrayUnion(comp),
+                },
+                { merge: true }
+              );
+          }
+        }
+
+        if (jobId) {
+          await db
+            .collection("contentAssetJobs")
+            .doc(jobId)
+            .set(
+              { status: "complete", results: { drafts, mediaAssets } },
+              { merge: true }
+            );
+        }
+
+        res.status(200).json({ drafts, mediaAssets });
+      } catch (err) {
+        console.error("Error generating content assets:", err);
+        res.status(500).json({ error: "Failed to generate content assets." });
+      }
+    });
   }
 );
 

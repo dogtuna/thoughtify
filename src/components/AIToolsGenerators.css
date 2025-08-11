@@ -161,3 +161,37 @@
   text-align: center;
 }
 
+/* Generation progress list */
+.generation-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 20px;
+  text-align: left;
+}
+
+.generation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.generation-item.done {
+  cursor: pointer;
+}
+
+.checkmark {
+  color: #4CAF50;
+  font-size: 20px;
+}
+
+.spinner.small {
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
+  margin: 0;
+}
+
