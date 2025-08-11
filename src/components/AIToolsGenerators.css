@@ -6,10 +6,70 @@
     padding: 20px;
     border-radius: 12px;
     margin: 20px auto;
-    max-width: 800px;
+    width: 90%;
+    max-width: 1200px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     text-align: center;
     color: white;
+  }
+
+.generator-subheading {
+    margin-top: 4px;
+    opacity: 0.8;
+  }
+
+.step-tracker {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 20px 0;
+  }
+
+.steps {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0.5;
+  }
+
+.step-item.active,
+.step-item.completed {
+    opacity: 1;
+  }
+
+.step-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #8C259E;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+.step-item.completed .step-circle {
+    background: #8C259E;
+    color: white;
+  }
+
+.step-label {
+    font-size: 12px;
+  }
+
+.save-status {
+    margin-top: -10px;
+    margin-bottom: 10px;
   }
   
   /* Form styling */

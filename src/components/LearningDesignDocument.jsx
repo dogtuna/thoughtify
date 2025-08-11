@@ -15,7 +15,6 @@ const LearningDesignDocument = ({
   selectedModality,
   learningObjectives,
   courseOutline,
-  totalSteps,
   onBack,
 }) => {
   const { learningDesignDocument, setLearningDesignDocument } = useProject();
@@ -67,14 +66,13 @@ const LearningDesignDocument = ({
 
   return (
     <div className="generator-result">
-      <div className="progress-indicator">Step 8 of {totalSteps}</div>
       <button
         type="button"
         onClick={onBack}
         className="generator-button"
         style={{ marginBottom: 10 }}
       >
-        Back to Step 7
+        Back
       </button>
       <button
         type="button"
@@ -126,6 +124,5 @@ LearningDesignDocument.propTypes = {
   selectedModality: PropTypes.string.isRequired,
   learningObjectives: PropTypes.object.isRequired,
   courseOutline: PropTypes.string.isRequired,
-  totalSteps: PropTypes.number.isRequired,
   onBack: PropTypes.func.isRequired,
 };

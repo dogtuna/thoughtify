@@ -24,6 +24,7 @@ import Footer from "./components/Footer";
 import "./App.css";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CookieConsent from "./components/CookieConsent";
+import Settings from "./components/Settings";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -55,7 +56,7 @@ export default function App() {
 
   return (
     <Router>
-      <NavBar />
+      <NavBar user={user} />
       <Routes>
         <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />
@@ -81,6 +82,7 @@ export default function App() {
           }
         />
         <Route path="/dashboard" element={<CustomDashboard />} />
+        <Route path="/settings" element={<Settings />} />
         <Route
           path="/leadership-assessment"
           element={user ? <LeadershipAssessmentWizard /> : <Navigate to="/login" />}
