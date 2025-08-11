@@ -13,6 +13,11 @@ body {
   align-items: center;
 }
 
+#root {
+  width: 90%;
+  margin: 0 auto;
+}
+
 /* Ensure keyboard focus is clearly visible */
 a:focus-visible,
 button:focus-visible {

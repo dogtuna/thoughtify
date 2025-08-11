@@ -66,6 +66,7 @@ const InitiativesNew = () => {
     "Design",
   ];
   const [step, setStep] = useState(1);
+  const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
@@ -126,6 +127,7 @@ const InitiativesNew = () => {
     if (!uid) return;
     try {
       await saveInitiative(uid, initiativeId, {
+        projectName,
         businessGoal,
         audienceProfile,
         sourceMaterial,
@@ -152,6 +154,7 @@ const InitiativesNew = () => {
     loadInitiative(uid, initiativeId)
       .then((data) => {
         if (data) {
+          setProjectName(data.projectName || "");
           setBusinessGoal(data.businessGoal || "");
           setAudienceProfile(data.audienceProfile || "");
           setSourceMaterial(data.sourceMaterial || "");
@@ -244,6 +247,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           businessGoal,
           audienceProfile,
           sourceMaterial,
@@ -284,6 +288,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           businessGoal,
           audienceProfile,
           sourceMaterial,
@@ -352,6 +357,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           strategy: data,
           selectedModality: data.modalityRecommendation,
         });
@@ -662,12 +668,18 @@ const InitiativesNew = () => {
               }`}
               onClick={() => setStep(idx + 1)}
             >
-              <div className="step-circle">{idx + 1}</div>
+              <div className="step-circle">
+                {idx + 1 < step ? "\u2713" : idx + 1}
+              </div>
               <div className="step-label">{label}</div>
             </div>
           ))}
         </div>
-        <button type="button" onClick={handleSave} className="generator-button">
+        <button
+          type="button"
+          onClick={handleSave}
+          className="generator-button save-button"
+        >
           Save
         </button>
       </div>
@@ -675,46 +687,50 @@ const InitiativesNew = () => {
 
       {step === 1 && (
         <form onSubmit={handleSubmit} className="generator-form">
-          <label>
-            Goal
-            <input
-              type="text"
-              value={businessGoal}
-              onChange={(e) => setBusinessGoal(e.target.value)}
-              className="generator-input"
-            />
-          </label>
-          <label>
-            Audience Profile
-            <textarea
-              value={audienceProfile}
-              onChange={(e) => setAudienceProfile(e.target.value)}
-              className="generator-input"
-              rows={3}
-            />
-          </label>
-          <label>
-            Source Material or Links
-            <textarea
-              value={sourceMaterial}
-              onChange={(e) => setSourceMaterial(e.target.value)}
-              className="generator-input"
-              rows={4}
-            />
-          </label>
-          <label>
-            Source File
-            <input type="file" onChange={handleFileUpload} className="generator-input" />
-          </label>
-          <label>
-            Project Constraints
-            <textarea
-              value={projectConstraints}
-              onChange={(e) => setProjectConstraints(e.target.value)}
-              className="generator-input"
-              rows={2}
-            />
-          </label>
+          <h3>Project Intake</h3>
+          <p>Tell us about your project. The more detail, the better.</p>
+          <div className="intake-grid">
+            <div className="intake-left">
+              <label>
+                Project Name (e.g., &apos;Q3 Sales Onboarding&apos;)
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="generator-input"
+                />
+              </label>
+              <label>
+                What is the primary business goal? (e.g., &apos;Reduce support tickets for Product X by 20%&apos;)
+                <input
+                  type="text"
+                  value={businessGoal}
+                  onChange={(e) => setBusinessGoal(e.target.value)}
+                  className="generator-input"
+                />
+              </label>
+              <label>
+                Who is the target audience? (e.g., &apos;New sales hires, age 22-28, with no prior industry experience&apos;)
+                <textarea
+                  value={audienceProfile}
+                  onChange={(e) => setAudienceProfile(e.target.value)}
+                  className="generator-input"
+                  rows={3}
+                />
+              </label>
+            </div>
+            <label className="upload-card">
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                className="file-input"
+                accept=".pdf,.docx,.txt"
+              />
+              <div className="upload-title">Upload Source Material (Optional)</div>
+              <div className="upload-subtitle">Click to upload or drag and drop</div>
+              <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+            </label>
+          </div>
           <button type="submit" disabled={loading} className="generator-button">
             {loading ? "Analyzing..." : "Next"}
           </button>
