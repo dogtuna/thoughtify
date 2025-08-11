@@ -51,6 +51,55 @@ const ContentAssetGenerator = () => {
     }
   };
 
+  const handleExport = (format = "json") => {
+    const data = {
+      ...draftContent,
+      mediaAssets: mediaAssets || [],
+    };
+
+    let content = "";
+    let type = "application/json";
+    let extension = "json";
+
+    if (format === "md") {
+      const mdLines = ["# Draft Content"];
+      Object.entries(draftContent || {}).forEach(([key, items]) => {
+        mdLines.push(`\n## ${formatType(key)}`);
+        (items || []).forEach((item) => {
+          if (typeof item === "string") {
+            mdLines.push(`- ${item}`);
+          } else {
+            mdLines.push("- ```json\n" + JSON.stringify(item, null, 2) + "\n```");
+          }
+        });
+      });
+
+      mdLines.push("\n# Media Assets");
+      (mediaAssets || []).forEach((asset) => {
+        const usage = asset.usageNotes || asset.usage || "";
+        mdLines.push(
+          `- **${asset.type || ""}**: ${asset.description || ""} ${usage}`.trim(),
+        );
+      });
+
+      content = mdLines.join("\n");
+      type = "text/markdown";
+      extension = "md";
+    } else {
+      content = JSON.stringify(data, null, 2);
+    }
+
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `content-assets.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
+  };
+
   const draftTypes = Object.keys(draftContent || {});
 
   const formatType = (type) => {
@@ -83,6 +132,24 @@ const ContentAssetGenerator = () => {
       </button>
       {error && <p className="generator-error">{error}</p>}
       {loading && <div className="spinner"></div>}
+
+      {(draftTypes.length > 0 || mediaAssets.length > 0) && (
+        <div style={{ marginTop: "10px" }}>
+          <button
+            onClick={() => handleExport("json")}
+            className="generator-button"
+            style={{ marginRight: "10px" }}
+          >
+            Export JSON
+          </button>
+          <button
+            onClick={() => handleExport("md")}
+            className="generator-button"
+          >
+            Export Markdown
+          </button>
+        </div>
+      )}
 
       {draftTypes.length > 0 && (
         <div className="generator-result">
