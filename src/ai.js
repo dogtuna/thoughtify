@@ -29,4 +29,17 @@ Use clear, concise language suitable for a general audience.`;
   return text;
 });
 
+// Define a flow for generating detailed draft content and a media asset list from an LDD.
+// The flow expects a Learning Design Document (object or string) and returns the drafts
+// alongside suggested media assets for each content block.
+export const contentAssetGenerationFlow = ai.defineFlow(
+  'contentAssetGenerationFlow',
+  async (ldd) => {
+    const prompt = `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\nLDD:\n${JSON.stringify(ldd, null, 2)}\n\nFor every component generate:\n- Lesson content for e-learning modules\n- Video scripts with storyboard suggestions\n- Facilitator guides and participant workbooks\n- Knowledge-base articles\n\nFor each content block, also recommend media assets with brief descriptions and references to where they will be used. Return the drafts and media asset list in a structured format that can be archived and reviewed.`;
+
+    const { text } = await ai.generate(prompt);
+    return text;
+  },
+);
+
 export default ai;
