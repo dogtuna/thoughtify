@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useSearchParams } from "react-router-dom";
 import { app, auth } from "../firebase.js";
@@ -8,6 +8,14 @@ import "./AIToolsGenerators.css";
 
 const TOTAL_STEPS = 9;
 
+const COMPONENTS = [
+  { key: "lessonContent", label: "Lesson Content" },
+  { key: "videoScripts", label: "Video Scripts" },
+  { key: "facilitatorGuides", label: "Facilitator Guides" },
+  { key: "participantWorkbooks", label: "Participant Workbooks" },
+  { key: "knowledgeBaseArticles", label: "Knowledge Base Articles" },
+];
+
 const ContentAssetGenerator = () => {
   const {
     learningDesignDocument,
@@ -16,50 +24,49 @@ const ContentAssetGenerator = () => {
     mediaAssets,
     setMediaAssets,
   } = useProject();
-  const [loading, setLoading] = useState(false);
+
   const [error, setError] = useState("");
+  const [status, setStatus] = useState(() =>
+    COMPONENTS.reduce((acc, c) => ({ ...acc, [c.key]: "pending" }), {})
+  );
+  const [viewing, setViewing] = useState(null);
+  const [started, setStarted] = useState(false);
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateContentAssets");
 
-  const MAX_RETRIES = 1;
-
   const isTimeoutError = (err) => {
     const message = err?.message || "";
     return err?.code === "deadline-exceeded" || /504|timeout/i.test(message);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     if (!learningDesignDocument) return;
-    setLoading(true);
+    setStarted(true);
     setError("");
     setDraftContent({});
     setMediaAssets([]);
+    const allDrafts = {};
+    let allAssets = [];
 
-    let attempt = 0;
-    while (attempt <= MAX_RETRIES) {
+    for (const item of COMPONENTS) {
+      setStatus((prev) => ({ ...prev, [item.key]: "loading" }));
       try {
-        const { data } = await callGenerate(learningDesignDocument);
-        setDraftContent(data.drafts || {});
-        setMediaAssets(data.mediaAssets || []);
-        const uid = auth.currentUser?.uid;
-        if (uid) {
-          await saveContentAssets(
-            uid,
-            initiativeId,
-            data.drafts || {},
-            data.mediaAssets || []
-          );
-        }
-        break;
+        const { data } = await callGenerate({
+          ldd: learningDesignDocument,
+          component: item.key,
+        });
+        const draftArr = data?.drafts?.[item.key] || data?.draft || [];
+        allDrafts[item.key] = draftArr;
+        allAssets = allAssets.concat(data?.mediaAssets || []);
+        setDraftContent((prev) => ({ ...prev, [item.key]: draftArr }));
+        setMediaAssets((prev) => [...prev, ...(data?.mediaAssets || [])]);
+        setStatus((prev) => ({ ...prev, [item.key]: "done" }));
       } catch (err) {
         console.error("Error generating content assets:", err);
-        if (isTimeoutError(err) && attempt < MAX_RETRIES) {
-          attempt += 1;
-          continue;
-        }
+        setStatus((prev) => ({ ...prev, [item.key]: "error" }));
         setError(
           isTimeoutError(err)
             ? "The generation request timed out. Please try again."
@@ -69,8 +76,21 @@ const ContentAssetGenerator = () => {
       }
     }
 
-    setLoading(false);
-  };
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      try {
+        await saveContentAssets(uid, initiativeId, allDrafts, allAssets);
+      } catch (e) {
+        console.error("Failed to save content assets:", e);
+      }
+    }
+  }, [learningDesignDocument, initiativeId, callGenerate, setDraftContent, setMediaAssets]);
+
+  useEffect(() => {
+    if (learningDesignDocument && !started) {
+      handleGenerate();
+    }
+  }, [learningDesignDocument, started, handleGenerate]);
 
   const handleExport = (format = "json") => {
     const data = {
@@ -99,7 +119,7 @@ const ContentAssetGenerator = () => {
       (mediaAssets || []).forEach((asset) => {
         const usage = asset.usageNotes || asset.usage || "";
         mdLines.push(
-          `- **${asset.type || ""}**: ${asset.description || ""} ${usage}`.trim(),
+          `- **${asset.type || ""}**: ${asset.description || ""} ${usage}`.trim()
         );
       });
 
@@ -120,90 +140,74 @@ const ContentAssetGenerator = () => {
     URL.revokeObjectURL(url);
     a.remove();
   };
-
-  const handleExport = (format = "json") => {
-    const data = {
-      ...draftContent,
-      mediaAssets: mediaAssets || [],
-    };
-
-    let content = "";
-    let type = "application/json";
-    let extension = "json";
-
-    if (format === "md") {
-      const mdLines = ["# Draft Content"];
-      Object.entries(draftContent || {}).forEach(([key, items]) => {
-        mdLines.push(`\n## ${formatType(key)}`);
-        (items || []).forEach((item) => {
-          if (typeof item === "string") {
-            mdLines.push(`- ${item}`);
-          } else {
-            mdLines.push("- ```json\n" + JSON.stringify(item, null, 2) + "\n```");
-          }
-        });
-      });
-
-      mdLines.push("\n# Media Assets");
-      (mediaAssets || []).forEach((asset) => {
-        const usage = asset.usageNotes || asset.usage || "";
-        mdLines.push(
-          `- **${asset.type || ""}**: ${asset.description || ""} ${usage}`.trim(),
-        );
-      });
-
-      content = mdLines.join("\n");
-      type = "text/markdown";
-      extension = "md";
-    } else {
-      content = JSON.stringify(data, null, 2);
-    }
-
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `content-assets.${extension}`;
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    a.remove();
-  };
-
-  const draftTypes = Object.keys(draftContent || {});
 
   const formatType = (type) => {
-    switch (type) {
-      case "lessonContent":
-        return "Lesson Content";
-      case "videoScripts":
-        return "Video Scripts";
-      case "facilitatorGuides":
-        return "Facilitator Guides";
-      case "participantWorkbooks":
-        return "Participant Workbooks";
-      case "knowledgeBaseArticles":
-        return "Knowledge Base Articles";
-      default:
-        return type;
-    }
+    const item = COMPONENTS.find((c) => c.key === type);
+    return item ? item.label : type;
   };
+
+  const hasResults =
+    Object.keys(draftContent || {}).length > 0 || mediaAssets.length > 0;
 
   return (
     <div className="generator-container">
       <div className="progress-indicator">Step 9 of {TOTAL_STEPS}</div>
       <h2>Content & Asset Generator</h2>
-      <button
-        onClick={handleGenerate}
-        disabled={loading || !learningDesignDocument}
-        className="generator-button"
-      >
-        {loading ? "Generating..." : "Generate Content & Assets"}
-      </button>
-      {error && <p className="generator-error">{error}</p>}
-      {loading && <div className="spinner"></div>}
+      <p className="generator-info">
+        We are generating each item below from your Learning Design Document. A
+        spinner indicates the current item being produced and a checkmark means
+        it is complete. Click any completed item to view its draft.
+      </p>
 
-      {(draftTypes.length > 0 || mediaAssets.length > 0) && (
+      {viewing ? (
+        <div className="generator-result">
+          <button
+            onClick={() => setViewing(null)}
+            className="generator-button"
+            style={{ marginBottom: "10px" }}
+          >
+            Back
+          </button>
+          <h3>{formatType(viewing)}</h3>
+          <ul>
+            {(draftContent[viewing] || []).map((item, idx) => (
+              <li key={idx}>
+                <pre>
+                  {typeof item === "string"
+                    ? item
+                    : JSON.stringify(item, null, 2)}
+                </pre>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <ul className="generation-list">
+          {COMPONENTS.map((item) => (
+            <li
+              key={item.key}
+              className={`generation-item ${
+                status[item.key] === "done" ? "done" : ""
+              }`}
+              onClick={() =>
+                status[item.key] === "done" && setViewing(item.key)
+              }
+            >
+              <span>{item.label}</span>
+              {status[item.key] === "loading" && (
+                <span className="spinner small"></span>
+              )}
+              {status[item.key] === "done" && (
+                <span className="checkmark">✓</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error && <p className="generator-error">{error}</p>}
+
+      {!viewing && hasResults && (
         <div style={{ marginTop: "10px" }}>
           <button
             onClick={() => handleExport("json")}
@@ -218,56 +222,6 @@ const ContentAssetGenerator = () => {
           >
             Export Markdown
           </button>
-        </div>
-      )}
-
-      {draftTypes.length > 0 && (
-        <div className="generator-result">
-          <h3>Draft Content</h3>
-          {draftTypes.map((type) => (
-            <details key={type} style={{ marginBottom: "1em" }}>
-              <summary style={{ cursor: "pointer", fontWeight: "bold" }}>
-                {formatType(type)}
-              </summary>
-              <ul>
-                {(draftContent[type] || []).map((item, idx) => (
-                  <li key={idx}>
-                    <pre>
-                      {typeof item === "string"
-                        ? item
-                        : JSON.stringify(item, null, 2)}
-                    </pre>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ))}
-        </div>
-      )}
-
-      {mediaAssets.length > 0 && (
-        <div className="generator-result">
-          <h3>Media Assets</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Type</th>
-                <th style={{ textAlign: "left" }}>Description</th>
-                <th style={{ textAlign: "left" }}>Usage Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mediaAssets.map((asset, idx) => (
-                <tr key={idx}>
-                  <td style={{ verticalAlign: "top" }}>{asset.type || ""}</td>
-                  <td style={{ verticalAlign: "top" }}>{asset.description || ""}</td>
-                  <td style={{ verticalAlign: "top" }}>
-                    {asset.usageNotes || asset.usage || ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
     </div>

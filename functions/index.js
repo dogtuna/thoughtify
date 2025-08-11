@@ -521,7 +521,7 @@ export const generateLearningStrategy = onCall(
 export const generateContentAssets = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (req) => {
-    const ldd = req.data;
+    const { ldd, component, components, jobId } = req.data || {};
     if (!ldd) {
       throw new HttpsError(
         "invalid-argument",
@@ -537,13 +537,40 @@ export const generateContentAssets = onCall(
       model: gemini("gemini-2.5-pro"),
     });
 
-    const prompt =
-      `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\n` +
-      `LDD:\n${JSON.stringify(ldd, null, 2)}\n\n` +
-      `Respond ONLY with valid JSON matching this structure:\n{\n  "lessonContent": [],\n  "videoScripts": [],\n  "facilitatorGuides": [],\n  "participantWorkbooks": [],\n  "knowledgeBaseArticles": [],\n  "mediaAssets": []\n}\n` +
-      `Each array should contain entries for the corresponding components. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
+    const ALL_COMPONENTS = [
+      "lessonContent",
+      "videoScripts",
+      "facilitatorGuides",
+      "participantWorkbooks",
+      "knowledgeBaseArticles",
+    ];
 
-    try {
+    let targets = [];
+    if (Array.isArray(components) && components.length > 0) {
+      targets = components;
+    } else if (typeof component === "string") {
+      targets = [component];
+    } else {
+      targets = ALL_COMPONENTS;
+    }
+
+    const drafts = {};
+    let mediaAssets = [];
+
+    for (const comp of targets) {
+      if (jobId) {
+        await db
+          .collection("contentAssetJobs")
+          .doc(jobId)
+          .set({ current: comp }, { merge: true });
+      }
+
+      const prompt =
+        `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft ${comp} materials and any associated media asset descriptions.\n\n` +
+        `LDD:\n${JSON.stringify(ldd, null, 2)}\n\n` +
+        `Respond ONLY with valid JSON matching this structure:\n{\n  "${comp}": [],\n  "mediaAssets": []\n}\n` +
+        `Each ${comp} entry should be suitable as draft content. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
+
       const { text } = await ai.generate(prompt);
 
       let result;
@@ -554,31 +581,36 @@ export const generateContentAssets = onCall(
         throw new HttpsError("internal", "Invalid AI response format.");
       }
 
-      const {
-        lessonContent = [],
-        videoScripts = [],
-        facilitatorGuides = [],
-        participantWorkbooks = [],
-        knowledgeBaseArticles = [],
-        mediaAssets = [],
-      } = result;
+      drafts[comp] = result[comp] || [];
+      if (Array.isArray(result.mediaAssets)) {
+        mediaAssets = mediaAssets.concat(result.mediaAssets);
+      }
 
-      const drafts = {
-        lessonContent,
-        videoScripts,
-        facilitatorGuides,
-        participantWorkbooks,
-        knowledgeBaseArticles,
-      };
-
-      return { drafts, mediaAssets };
-    } catch (error) {
-      console.error("Error generating content assets:", error);
-      throw new HttpsError(
-        "internal",
-        "Failed to generate content assets."
-      );
+      if (jobId) {
+        await db
+          .collection("contentAssetJobs")
+          .doc(jobId)
+          .set(
+            {
+              current: null,
+              completed: admin.firestore.FieldValue.arrayUnion(comp),
+            },
+            { merge: true }
+          );
+      }
     }
+
+    if (jobId) {
+      await db
+        .collection("contentAssetJobs")
+        .doc(jobId)
+        .set(
+          { status: "complete", results: { drafts, mediaAssets } },
+          { merge: true }
+        );
+    }
+
+    return { drafts, mediaAssets };
   }
 );
 
