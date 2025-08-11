@@ -55,7 +55,7 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
-  const TOTAL_STEPS = 8;
+  const TOTAL_STEPS = 9;
   const [step, setStep] = useState(1);
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
