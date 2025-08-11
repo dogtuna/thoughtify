@@ -24,31 +24,101 @@ const ContentAssetGenerator = () => {
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateContentAssets");
 
+  const MAX_RETRIES = 1;
+
+  const isTimeoutError = (err) => {
+    const message = err?.message || "";
+    return err?.code === "deadline-exceeded" || /504|timeout/i.test(message);
+  };
+
   const handleGenerate = async () => {
     if (!learningDesignDocument) return;
     setLoading(true);
     setError("");
     setDraftContent({});
     setMediaAssets([]);
-    try {
-      const { data } = await callGenerate(learningDesignDocument);
-      setDraftContent(data.drafts || {});
-      setMediaAssets(data.mediaAssets || []);
-      const uid = auth.currentUser?.uid;
-      if (uid) {
-        await saveContentAssets(
-          uid,
-          initiativeId,
-          data.drafts || {},
-          data.mediaAssets || []
+
+    let attempt = 0;
+    while (attempt <= MAX_RETRIES) {
+      try {
+        const { data } = await callGenerate(learningDesignDocument);
+        setDraftContent(data.drafts || {});
+        setMediaAssets(data.mediaAssets || []);
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          await saveContentAssets(
+            uid,
+            initiativeId,
+            data.drafts || {},
+            data.mediaAssets || []
+          );
+        }
+        break;
+      } catch (err) {
+        console.error("Error generating content assets:", err);
+        if (isTimeoutError(err) && attempt < MAX_RETRIES) {
+          attempt += 1;
+          continue;
+        }
+        setError(
+          isTimeoutError(err)
+            ? "The generation request timed out. Please try again."
+            : err?.message || "Error generating content assets."
         );
+        break;
       }
-    } catch (err) {
-      console.error("Error generating content assets:", err);
-      setError(err?.message || "Error generating content assets.");
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
+  };
+
+  const handleExport = (format = "json") => {
+    const data = {
+      ...draftContent,
+      mediaAssets: mediaAssets || [],
+    };
+
+    let content = "";
+    let type = "application/json";
+    let extension = "json";
+
+    if (format === "md") {
+      const mdLines = ["# Draft Content"];
+      Object.entries(draftContent || {}).forEach(([key, items]) => {
+        mdLines.push(`\n## ${formatType(key)}`);
+        (items || []).forEach((item) => {
+          if (typeof item === "string") {
+            mdLines.push(`- ${item}`);
+          } else {
+            mdLines.push("- ```json\n" + JSON.stringify(item, null, 2) + "\n```");
+          }
+        });
+      });
+
+      mdLines.push("\n# Media Assets");
+      (mediaAssets || []).forEach((asset) => {
+        const usage = asset.usageNotes || asset.usage || "";
+        mdLines.push(
+          `- **${asset.type || ""}**: ${asset.description || ""} ${usage}`.trim(),
+        );
+      });
+
+      content = mdLines.join("\n");
+      type = "text/markdown";
+      extension = "md";
+    } else {
+      content = JSON.stringify(data, null, 2);
+    }
+
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `content-assets.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
   };
 
   const handleExport = (format = "json") => {
