@@ -1,6 +1,7 @@
 // src/ai.js
 import { genkit } from 'genkit';
 import { gemini, googleAI } from '@genkit-ai/googleai';
+/** @typedef {import('./ai.types').ContentAssetGenerationResult} ContentAssetGenerationResult */
 
 // The googleAI plugin should automatically pick up your API key from your environment.
 // (Ensure your .env file contains REACT_APP_GOOGLE_GENAI_API_KEY if using Create React App.)
@@ -35,10 +36,12 @@ Use clear, concise language suitable for a general audience.`;
 export const contentAssetGenerationFlow = ai.defineFlow(
   'contentAssetGenerationFlow',
   async (ldd) => {
-    const prompt = `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\nLDD:\n${JSON.stringify(ldd, null, 2)}\n\nFor every component generate:\n- Lesson content for e-learning modules\n- Video scripts with storyboard suggestions\n- Facilitator guides and participant workbooks\n- Knowledge-base articles\n\nFor each content block, also recommend media assets with brief descriptions and references to where they will be used. Return the drafts and media asset list in a structured format that can be archived and reviewed.`;
+    const prompt = `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\nLDD:\n${JSON.stringify(ldd, null, 2)}\n\nRespond ONLY with valid JSON matching this structure:\n{\n  "lessonContent": [],\n  "videoScripts": [],\n  "facilitatorGuides": [],\n  "participantWorkbooks": [],\n  "knowledgeBaseArticles": [],\n  "mediaAssets": []\n}\nEach array should contain entries for the corresponding components. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
 
     const { text } = await ai.generate(prompt);
-    return text;
+    /** @type {ContentAssetGenerationResult} */
+    const result = JSON.parse(text);
+    return result;
   },
 );
 
