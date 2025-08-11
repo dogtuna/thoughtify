@@ -55,11 +55,23 @@ const normalizePersona = (p = {}) => ({
 });
 
 const InitiativesNew = () => {
-  const TOTAL_STEPS = 9;
+  const steps = [
+    "Project Info",
+    "Clarify",
+    "Brief",
+    "Personas",
+    "Approach",
+    "Objectives",
+    "Outline",
+    "Design",
+  ];
   const [step, setStep] = useState(1);
+  const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
-  const [sourceMaterial, setSourceMaterial] = useState("");
+  const [sourceMaterials, setSourceMaterials] = useState([]);
+  const getCombinedSource = () =>
+    sourceMaterials.map((f) => f.content).join("\n");
   const [projectConstraints, setProjectConstraints] = useState("");
 
   const [projectBrief, setProjectBrief] = useState("");
@@ -86,11 +98,17 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
 
-  const { learningObjectives, courseOutline, setLearningDesignDocument } = useProject();
+  const {
+    learningObjectives,
+    courseOutline,
+    learningDesignDocument,
+    setLearningDesignDocument,
+  } = useProject();
 
   const projectBriefRef = useRef(null);
   const nextButtonRef = useRef(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
 
   const addUsedMotivation = (keywords = []) => {
     setUsedMotivationKeywords((prev) =>
@@ -106,6 +124,31 @@ const InitiativesNew = () => {
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
+  const handleSave = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      await saveInitiative(uid, initiativeId, {
+        projectName,
+        businessGoal,
+        audienceProfile,
+        sourceMaterials,
+        projectConstraints,
+        projectBrief,
+        clarifyingQuestions,
+        clarifyingAnswers,
+        strategy,
+        selectedModality,
+        learningDesignDocument,
+      });
+      setSaveStatus("Saved");
+      setTimeout(() => setSaveStatus(""), 3000);
+    } catch (err) {
+      console.error("Error saving initiative:", err);
+      setSaveStatus("Error Saving");
+    }
+  };
+
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -113,9 +156,16 @@ const InitiativesNew = () => {
     loadInitiative(uid, initiativeId)
       .then((data) => {
         if (data) {
+          setProjectName(data.projectName || "");
           setBusinessGoal(data.businessGoal || "");
           setAudienceProfile(data.audienceProfile || "");
-          setSourceMaterial(data.sourceMaterial || "");
+          setSourceMaterials(
+            Array.isArray(data.sourceMaterials)
+              ? data.sourceMaterials
+              : data.sourceMaterial
+              ? [{ name: "Imported", content: data.sourceMaterial }]
+              : []
+          );
           setProjectConstraints(data.projectConstraints || "");
           setProjectBrief(data.projectBrief || "");
           setClarifyingQuestions(data.clarifyingQuestions || []);
@@ -167,14 +217,52 @@ const InitiativesNew = () => {
   const generateLearnerPersona = httpsCallable(functions, "generateLearnerPersona");
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSourceMaterial((prev) => `${prev}\n${reader.result}`);
-    };
-    reader.readAsText(file);
+  const extractTextFromPdf = (buffer) => {
+    const raw = new TextDecoder("latin1").decode(buffer);
+    const regex = /\(([^()]+)\)\s*Tj/g;
+    let match;
+    let text = "";
+    while ((match = regex.exec(raw)) !== null) {
+      text += `${match[1]} `;
+    }
+    return text.trim();
+  };
+
+  const handleFiles = async (files) => {
+    for (const file of Array.from(files)) {
+      try {
+        if (file.name.toLowerCase().endsWith(".pdf")) {
+          const buffer = await file.arrayBuffer();
+          const text = extractTextFromPdf(buffer);
+          if (!text) throw new Error("Unable to extract text");
+          setSourceMaterials((prev) => [...prev, { name: file.name, content: text }]);
+        } else {
+          const text = await file.text();
+          setSourceMaterials((prev) => [...prev, { name: file.name, content: text }]);
+        }
+      } catch (err) {
+        console.error("Failed to read file", err);
+        setError(`Failed to process ${file.name}`);
+      }
+    }
+  };
+
+  const handleFileInput = (e) => {
+    const { files } = e.target;
+    if (files) handleFiles(files);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const removeFile = (index) => {
+    setSourceMaterials((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -194,7 +282,7 @@ const InitiativesNew = () => {
       const { data } = await generateProjectBrief({
         businessGoal,
         audienceProfile,
-        sourceMaterial,
+        sourceMaterial: getCombinedSource(),
         projectConstraints,
       });
 
@@ -205,9 +293,10 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           businessGoal,
           audienceProfile,
-          sourceMaterial,
+          sourceMaterials,
           projectConstraints,
           clarifyingQuestions: qs,
           clarifyingAnswers: qs.map(() => ""),
@@ -230,7 +319,7 @@ const InitiativesNew = () => {
       const { data } = await generateProjectBrief({
         businessGoal,
         audienceProfile,
-        sourceMaterial,
+        sourceMaterial: getCombinedSource(),
         projectConstraints,
         clarifyingQuestions,
         clarifyingAnswers,
@@ -245,9 +334,10 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           businessGoal,
           audienceProfile,
-          sourceMaterial,
+          sourceMaterials,
           projectConstraints,
           projectBrief: data.projectBrief,
           clarifyingQuestions,
@@ -298,6 +388,7 @@ const InitiativesNew = () => {
         clarifyingQuestions,
         clarifyingAnswers,
         personaCount: 0,
+        sourceMaterial: getCombinedSource(),
       });
 
       if (
@@ -313,6 +404,7 @@ const InitiativesNew = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
+          projectName,
           strategy: data,
           selectedModality: data.modalityRecommendation,
         });
@@ -356,6 +448,7 @@ const InitiativesNew = () => {
           businessGoal,
           audienceProfile,
           projectConstraints,
+          sourceMaterial: getCombinedSource(),
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
           existingNames,
@@ -422,6 +515,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         existingNames,
@@ -508,6 +602,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         refreshField: field,
@@ -609,61 +704,126 @@ const InitiativesNew = () => {
 
   return (
     <div className="generator-container">
-      <h2>Initiatives - Project Intake & Analysis</h2>
+      <h2>Thoughtify Project Architect</h2>
+      <p className="generator-subheading">
+        Your AI Partner for End-to-End Course Creation
+      </p>
+      <div className="step-tracker">
+        <div
+          className="steps"
+          style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}
+        >
+          {steps.map((label, idx) => (
+            <div
+              key={label}
+              className={`step-item ${
+                idx + 1 === step ? "active" : idx + 1 < step ? "completed" : ""
+              }`}
+              onClick={() => setStep(idx + 1)}
+            >
+              <div className="step-circle">
+                {idx + 1 < step ? "\u2713" : idx + 1}
+              </div>
+              <div className="step-label">{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {saveStatus && <p className="save-status">{saveStatus}</p>}
 
       {step === 1 && (
         <form onSubmit={handleSubmit} className="generator-form">
-          <div className="progress-indicator">Step 1 of {TOTAL_STEPS}</div>
-          <label>
-            Goal
-            <input
-              type="text"
-              value={businessGoal}
-              onChange={(e) => setBusinessGoal(e.target.value)}
-              className="generator-input"
-            />
-          </label>
-          <label>
-            Audience Profile
-            <textarea
-              value={audienceProfile}
-              onChange={(e) => setAudienceProfile(e.target.value)}
-              className="generator-input"
-              rows={3}
-            />
-          </label>
-          <label>
-            Source Material or Links
-            <textarea
-              value={sourceMaterial}
-              onChange={(e) => setSourceMaterial(e.target.value)}
-              className="generator-input"
-              rows={4}
-            />
-          </label>
-          <label>
-            Source File
-            <input type="file" onChange={handleFileUpload} className="generator-input" />
-          </label>
-          <label>
-            Project Constraints
-            <textarea
-              value={projectConstraints}
-              onChange={(e) => setProjectConstraints(e.target.value)}
-              className="generator-input"
-              rows={2}
-            />
-          </label>
-          <button type="submit" disabled={loading} className="generator-button">
-            {loading ? "Analyzing..." : "Advance to Step 2"}
-          </button>
+          <h3>Project Intake</h3>
+          <p>Tell us about your project. The more detail, the better.</p>
+          <div className="intake-grid">
+            <div className="intake-left">
+              <label>
+                Project Name
+                <input
+                  type="text"
+                  value={projectName}
+                  placeholder="e.g., 'Q3 Sales Onboarding'"
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="generator-input"
+                />
+              </label>
+              <label>
+                What is the primary business goal?
+                <input
+                  type="text"
+                  value={businessGoal}
+                  placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
+                  onChange={(e) => setBusinessGoal(e.target.value)}
+                  className="generator-input"
+                />
+              </label>
+              <label>
+                Who is the target audience?
+                <textarea
+                  value={audienceProfile}
+                  placeholder="e.g., 'New sales hires, age 22-28, with no prior industry experience'"
+                  onChange={(e) => setAudienceProfile(e.target.value)}
+                  className="generator-input"
+                  rows={3}
+                />
+              </label>
+            </div>
+            <div
+              className="upload-card"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
+              <input
+                type="file"
+                onChange={handleFileInput}
+                className="file-input"
+                accept=".pdf,.docx,.txt"
+                multiple
+              />
+              <div className="upload-title">Upload Source Material (Optional)</div>
+              <div className="upload-subtitle">Click to upload or drag and drop</div>
+              <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+            </div>
+          </div>
+          {sourceMaterials.length > 0 && (
+            <ul className="file-list">
+              {sourceMaterials.map((f, idx) => (
+                <li key={idx}>
+                  {f.name}
+                  <button
+                    type="button"
+                    className="remove-file"
+                    onClick={() => removeFile(idx)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+              disabled={loading}
+            >
+              Save
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="generator-button next-button"
+            >
+              {loading ? "Analyzing..." : "Next"}
+            </button>
+          </div>
           {error && <p className="generator-error">{error}</p>}
         </form>
       )}
 
       {step === 2 && (
         <div className="generator-result">
-          <div className="progress-indicator">Step 2 of {TOTAL_STEPS}</div>
           <p>
             Answering the questions below is optional, but it will help ensure the brief is as good as possible.
           </p>
@@ -678,15 +838,26 @@ const InitiativesNew = () => {
               />
             </div>
           ))}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setStep(1)} className="generator-button">
-              Back to Step 1
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
             </button>
             <button
               type="button"
               onClick={handleGenerateBrief}
               disabled={loading}
-              className="generator-button"
+              className="generator-button next-button"
             >
               {loading ? "Generating..." : "Generate Brief"}
             </button>
@@ -697,7 +868,6 @@ const InitiativesNew = () => {
 
       {step === 3 && (
         <div className="generator-result" ref={projectBriefRef}>
-          <div className="progress-indicator">Step 3 of {TOTAL_STEPS}</div>
           <h3>Project Brief</h3>
           <textarea
             className="generator-input"
@@ -706,9 +876,20 @@ const InitiativesNew = () => {
             readOnly={!isEditingBrief}
             rows={10}
           />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setStep(2)} className="generator-button">
-              Back to Step 2
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
             </button>
             <button
               type="button"
@@ -725,16 +906,20 @@ const InitiativesNew = () => {
             >
               {isEditingBrief ? "Save Brief" : "Edit Brief"}
             </button>
-            <button type="button" onClick={handleDownload} className="generator-button">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="generator-button"
+            >
               Download Brief
             </button>
             <button
               type="button"
               onClick={() => setStep(4)}
-              className="generator-button"
+              className="generator-button next-button"
               ref={nextButtonRef}
             >
-              Advance to Step 4
+              Next
             </button>
           </div>
           {showScrollHint && (
@@ -745,15 +930,22 @@ const InitiativesNew = () => {
 
       {step === 4 && (
         <div className="generator-result">
-          <div className="progress-indicator">Step 4 of {TOTAL_STEPS}</div>
-          <button
-            type="button"
-            onClick={() => setStep(3)}
-            className="generator-button"
-            style={{ marginBottom: 10 }}
-          >
-            Back to Step 3
-          </button>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
+          </div>
 
           <div>
             <h3>Learner Personas</h3>
@@ -1154,14 +1346,21 @@ const InitiativesNew = () => {
             )}
           </div>
           {personaError && <p className="generator-error">{personaError}</p>}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
             <button
               type="button"
               onClick={handleGenerateStrategy}
               disabled={nextLoading}
-              className="generator-button"
+              className="generator-button next-button"
             >
-              {nextLoading ? "Generating..." : "Advance to Step 5"}
+              {nextLoading ? "Generating..." : "Next"}
             </button>
           </div>
           {nextError && <p className="generator-error">{nextError}</p>}
@@ -1170,15 +1369,6 @@ const InitiativesNew = () => {
 
       {step === 5 && strategy && (
         <div className="generator-result">
-          <div className="progress-indicator">Step 5 of {TOTAL_STEPS}</div>
-          <button
-            type="button"
-            onClick={() => setStep(4)}
-            className="generator-button"
-            style={{ marginBottom: 10 }}
-          >
-            Back to Step 4
-          </button>
           <h3>Select Learning Approach</h3>
           <select
             className="generator-input"
@@ -1212,11 +1402,25 @@ const InitiativesNew = () => {
               </>
             );
           })()}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
             <button
               type="button"
               onClick={() => setStep(6)}
-              className="generator-button"
+              className="generator-button next-button"
             >
               Confirm & Continue
             </button>
@@ -1231,7 +1435,7 @@ const InitiativesNew = () => {
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
-          totalSteps={TOTAL_STEPS}
+          sourceMaterials={sourceMaterials}
           onBack={() => setStep(5)}
           onNext={() => setStep(7)}
         />
@@ -1245,7 +1449,7 @@ const InitiativesNew = () => {
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
           learningObjectives={learningObjectives}
-          totalSteps={TOTAL_STEPS}
+          sourceMaterials={sourceMaterials}
           onBack={() => setStep(6)}
           onNext={() => setStep(8)}
         />
@@ -1260,7 +1464,7 @@ const InitiativesNew = () => {
           selectedModality={selectedModality}
           learningObjectives={learningObjectives}
           courseOutline={courseOutline}
-          totalSteps={TOTAL_STEPS}
+          sourceMaterials={sourceMaterials}
           onBack={() => setStep(7)}
         />
       )}

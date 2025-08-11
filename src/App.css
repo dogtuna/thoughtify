@@ -13,6 +13,11 @@ body {
   align-items: center;
 }
 
+#root {
+  width: 90%;
+  margin: 0 auto;
+}
+
 /* Ensure keyboard focus is clearly visible */
 a:focus-visible,
 button:focus-visible {
@@ -527,11 +532,14 @@ body::before {
 /* Navigation bar */
 .navbar {
   width: 100%;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   padding: 10px 20px;
   position: sticky;
   top: 0;
   z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .nav-list {
@@ -543,14 +551,49 @@ body::before {
   padding: 0;
 }
 
+.nav-item {
+  position: relative;
+}
+
 .nav-link {
-  color: #fff;
+  color: #000;
   text-decoration: none;
   font-weight: 600;
 }
 
 .nav-link:hover {
   color: #FB852A;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  list-style: none;
+  margin: 0;
+  padding: 10px 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  min-width: 200px;
+}
+
+.dropdown-link {
+  display: block;
+  padding: 5px 15px;
+  color: #000;
+  text-decoration: none;
+}
+
+.dropdown-link:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.nav-item.dropdown:hover .dropdown-menu {
+  display: block;
 }
 
 /* Footer */
