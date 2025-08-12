@@ -999,7 +999,7 @@ export const generateHierarchicalOutline = onCall(
 
       const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nSource Material: ${sourceMaterial}\nLearning Objectives:\n${lines.join("\n")}`;
 
-      const prompt = `You are a Senior Instructional Designer. Using the information below, create a detailed, hierarchical course outline that ensures all learning objectives are fully covered. Return the outline as JSON where each entry is an object with "number" and "text" fields (e.g., [{"number":"1","text":"Intro"},{"number":"1.1","text":"Topic"}]).\n\n${baseInfo}`;
+      const prompt = `You are a Senior Instructional Designer. Using the information below, create a detailed, hierarchical course outline that ensures all learning objectives are fully covered. Each top-level section must include at least one sub-topic (e.g., 1.1) so that every heading has children. Return the outline as JSON where each entry is an object with "number" and "text" fields (e.g., [{"number":"1","text":"Intro"},{"number":"1.1","text":"Topic"}]).\n\n${baseInfo}`;
 
       const flow = ai.defineFlow("hierarchicalOutlineFlow", async () => {
         const { text } = await ai.generate(prompt);

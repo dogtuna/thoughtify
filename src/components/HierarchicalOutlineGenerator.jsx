@@ -57,6 +57,20 @@ const HierarchicalOutlineGenerator = ({
     });
   };
 
+  const ensureSubtopics = (items = []) => {
+    const result = [];
+    items.forEach((item, idx) => {
+      result.push(item);
+      if (item.level === 1) {
+        const next = items[idx + 1];
+        if (!next || next.level === 1) {
+          result.push({ level: 2, text: "Overview" });
+        }
+      }
+    });
+    return result;
+  };
+
   const groupLines = (items = []) => {
     const sections = [];
     items.forEach((line) => {
@@ -90,12 +104,11 @@ const HierarchicalOutlineGenerator = ({
       if (!outlineItems.length) {
         throw new Error("No outline returned");
       }
-      const initialLines = renumber(
-        outlineItems.map((l) => ({
-          level: (l.number || "").split(".").length,
-          text: l.text || "",
-        }))
-      );
+      const mapped = outlineItems.map((l) => ({
+        level: (l.number || "").split(".").length,
+        text: l.text || "",
+      }));
+      const initialLines = renumber(ensureSubtopics(mapped));
       setLines(initialLines);
       setCourseOutline(formatOutline(initialLines));
     } catch (err) {
@@ -110,7 +123,7 @@ const HierarchicalOutlineGenerator = ({
     if (!courseOutline) {
       handleGenerate();
     } else {
-      setLines(renumber(parseOutline(courseOutline)));
+      setLines(renumber(ensureSubtopics(parseOutline(courseOutline))));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseOutline]);
@@ -142,7 +155,10 @@ const HierarchicalOutlineGenerator = ({
   };
 
   const handleDeleteLine = (idx) => {
-    setLines((prev) => renumber(prev.filter((_, i) => i !== idx)));
+    setLines((prev) => {
+      const filtered = prev.filter((_, i) => i !== idx);
+      return renumber(ensureSubtopics(filtered));
+    });
   };
 
   const toggleSection = (idx) => {
