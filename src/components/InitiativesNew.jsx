@@ -127,6 +127,8 @@ const InitiativesNew = () => {
   const [personaCount, setPersonaCount] = useState(0);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
+  const [usedNames, setUsedNames] = useState([]);
+  const [usedLearningPrefs, setUsedLearningPrefs] = useState([]);
 
   const {
     learningObjectives,
@@ -148,6 +150,16 @@ const InitiativesNew = () => {
   const addUsedChallenge = (keywords = []) => {
     setUsedChallengeKeywords((prev) =>
       Array.from(new Set([...prev, ...keywords.filter(Boolean)]))
+    );
+  };
+  const addUsedName = (names = []) => {
+    setUsedNames((prev) =>
+      Array.from(new Set([...prev, ...names.filter(Boolean)]))
+    );
+  };
+  const addUsedLearningPref = (prefs = []) => {
+    setUsedLearningPrefs((prev) =>
+      Array.from(new Set([...prev, ...prefs.filter(Boolean)]))
     );
   };
 
@@ -224,6 +236,11 @@ const InitiativesNew = () => {
           ].filter(Boolean);
           addUsedMotivation(mKeys);
           addUsedChallenge(cKeys);
+          addUsedName([p.name]);
+          addUsedLearningPref([
+            p.learningPreferences,
+            ...(p.learningPreferencesOptions || []),
+          ]);
         });
       })
       .catch((err) => console.error("Error loading personas:", err));
@@ -540,7 +557,7 @@ const InitiativesNew = () => {
     try {
       const startIndex = personas.length;
       const newPersonas = [];
-      let existingNames = personas.map((p) => p.name);
+      let existingNames = [...usedNames, ...personas.map((p) => p.name)];
       for (let i = 0; i < toGenerate; i++) {
         const personaRes = await generateLearnerPersona({
           projectBrief,
@@ -551,6 +568,7 @@ const InitiativesNew = () => {
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
           existingNames,
+          existingLearningPreferences: usedLearningPrefs,
         });
         const personaData = normalizePersona(personaRes.data);
         if (!personaData?.name) {
@@ -609,6 +627,11 @@ const InitiativesNew = () => {
           ...challengesList.map((o) => o.keyword),
           ...challengeOptions.map((o) => o.keyword),
         ]);
+        addUsedName([personaData.name]);
+        addUsedLearningPref([
+          rest.learningPreferences,
+          ...(rest.learningPreferencesOptions || []),
+        ]);
         existingNames.push(personaData.name);
         const uid = auth.currentUser?.uid;
         let savedPersona = personaToSave;
@@ -638,9 +661,13 @@ const InitiativesNew = () => {
     setPersonaLoading(true);
     setPersonaError("");
     try {
-      const existingNames = personas
+      const existingNamesCurrent = personas
         .filter((_, i) => !(action === "replace" && i === activePersonaIndex))
         .map((p) => p.name);
+      const existingNames = [
+        ...usedNames,
+        ...existingNamesCurrent,
+      ];
       const personaRes = await generateLearnerPersona({
         projectBrief,
         businessGoal,
@@ -650,6 +677,7 @@ const InitiativesNew = () => {
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         existingNames,
+        existingLearningPreferences: usedLearningPrefs,
       });
       const personaData = normalizePersona(personaRes.data);
       if (!personaData?.name) {
@@ -710,6 +738,11 @@ const InitiativesNew = () => {
       addUsedChallenge([
         ...challengesList.map((o) => o.keyword),
         ...challengeOptions.map((o) => o.keyword),
+      ]);
+      addUsedName([personaData.name]);
+      addUsedLearningPref([
+        rest.learningPreferences,
+        ...(rest.learningPreferencesOptions || []),
       ]);
       const uid = auth.currentUser?.uid;
       if (uid) {
