@@ -234,16 +234,7 @@ const LearningObjectivesGenerator = ({
   };
 
   return (
-    <div className="generator-result">
-      <div className="button-row">
-        <button
-          type="button"
-          onClick={onBack}
-          className="generator-button back-button"
-        >
-          Back
-        </button>
-      </div>
+    <div className="generator-result learning-objectives">
       <h3>Learning Objectives</h3>
       <div style={{ marginBottom: 10 }}>
         <label>
@@ -302,27 +293,36 @@ const LearningObjectivesGenerator = ({
           {(learningObjectives.enablingObjectives || []).map((obj, idx) =>
             renderObjective(obj, "enabling", idx)
           )}
-          <div className="button-row">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="generator-button save-button"
-            >
-              {saving ? "Saving..." : "Save Objectives"}
-            </button>
-            {onNext && (
-              <button
-                type="button"
-                onClick={onNext}
-                className="generator-button next-button"
-              >
-                Next
-              </button>
-            )}
-          </div>
         </div>
       )}
+      <div className="button-row">
+        <button
+          type="button"
+          onClick={onBack}
+          className="generator-button back-button"
+        >
+          Back
+        </button>
+        {learningObjectives && (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="generator-button save-button"
+          >
+            {saving ? "Saving..." : "Save Objectives"}
+          </button>
+        )}
+        {learningObjectives && onNext && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="generator-button next-button"
+          >
+            Next
+          </button>
+        )}
+      </div>
     </div>
   );
 };
