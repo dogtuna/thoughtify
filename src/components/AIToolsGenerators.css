@@ -430,6 +430,14 @@
   margin: 0 0 16px;
 }
 
+.persona-edit-grid .grid-item.bottom-row .pill-row .pill {
+  flex: 1 1 calc(50% - 8px);
+}
+
+.persona-edit-grid + .button-row {
+  margin-top: 25px;
+}
+
 @media (max-width: 600px) {
   .persona-edit-grid .grid-item {
     flex-basis: 100%;
