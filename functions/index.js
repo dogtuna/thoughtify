@@ -42,6 +42,26 @@ const LAST_NAMES = [
   "Martinez", "Wilson",
 ];
 
+const AGE_RANGES = ["18-24", "25-34", "35-44", "45-54", "55+"];
+const EDUCATION_LEVELS = [
+  "No College",
+  "High school diploma",
+  "Associate degree",
+  "Bachelor's degree",
+  "Master's degree",
+  "Doctorate",
+];
+const TECH_LEVELS = ["Beginner", "Intermediate", "Advanced"];
+
+function getRandomItems(arr, count) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, count);
+}
+
 function generateUniqueName(existing = []) {
   const used = new Set(existing.map((n) => n.toLowerCase()));
   for (let i = 0; i < 100; i++) {
@@ -635,6 +655,7 @@ export const generateLearnerPersona = onCall(
       refreshField,
       personaName,
       existingNames = [],
+      existingLearningPreferences = [],
     } = req.data || {};
 
     if (!projectBrief) {
@@ -651,12 +672,16 @@ export const generateLearnerPersona = onCall(
 
     const randomSeed = Math.random().toString(36).substring(2, 8);
     const finalName = personaName || generateUniqueName(existingNames);
+    const ageRange = AGE_RANGES[crypto.randomInt(0, AGE_RANGES.length)];
+    const ageRangeOptions = getRandomItems(
+      AGE_RANGES.filter((a) => a !== ageRange),
+      2
+    );
 
     // Refresh field options only
     const refreshableFields = [
       "motivation",
       "challenges",
-      "ageRange",
       "educationLevel",
       "techProficiency",
       "learningPreferences",
@@ -683,14 +708,19 @@ Audience Profile: ${audienceProfile}
 Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       } else {
         const fieldDescriptions = {
-          ageRange: "age range (e.g., '25-34')",
-          educationLevel: "education level (e.g., 'Bachelor's degree')",
-          techProficiency: "tech proficiency level (e.g., 'Intermediate')",
+          educationLevel: "education level",
+          techProficiency: "tech proficiency level",
           learningPreferences: "learning preference in a short phrase",
         };
+        const optionLists = {
+          educationLevel: EDUCATION_LEVELS,
+          techProficiency: TECH_LEVELS,
+        };
+        const list = optionLists[refreshField] || [];
+        const listText = list.join(", ");
         listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
           fieldDescriptions[refreshField]
-        } options in JSON with an array called "options". Each option must be a concise phrase.
+        } options in JSON with an array called "options". Each option must be a concise phrase selected from [${listText}].
 
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
@@ -718,40 +748,45 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       return { [key]: data.options || [] };
     }
 
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona named ${finalName}. Provide:
-- "ageRange": the typical age range as a string (e.g., "25-34") and "ageRangeOptions" with exactly two alternatives.
-- "educationLevel": a concise education description and "educationLevelOptions" with two alternatives.
-- "techProficiency": the learner's technology skill level and "techProficiencyOptions" with two alternatives.
-- "learningPreferences": one full-sentence about ${finalName}'s preferred learning style and "learningPreferencesOptions" with two alternative full-sentence options about ${finalName}.
-- For both the primary motivation and the primary challenge:
-  - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-  - Provide a full-sentence description in a "text" field written about ${finalName} in third person using their name.
-  - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about ${finalName}.
-Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
+      const nameInstruction = personaName
+        ? `The persona's name is ${personaName}.`
+        : `Create a unique first and last name for the learner persona that is not in this list: ${
+            existingNames.join(", ") || "none"
+          }.`;
+      const educationList = EDUCATION_LEVELS.join(", ");
+      const techList = TECH_LEVELS.join(", ");
+      const textPrompt = `You are a Senior Instructional Designer. ${nameInstruction} The persona is in the ${ageRange} age group. Using the provided information, create one learner persona. Provide:
+  - "educationLevel": select one option from [${educationList}] and "educationLevelOptions" with two other distinct options from this list.
+  - "techProficiency": select one option from [${techList}] and "techProficiencyOptions" with two other distinct options from this list.
+   - "learningPreferences": one full-sentence about the learner's preferred learning style and "learningPreferencesOptions" with two alternative full-sentence options about the learner.
+  - For both the primary motivation and the primary challenge:
+    - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
+    - Provide a full-sentence description in a "text" field written about the learner in third person using their name.
+    - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the learner.
+  Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
-{
-  "name": "Name",
-  "ageRange": "25-34",
-  "ageRangeOptions": ["18-24", "35-44"],
-  "educationLevel": "Bachelor's degree",
-  "educationLevelOptions": ["High school diploma", "Master's degree"],
-  "techProficiency": "Intermediate",
-  "techProficiencyOptions": ["Beginner", "Advanced"],
-  "learningPreferences": "Full sentence about Name",
-  "learningPreferencesOptions": ["Full sentence about Name", "Full sentence about Name"],
-  "motivation": {"keyword": "short", "text": "full"},
-  "motivationOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}],
-  "challenges": {"keyword": "short", "text": "full"},
-  "challengeOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}]
-}
+  {
+    "name": "Name",
+    "educationLevel": "High school diploma",
+    "educationLevelOptions": ["No College", "Bachelor's degree"],
+    "techProficiency": "Intermediate",
+    "techProficiencyOptions": ["Beginner", "Advanced"],
+    "learningPreferences": "Full sentence about Name",
+    "learningPreferencesOptions": ["Full sentence about Name", "Full sentence about Name"],
+    "motivation": {"keyword": "short", "text": "full"},
+    "motivationOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}],
+    "challenges": {"keyword": "short", "text": "full"},
+    "challengeOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}]
+  }
 
-Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.
-Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
+  Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.
+  Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
+  Avoid learning preferences: ${existingLearningPreferences.join(" | ") || "none"}.
 
-  Project Brief: ${projectBrief}
-  Business Goal: ${businessGoal}
-  Audience Profile: ${audienceProfile}
-  Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
+    Project Brief: ${projectBrief}
+    Business Goal: ${businessGoal}
+    Audience Profile: ${audienceProfile}
+    Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
 
     const { text } = await ai.generate(textPrompt);
 
@@ -762,11 +797,35 @@ Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
       console.error("Failed to parse AI response:", err, text);
       throw new HttpsError("internal", "Invalid AI response format.");
     }
-
-    persona.name = finalName;
-return persona;
-  }
-);
+      if (personaName) {
+        persona.name = personaName;
+      } else if (
+        !persona.name ||
+        existingNames
+          .map((n) => n.toLowerCase())
+          .includes(persona.name.toLowerCase())
+      ) {
+        persona.name = generateUniqueName(existingNames);
+      }
+      persona.ageRange = ageRange;
+      persona.ageRangeOptions = ageRangeOptions;
+      if (!EDUCATION_LEVELS.includes(persona.educationLevel)) {
+        persona.educationLevel = getRandomItems(EDUCATION_LEVELS, 1)[0];
+      }
+      persona.educationLevelOptions = getRandomItems(
+        EDUCATION_LEVELS.filter((e) => e !== persona.educationLevel),
+        2
+      );
+      if (!TECH_LEVELS.includes(persona.techProficiency)) {
+        persona.techProficiency = getRandomItems(TECH_LEVELS, 1)[0];
+      }
+      persona.techProficiencyOptions = getRandomItems(
+        TECH_LEVELS.filter((t) => t !== persona.techProficiency),
+        2
+      );
+      return persona;
+    }
+  );
 
 
 // Renamed internal constant to avoid any accidental duplicate declarations
@@ -924,15 +983,16 @@ export const generateHierarchicalOutline = onCall(
 
       const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}\nSource Material: ${sourceMaterial}\nLearning Objectives:\n${lines.join("\n")}`;
 
-      const prompt = `You are a Senior Instructional Designer. Using the information below, create a detailed, hierarchical course outline that ensures all learning objectives are fully covered. Return the outline as plain text with modules and subtopics.\n\n${baseInfo}`;
+      const prompt = `You are a Senior Instructional Designer. Using the information below, create a detailed, hierarchical course outline that ensures all learning objectives are fully covered. Return the outline as JSON where each entry is an object with "number" and "text" fields (e.g., [{"number":"1","text":"Intro"},{"number":"1.1","text":"Topic"}]).\n\n${baseInfo}`;
 
       const flow = ai.defineFlow("hierarchicalOutlineFlow", async () => {
         const { text } = await ai.generate(prompt);
         return text;
       });
 
-      const outline = await flow();
-      return { outline };
+      const raw = await flow();
+      const parsed = parseJsonFromText(raw);
+      return { outline: Array.isArray(parsed) ? parsed : parsed?.outline || [] };
     } catch (error) {
       console.error("Error generating hierarchical outline:", error);
       throw new HttpsError(
