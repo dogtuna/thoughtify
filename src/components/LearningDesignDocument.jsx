@@ -97,9 +97,10 @@ const LearningDesignDocument = ({
       const parsed = [];
       let current = null;
       lines.forEach((line) => {
-        if (line.startsWith("## ")) {
+        const trimmed = line.trimStart();
+        if (/^##\s*/.test(trimmed)) {
           if (current) parsed.push(current);
-          current = { title: line.replace(/^##\s*/, ""), content: "" };
+          current = { title: trimmed.replace(/^##\s*/, ""), content: "" };
         } else if (current) {
           current.content += `${line}\n`;
         }
@@ -259,6 +260,13 @@ const LearningDesignDocument = ({
     },
   ];
 
+  const tabSections = tabs.map((tab) => {
+    const match = sections.find((s) =>
+      s.title.toLowerCase().includes(tab.label.toLowerCase())
+    );
+    return match || { title: tab.label, content: "" };
+  });
+
   return (
     <div className="design-doc-shell">
       <div className="design-doc-panel">
@@ -268,13 +276,6 @@ const LearningDesignDocument = ({
             <p>Learning Design Document</p>
           </div>
           <div className="design-doc-actions">
-            <button
-              type="button"
-              onClick={() => navigate("/ai-tools")}
-              className="generator-button"
-            >
-              Return to Project Planner
-            </button>
             {learningDesignDocument && (
               <button
                 type="button"
@@ -322,35 +323,32 @@ const LearningDesignDocument = ({
           </div>
         )}
 
-        {sections.length > 0 && (
+        {learningDesignDocument && (
           <div className="design-doc-main">
             <nav className="design-doc-nav">
               <ul>
-                {tabs.map(
-                  (tab, idx) =>
-                    idx < sections.length && (
-                      <li key={tab.label}>
-                        <a
-                          href="#"
-                          className={`nav-link ${idx === activeTab ? "active" : ""}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setActiveTab(idx);
-                          }}
-                        >
-                          {tab.icon}
-                          {tab.label}
-                        </a>
-                      </li>
-                    )
-                )}
+                {tabs.map((tab, idx) => (
+                  <li key={tab.label}>
+                    <a
+                      href="#"
+                      className={`nav-link ${idx === activeTab ? "active" : ""}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveTab(idx);
+                      }}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </nav>
             <main
               className="design-doc-content"
               dangerouslySetInnerHTML={{
                 __html: renderMarkdown(
-                  `## ${sections[activeTab].title}\n${sections[activeTab].content}`
+                  `## ${tabSections[activeTab].title}\n${tabSections[activeTab].content}`
                 ),
               }}
             />
