@@ -86,7 +86,14 @@ const HierarchicalOutlineGenerator = ({
         learningObjectives,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
-      setCourseOutline(data.outline);
+      const initialLines = renumber(
+        (data.outline || []).map((l) => ({
+          level: (l.number || "").split(".").length,
+          text: l.text || "",
+        }))
+      );
+      setLines(initialLines);
+      setCourseOutline(formatOutline(initialLines));
     } catch (err) {
       console.error("Error generating hierarchical outline:", err);
       setError(err?.message || "Error generating hierarchical outline.");
