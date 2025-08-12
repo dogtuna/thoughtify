@@ -84,6 +84,21 @@
     background: rgba(255, 255, 255, 0.1);
     color: white;
     font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .learning-objectives .generator-input {
+    width: 85%;
+    max-width: none;
+    margin: 10px 0;
+  }
+
+  .learning-objectives h3 {
+    text-align: left;
+  }
+
+  .learning-objectives label {
+    display: block;
   }
 
   .intake-grid {
@@ -392,6 +407,51 @@
   text-align: center;
 }
 
+/* Ensure inputs don't overflow their grid item */
+.persona-edit-grid .grid-item .generator-input {
+  max-width: 100%;
+  margin: 10px 0;
+}
+
+/* Taller cards on the top row */
+.persona-edit-grid .grid-item.top-row {
+  min-height: 260px;
+}
+
+/* Field groups for labeled selects */
+.persona-edit-grid .grid-item .field-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.persona-edit-grid .grid-item .field-group label {
+  margin-bottom: 4px;
+}
+
+/* Bottom row adjustments */
+.persona-edit-grid .grid-item.bottom-row {
+  gap: 4px;
+}
+
+.persona-edit-grid .grid-item.bottom-row h5 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.persona-edit-grid .grid-item.bottom-row .pill-row {
+  margin: 0 0 16px;
+}
+
+.persona-edit-grid .grid-item.bottom-row .pill-row .pill {
+  flex: 1 1 calc(50% - 8px);
+}
+
+.persona-edit-grid + .button-row {
+  margin-top: 25px;
+}
+
 @media (max-width: 600px) {
   .persona-edit-grid .grid-item {
     flex-basis: 100%;
@@ -404,6 +464,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 10px 0;
+  justify-content: center;
 }
 
 .pill {
