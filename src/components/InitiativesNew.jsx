@@ -132,7 +132,9 @@ const InitiativesNew = () => {
 
   const {
     learningObjectives,
+    setLearningObjectives,
     courseOutline,
+    setCourseOutline,
     learningDesignDocument,
     setLearningDesignDocument,
   } = useProject();
@@ -181,6 +183,8 @@ const InitiativesNew = () => {
         clarifyingAnswers,
         strategy,
         selectedModality,
+        learningObjectives,
+        courseOutline,
         learningDesignDocument,
       });
       setSaveStatus("Saved");
@@ -214,6 +218,8 @@ const InitiativesNew = () => {
           setClarifyingAnswers(data.clarifyingAnswers || []);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
+          setLearningObjectives(data.learningObjectives || null);
+          setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
         }
       })
@@ -244,7 +250,12 @@ const InitiativesNew = () => {
         });
       })
       .catch((err) => console.error("Error loading personas:", err));
-  }, [initiativeId, setLearningDesignDocument]);
+  }, [
+    initiativeId,
+    setLearningDesignDocument,
+    setLearningObjectives,
+    setCourseOutline,
+  ]);
 
   useEffect(() => {
     if (!projectBriefRef.current || !nextButtonRef.current) return;
