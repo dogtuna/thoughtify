@@ -1615,6 +1615,7 @@ const InitiativesNew = () => {
 
       {step === 8 && (
         <LearningDesignDocument
+          projectName={projectName}
           projectBrief={projectBrief}
           businessGoal={businessGoal}
           audienceProfile={audienceProfile}
