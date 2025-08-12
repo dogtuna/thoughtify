@@ -86,8 +86,9 @@ const HierarchicalOutlineGenerator = ({
         learningObjectives,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
+      const outlineItems = Array.isArray(data.outline) ? data.outline : [];
       const initialLines = renumber(
-        (data.outline || []).map((l) => ({
+        outlineItems.map((l) => ({
           level: (l.number || "").split(".").length,
           text: l.text || "",
         }))

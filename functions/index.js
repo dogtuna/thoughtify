@@ -991,8 +991,8 @@ export const generateHierarchicalOutline = onCall(
       });
 
       const raw = await flow();
-      const outline = parseJsonFromText(raw);
-      return { outline };
+      const parsed = parseJsonFromText(raw);
+      return { outline: Array.isArray(parsed) ? parsed : parsed?.outline || [] };
     } catch (error) {
       console.error("Error generating hierarchical outline:", error);
       throw new HttpsError(
