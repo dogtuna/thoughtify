@@ -132,9 +132,12 @@ const InitiativesNew = () => {
 
   const {
     learningObjectives,
+    setLearningObjectives,
     courseOutline,
+    setCourseOutline,
     learningDesignDocument,
     setLearningDesignDocument,
+    resetProject,
   } = useProject();
 
   const projectBriefRef = useRef(null);
@@ -181,6 +184,8 @@ const InitiativesNew = () => {
         clarifyingAnswers,
         strategy,
         selectedModality,
+        learningObjectives,
+        courseOutline,
         learningDesignDocument,
       });
       setSaveStatus("Saved");
@@ -194,6 +199,26 @@ const InitiativesNew = () => {
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
+
+    // Reset all local and project state when switching initiatives
+    resetProject();
+    setProjectName("");
+    setBusinessGoal("");
+    setAudienceProfile("");
+    setSourceMaterials([]);
+    setProjectConstraints("");
+    setProjectBrief("");
+    setClarifyingQuestions([]);
+    setClarifyingAnswers([]);
+    setStrategy(null);
+    setSelectedModality("");
+    setPersonas([]);
+    setActivePersonaIndex(0);
+    setPersonaCount(0);
+    setUsedMotivationKeywords([]);
+    setUsedChallengeKeywords([]);
+    setUsedNames([]);
+    setUsedLearningPrefs([]);
 
     loadInitiative(uid, initiativeId)
       .then((data) => {
@@ -214,6 +239,8 @@ const InitiativesNew = () => {
           setClarifyingAnswers(data.clarifyingAnswers || []);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
+          setLearningObjectives(data.learningObjectives || null);
+          setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
         }
       })
@@ -244,7 +271,13 @@ const InitiativesNew = () => {
         });
       })
       .catch((err) => console.error("Error loading personas:", err));
-  }, [initiativeId, setLearningDesignDocument]);
+  }, [
+    initiativeId,
+    resetProject,
+    setLearningDesignDocument,
+    setLearningObjectives,
+    setCourseOutline,
+  ]);
 
   useEffect(() => {
     if (!projectBriefRef.current || !nextButtonRef.current) return;
