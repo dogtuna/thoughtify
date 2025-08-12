@@ -239,8 +239,6 @@ const LearningDesignDocument = ({
 );
 };
 
-export default LearningDesignDocument;
-
 LearningDesignDocument.propTypes = {
   projectBrief: PropTypes.string.isRequired,
   businessGoal: PropTypes.string.isRequired,
@@ -252,3 +250,5 @@ LearningDesignDocument.propTypes = {
   sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
 };
+
+export default LearningDesignDocument;
