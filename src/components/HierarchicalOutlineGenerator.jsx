@@ -23,6 +23,7 @@ const HierarchicalOutlineGenerator = ({
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [lines, setLines] = useState([]);
+  const [expandedSections, setExpandedSections] = useState({});
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateHierarchicalOutline");
   const [searchParams] = useSearchParams();
@@ -54,6 +55,18 @@ const HierarchicalOutlineGenerator = ({
         number: counters.slice(0, lvl).join("."),
       };
     });
+  };
+
+  const groupLines = (items = []) => {
+    const sections = [];
+    items.forEach((line) => {
+      if (line.level === 1) {
+        sections.push({ header: line, children: [] });
+      } else if (sections.length) {
+        sections[sections.length - 1].children.push(line);
+      }
+    });
+    return sections;
   };
 
   const formatOutline = (items = []) =>
@@ -92,6 +105,10 @@ const HierarchicalOutlineGenerator = ({
   }, [courseOutline]);
 
   useEffect(() => {
+    setExpandedSections({});
+  }, [lines]);
+
+  useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (uid) {
       saveInitiative(uid, initiativeId, { courseOutline });
@@ -115,6 +132,10 @@ const HierarchicalOutlineGenerator = ({
 
   const handleDeleteLine = (idx) => {
     setLines((prev) => renumber(prev.filter((_, i) => i !== idx)));
+  };
+
+  const toggleSection = (idx) => {
+    setExpandedSections((prev) => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   const handleToggleEdit = async () => {
@@ -144,9 +165,34 @@ const HierarchicalOutlineGenerator = ({
         <>
           {!isEditing ? (
             <div className="outline-display">
-              {lines.map((line, idx) => (
-                <div key={idx} style={{ paddingLeft: (line.level - 1) * 20 }}>
-                  <span className="outline-number">{line.number}</span> {line.text}
+              {groupLines(lines).map((section, idx) => (
+                <div key={idx} className="outline-section">
+                  <div
+                    className="outline-header"
+                    onClick={() => toggleSection(idx)}
+                  >
+                    <div>
+                      <span className="outline-number">{section.header.number}</span>{" "}
+                      {section.header.text}
+                    </div>
+                    <span className="outline-arrow">
+                      {expandedSections[idx] ? "▼" : "▶"}
+                    </span>
+                  </div>
+                  {expandedSections[idx] && (
+                    <div className="outline-subitems">
+                      {section.children.map((child, cidx) => (
+                        <div
+                          key={cidx}
+                          className="outline-subline"
+                          style={{ paddingLeft: (child.level - 2) * 20 }}
+                        >
+                          <span className="outline-number">{child.number}</span>{" "}
+                          {child.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

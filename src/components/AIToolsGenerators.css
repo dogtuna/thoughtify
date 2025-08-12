@@ -273,6 +273,37 @@
     margin-bottom: 10px;
 }
 
+.outline-section {
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.outline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 1.05em;
+}
+
+.outline-arrow {
+    margin-left: 8px;
+}
+
+.outline-subitems {
+    padding-left: 20px;
+    margin-top: 4px;
+}
+
+.outline-subline {
+    padding: 4px 0;
+    font-size: 0.95em;
+}
+
 .outline-edit-row {
     display: flex;
     align-items: center;
