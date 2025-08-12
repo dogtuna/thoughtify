@@ -87,6 +87,20 @@
     box-sizing: border-box;
   }
 
+  .learning-objectives .generator-input {
+    width: 85%;
+    max-width: none;
+    margin: 10px 0;
+  }
+
+  .learning-objectives h3 {
+    text-align: left;
+  }
+
+  .learning-objectives label {
+    display: block;
+  }
+
   .intake-grid {
     display: flex;
     gap: 20px;
