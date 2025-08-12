@@ -22,10 +22,27 @@ const LearningDesignDocument = ({
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [baseDocument, setBaseDocument] = useState("");
+  const [includeOutline, setIncludeOutline] = useState(false);
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateLearningDesignDocument");
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
+
+  const renderMarkdown = (text) => {
+    if (!text) return "";
+    let html = text
+      .replace(/^###### (.*)$/gm, "<h6>$1</h6>")
+      .replace(/^##### (.*)$/gm, "<h5>$1</h5>")
+      .replace(/^#### (.*)$/gm, "<h4>$1</h4>")
+      .replace(/^### (.*)$/gm, "<h3>$1</h3>")
+      .replace(/^## (.*)$/gm, "<h2>$1</h2>")
+      .replace(/^# (.*)$/gm, "<h1>$1</h1>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\n\n/g, "</p><p>")
+      .replace(/\n/g, "<br/>");
+    return `<p>${html}</p>`;
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -42,7 +59,7 @@ const LearningDesignDocument = ({
         courseOutline,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
-      setLearningDesignDocument(data.document);
+      setBaseDocument(data.document);
     } catch (err) {
       console.error("Error generating learning design document:", err);
       setError(err?.message || "Error generating learning design document.");
@@ -55,9 +72,20 @@ const LearningDesignDocument = ({
   useEffect(() => {
     if (!learningDesignDocument) {
       handleGenerate();
+    } else {
+      setBaseDocument(learningDesignDocument);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learningDesignDocument]);
+  }, []);
+
+  useEffect(() => {
+    if (baseDocument) {
+      const fullDoc = includeOutline
+        ? `${baseDocument}\n\n## Full Course Outline\n\n${courseOutline}`
+        : baseDocument;
+      setLearningDesignDocument(fullDoc);
+    }
+  }, [baseDocument, includeOutline, courseOutline, setLearningDesignDocument]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -71,6 +99,21 @@ const LearningDesignDocument = ({
     if (uid) {
       await saveInitiative(uid, initiativeId, { learningDesignDocument });
     }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([learningDesignDocument], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "learning-design-document.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleNext = async () => {
+    await handleManualSave();
+    navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`);
   };
 
   return (
@@ -102,34 +145,58 @@ const LearningDesignDocument = ({
         </div>
       )}
       {learningDesignDocument && (
-        <div className="generator-result" style={{ textAlign: "left" }}>
-          <textarea
-            value={learningDesignDocument}
-            onChange={(e) => setLearningDesignDocument(e.target.value)}
-            style={{ width: "100%", minHeight: "300px" }}
-          />
-        </div>
+        <div
+          className="design-doc-display"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(learningDesignDocument) }}
+        />
       )}
-      <div className="button-row">
+      {learningDesignDocument && (
+        <label style={{ display: "block", marginTop: "10px" }}>
+          <input
+            type="checkbox"
+            checked={includeOutline}
+            onChange={(e) => setIncludeOutline(e.target.checked)}
+          />
+          Include full outline
+        </label>
+      )}
+    <div className="button-row">
+      <button
+        type="button"
+        onClick={handleManualSave}
+        className="generator-button save-button"
+      >
+        Save
+      </button>
+      {learningDesignDocument && (
         <button
           type="button"
-          onClick={handleManualSave}
-          className="generator-button save-button"
+          onClick={handleGenerate}
+          disabled={loading}
+          className="generator-button"
         >
-          Save
+          {loading ? "Generating..." : "Regenerate Document"}
         </button>
+      )}
+      {learningDesignDocument && (
         <button
           type="button"
-          onClick={() =>
-            navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`)
-          }
-          className="generator-button next-button"
+          onClick={handleDownload}
+          className="generator-button"
         >
-          Next: Content & Assets
+          Download
         </button>
-      </div>
+      )}
+      <button
+        type="button"
+        onClick={handleNext}
+        className="generator-button next-button"
+      >
+        Next: Content & Assets
+      </button>
     </div>
-  );
+  </div>
+);
 };
 
 export default LearningDesignDocument;

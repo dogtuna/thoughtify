@@ -84,6 +84,25 @@
     background: rgba(255, 255, 255, 0.1);
     color: white;
     font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .learning-objectives {
+    padding-left: 30px;
+  }
+
+  .learning-objectives .generator-input {
+    width: 85%;
+    max-width: none;
+    margin: 10px 0;
+  }
+
+  .learning-objectives h3 {
+    text-align: left;
+  }
+
+  .learning-objectives label {
+    display: block;
   }
 
   .intake-grid {
@@ -247,6 +266,76 @@
     margin: 0;
 }
 
+.outline-display {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.outline-section {
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.design-doc-display {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 8px;
+    line-height: 1.5;
+}
+
+.outline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 1.05em;
+}
+
+.outline-arrow {
+    margin-left: 8px;
+}
+
+.outline-subitems {
+    padding-left: 20px;
+    margin-top: 4px;
+}
+
+.outline-subline {
+    padding: 4px 0;
+    font-size: 0.95em;
+}
+
+.outline-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.outline-edit-row input {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.outline-number {
+    font-weight: 600;
+    min-width: 40px;
+}
+
+.outline-delete {
+    border-image: linear-gradient(45deg, #B22222, #FF4500) 1;
+}
+
 /* Spinner styling */
 .spinner {
   display: inline-block;
@@ -392,6 +481,51 @@
   text-align: center;
 }
 
+/* Ensure inputs don't overflow their grid item */
+.persona-edit-grid .grid-item .generator-input {
+  max-width: 100%;
+  margin: 10px 0;
+}
+
+/* Taller cards on the top row */
+.persona-edit-grid .grid-item.top-row {
+  min-height: 260px;
+}
+
+/* Field groups for labeled selects */
+.persona-edit-grid .grid-item .field-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.persona-edit-grid .grid-item .field-group label {
+  margin-bottom: 4px;
+}
+
+/* Bottom row adjustments */
+.persona-edit-grid .grid-item.bottom-row {
+  gap: 4px;
+}
+
+.persona-edit-grid .grid-item.bottom-row h5 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.persona-edit-grid .grid-item.bottom-row .pill-row {
+  margin: 0 0 16px;
+}
+
+.persona-edit-grid .grid-item.bottom-row .pill-row .pill {
+  flex: 1 1 calc(50% - 8px);
+}
+
+.persona-edit-grid + .button-row {
+  margin-top: 25px;
+}
+
 @media (max-width: 600px) {
   .persona-edit-grid .grid-item {
     flex-basis: 100%;
@@ -404,6 +538,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 10px 0;
+  justify-content: center;
 }
 
 .pill {
