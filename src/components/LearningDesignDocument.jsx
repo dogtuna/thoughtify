@@ -57,7 +57,7 @@ const LearningDesignDocument = ({
       handleGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learningDesignDocument]);
+  }, []);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -71,6 +71,11 @@ const LearningDesignDocument = ({
     if (uid) {
       await saveInitiative(uid, initiativeId, { learningDesignDocument });
     }
+  };
+
+  const handleNext = async () => {
+    await handleManualSave();
+    navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`);
   };
 
   return (
@@ -102,34 +107,42 @@ const LearningDesignDocument = ({
         </div>
       )}
       {learningDesignDocument && (
-        <div className="generator-result" style={{ textAlign: "left" }}>
-          <textarea
-            value={learningDesignDocument}
-            onChange={(e) => setLearningDesignDocument(e.target.value)}
-            style={{ width: "100%", minHeight: "300px" }}
-          />
-        </div>
-      )}
-      <div className="button-row">
-        <button
-          type="button"
-          onClick={handleManualSave}
-          className="generator-button save-button"
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            navigate(`/ai-tools/content-assets?initiativeId=${initiativeId}`)
-          }
-          className="generator-button next-button"
-        >
-          Next: Content & Assets
-        </button>
+      <div className="generator-result" style={{ textAlign: "left" }}>
+        <textarea
+          value={learningDesignDocument}
+          onChange={(e) => setLearningDesignDocument(e.target.value)}
+          style={{ width: "100%", minHeight: "300px" }}
+        />
       </div>
+    )}
+    <div className="button-row">
+      <button
+        type="button"
+        onClick={handleManualSave}
+        className="generator-button save-button"
+      >
+        Save
+      </button>
+      {learningDesignDocument && (
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={loading}
+          className="generator-button"
+        >
+          {loading ? "Generating..." : "Regenerate Document"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleNext}
+        className="generator-button next-button"
+      >
+        Next: Content & Assets
+      </button>
     </div>
-  );
+  </div>
+);
 };
 
 export default LearningDesignDocument;

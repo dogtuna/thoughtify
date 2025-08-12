@@ -186,6 +186,11 @@ const LearningObjectivesGenerator = ({
     }
   };
 
+  const handleNext = async () => {
+    await handleSave();
+    if (onNext) onNext();
+  };
+
   const renderObjective = (obj, type, index) => {
     if (!obj) return null;
     const isEditing = editing && editing.type === type && editing.index === index;
@@ -316,7 +321,7 @@ const LearningObjectivesGenerator = ({
         {learningObjectives && onNext && (
           <button
             type="button"
-            onClick={onNext}
+            onClick={handleNext}
             className="generator-button next-button"
           >
             Next

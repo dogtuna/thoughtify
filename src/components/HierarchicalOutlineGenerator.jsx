@@ -174,6 +174,11 @@ const HierarchicalOutlineGenerator = ({
     setIsEditing((prev) => !prev);
   };
 
+  const handleNext = async () => {
+    await handleManualSave();
+    if (onNext) onNext();
+  };
+
   return (
     <div className="generator-result">
       <h3>Hierarchical Course Outline</h3>
@@ -265,7 +270,7 @@ const HierarchicalOutlineGenerator = ({
             {onNext && (
               <button
                 type="button"
-                onClick={onNext}
+                onClick={handleNext}
                 className="generator-button next-button"
               >
                 Next
