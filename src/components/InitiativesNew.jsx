@@ -137,6 +137,7 @@ const InitiativesNew = () => {
     setCourseOutline,
     learningDesignDocument,
     setLearningDesignDocument,
+    resetProject,
   } = useProject();
 
   const projectBriefRef = useRef(null);
@@ -199,6 +200,26 @@ const InitiativesNew = () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
+    // Reset all local and project state when switching initiatives
+    resetProject();
+    setProjectName("");
+    setBusinessGoal("");
+    setAudienceProfile("");
+    setSourceMaterials([]);
+    setProjectConstraints("");
+    setProjectBrief("");
+    setClarifyingQuestions([]);
+    setClarifyingAnswers([]);
+    setStrategy(null);
+    setSelectedModality("");
+    setPersonas([]);
+    setActivePersonaIndex(0);
+    setPersonaCount(0);
+    setUsedMotivationKeywords([]);
+    setUsedChallengeKeywords([]);
+    setUsedNames([]);
+    setUsedLearningPrefs([]);
+
     loadInitiative(uid, initiativeId)
       .then((data) => {
         if (data) {
@@ -252,6 +273,7 @@ const InitiativesNew = () => {
       .catch((err) => console.error("Error loading personas:", err));
   }, [
     initiativeId,
+    resetProject,
     setLearningDesignDocument,
     setLearningObjectives,
     setCourseOutline,
