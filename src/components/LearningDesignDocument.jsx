@@ -23,7 +23,8 @@ const LearningDesignDocument = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [baseDocument, setBaseDocument] = useState("");
-  const [includeOutline, setIncludeOutline] = useState(false);
+  const [sections, setSections] = useState([]);
+  const [activeTab, setActiveTab] = useState(0);
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateLearningDesignDocument");
   const [searchParams] = useSearchParams();
@@ -80,12 +81,28 @@ const LearningDesignDocument = ({
 
   useEffect(() => {
     if (baseDocument) {
-      const fullDoc = includeOutline
-        ? `${baseDocument}\n\n## Full Course Outline\n\n${courseOutline}`
-        : baseDocument;
-      setLearningDesignDocument(fullDoc);
+      setLearningDesignDocument(baseDocument);
     }
-  }, [baseDocument, includeOutline, courseOutline, setLearningDesignDocument]);
+  }, [baseDocument, setLearningDesignDocument]);
+
+  useEffect(() => {
+    if (learningDesignDocument) {
+      const lines = learningDesignDocument.split("\n");
+      const parsed = [];
+      let current = null;
+      lines.forEach((line) => {
+        if (line.startsWith("## ")) {
+          if (current) parsed.push(current);
+          current = { title: line.replace(/^##\s*/, ""), content: "" };
+        } else if (current) {
+          current.content += `${line}\n`;
+        }
+      });
+      if (current) parsed.push(current);
+      setSections(parsed);
+      setActiveTab(0);
+    }
+  }, [learningDesignDocument]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -117,83 +134,106 @@ const LearningDesignDocument = ({
   };
 
   return (
-    <div className="generator-result">
-      <div className="button-row">
-        <button
-          type="button"
-          onClick={onBack}
-          className="generator-button back-button"
-        >
-          Back
-        </button>
-      </div>
-      <h3>Learning Design Document</h3>
-      {!learningDesignDocument && !error && (
-        <p>{loading ? "Generating..." : "Preparing document..."}</p>
-      )}
-      {error && (
-        <div>
-          <p className="generator-error">{error}</p>
+    <div className="design-doc-shell">
+      <div className="design-doc-panel">
+        <header className="design-doc-header">
+          <h1>Learning Design Document</h1>
+        </header>
+
+        {!learningDesignDocument && !error && (
+          <div className="design-doc-placeholder">
+            <p>{loading ? "Generating..." : "Preparing document..."}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="design-doc-placeholder">
+            <p className="generator-error">{error}</p>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={loading}
+              className="generator-button next-button"
+            >
+              {loading ? "Generating..." : "Try Again"}
+            </button>
+          </div>
+        )}
+
+        {sections.length > 0 && (
+          <div className="design-doc-main">
+            <nav className="design-doc-nav">
+              <ul>
+                {sections.map((sec, idx) => (
+                  <li key={sec.title}>
+                    <a
+                      href="#"
+                      className={`nav-link ${idx === activeTab ? "active" : ""}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveTab(idx);
+                      }}
+                    >
+                      {sec.title.replace(/^[0-9]+\.\s*/, "")}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+            <main
+              className="design-doc-content"
+              dangerouslySetInnerHTML={{
+                __html: renderMarkdown(
+                  `## ${sections[activeTab].title}\n${sections[activeTab].content}`
+                ),
+              }}
+            />
+          </div>
+        )}
+
+        <div className="button-row">
           <button
             type="button"
-            onClick={handleGenerate}
-            disabled={loading}
+            onClick={onBack}
+            className="generator-button back-button"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={handleManualSave}
+            className="generator-button save-button"
+          >
+            Save
+          </button>
+          {learningDesignDocument && (
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={loading}
+              className="generator-button"
+            >
+              {loading ? "Generating..." : "Regenerate Document"}
+            </button>
+          )}
+          {learningDesignDocument && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="generator-button"
+            >
+              Download
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
             className="generator-button next-button"
           >
-            {loading ? "Generating..." : "Try Again"}
+            Next: Content & Assets
           </button>
         </div>
-      )}
-      {learningDesignDocument && (
-        <div
-          className="design-doc-display"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(learningDesignDocument) }}
-        />
-      )}
-      {learningDesignDocument && (
-        <label style={{ display: "block", marginTop: "10px" }}>
-          <input
-            type="checkbox"
-            checked={includeOutline}
-            onChange={(e) => setIncludeOutline(e.target.checked)}
-          />
-          Include full outline
-        </label>
-      )}
-    <div className="button-row">
-      <button
-        type="button"
-        onClick={handleManualSave}
-        className="generator-button save-button"
-      >
-        Save
-      </button>
-      {learningDesignDocument && (
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={loading}
-          className="generator-button"
-        >
-          {loading ? "Generating..." : "Regenerate Document"}
-        </button>
-      )}
-      {learningDesignDocument && (
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="generator-button"
-        >
-          Download
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={handleNext}
-        className="generator-button next-button"
-      >
-        Next: Content & Assets
-      </button>
+      </div>
     </div>
   </div>
 );
