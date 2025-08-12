@@ -21,10 +21,43 @@ const HierarchicalOutlineGenerator = ({
   const { courseOutline, setCourseOutline } = useProject();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [lines, setLines] = useState([]);
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateHierarchicalOutline");
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
+
+  const parseOutline = (outline = "") =>
+    outline
+      .split(/\r?\n/)
+      .filter((l) => l.trim())
+      .map((line) => {
+        const match = line.match(/^(\d+(?:\.\d+)*)\s+(.*)$/);
+        if (match) {
+          return {
+            level: match[1].split(".").length,
+            text: match[2].trim(),
+          };
+        }
+        return { level: 1, text: line.trim() };
+      });
+
+  const renumber = (items = []) => {
+    const counters = [];
+    return items.map((item) => {
+      const lvl = item.level || 1;
+      counters[lvl - 1] = (counters[lvl - 1] || 0) + 1;
+      counters.length = lvl;
+      return {
+        ...item,
+        number: counters.slice(0, lvl).join("."),
+      };
+    });
+  };
+
+  const formatOutline = (items = []) =>
+    items.map((l) => `${l.number} ${l.text}`).join("\n");
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -52,6 +85,8 @@ const HierarchicalOutlineGenerator = ({
   useEffect(() => {
     if (!courseOutline) {
       handleGenerate();
+    } else {
+      setLines(renumber(parseOutline(courseOutline)));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseOutline]);
@@ -70,17 +105,29 @@ const HierarchicalOutlineGenerator = ({
     }
   };
 
+  const handleLineChange = (idx, value) => {
+    setLines((prev) => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], text: value };
+      return updated;
+    });
+  };
+
+  const handleDeleteLine = (idx) => {
+    setLines((prev) => renumber(prev.filter((_, i) => i !== idx)));
+  };
+
+  const handleToggleEdit = async () => {
+    if (isEditing) {
+      const updated = formatOutline(renumber(lines));
+      setCourseOutline(updated);
+      await handleManualSave();
+    }
+    setIsEditing((prev) => !prev);
+  };
+
   return (
     <div className="generator-result">
-      <div className="button-row">
-        <button
-          type="button"
-          onClick={onBack}
-          className="generator-button back-button"
-        >
-          Back
-        </button>
-      </div>
       <h3>Hierarchical Course Outline</h3>
       {!courseOutline && (
         <button
@@ -95,20 +142,52 @@ const HierarchicalOutlineGenerator = ({
       {error && <p className="generator-error">{error}</p>}
       {courseOutline && (
         <>
-          <div className="generator-result" style={{ textAlign: "left" }}>
-            <textarea
-              value={courseOutline}
-              onChange={(e) => setCourseOutline(e.target.value)}
-              style={{ width: "100%", minHeight: "300px" }}
-            />
-          </div>
+          {!isEditing ? (
+            <div className="outline-display">
+              {lines.map((line, idx) => (
+                <div key={idx} style={{ paddingLeft: (line.level - 1) * 20 }}>
+                  <span className="outline-number">{line.number}</span> {line.text}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="outline-edit">
+              {lines.map((line, idx) => (
+                <div
+                  key={idx}
+                  className="outline-edit-row"
+                  style={{ paddingLeft: (line.level - 1) * 20 }}
+                >
+                  <span className="outline-number">{line.number}</span>
+                  <input
+                    value={line.text}
+                    onChange={(e) => handleLineChange(idx, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteLine(idx)}
+                    className="generator-button outline-delete"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="button-row">
             <button
               type="button"
-              onClick={handleManualSave}
-              className="generator-button save-button"
+              onClick={onBack}
+              className="generator-button back-button"
             >
-              Save
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleEdit}
+              className={`generator-button ${isEditing ? "save-button" : "edit-button"}`}
+            >
+              {isEditing ? "Save" : "Edit"}
             </button>
             {onNext && (
               <button
@@ -116,7 +195,7 @@ const HierarchicalOutlineGenerator = ({
                 onClick={onNext}
                 className="generator-button next-button"
               >
-                Generate Learning Design Document
+                Next
               </button>
             )}
           </div>

@@ -87,6 +87,10 @@
     box-sizing: border-box;
   }
 
+  .learning-objectives {
+    padding-left: 30px;
+  }
+
   .learning-objectives .generator-input {
     width: 85%;
     max-width: none;
@@ -260,6 +264,38 @@
     font-size: 16px;
     line-height: 1.5;
     margin: 0;
+}
+
+.outline-display {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.outline-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.outline-edit-row input {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #8C259E;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.outline-number {
+    font-weight: 600;
+    min-width: 40px;
+}
+
+.outline-delete {
+    border-image: linear-gradient(45deg, #B22222, #FF4500) 1;
 }
 
 /* Spinner styling */
