@@ -635,6 +635,7 @@ export const generateLearnerPersona = onCall(
       refreshField,
       personaName,
       existingNames = [],
+      existingLearningPreferences = [],
     } = req.data || {};
 
     if (!projectBrief) {
@@ -718,15 +719,20 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       return { [key]: data.options || [] };
     }
 
-    const textPrompt = `You are a Senior Instructional Designer. Using the provided information, create one learner persona named ${finalName}. Provide:
+    const nameInstruction = personaName
+      ? `The persona's name is ${personaName}.`
+      : `Create a unique first and last name for the learner persona that is not in this list: ${
+          existingNames.join(", ") || "none"
+        }.`;
+    const textPrompt = `You are a Senior Instructional Designer. ${nameInstruction} Using the provided information, create one learner persona. Provide:
 - "ageRange": the typical age range as a string (e.g., "25-34") and "ageRangeOptions" with exactly two alternatives.
 - "educationLevel": a concise education description and "educationLevelOptions" with two alternatives.
 - "techProficiency": the learner's technology skill level and "techProficiencyOptions" with two alternatives.
-- "learningPreferences": one full-sentence about ${finalName}'s preferred learning style and "learningPreferencesOptions" with two alternative full-sentence options about ${finalName}.
+ - "learningPreferences": one full-sentence about the learner's preferred learning style and "learningPreferencesOptions" with two alternative full-sentence options about the learner.
 - For both the primary motivation and the primary challenge:
   - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-  - Provide a full-sentence description in a "text" field written about ${finalName} in third person using their name.
-  - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about ${finalName}.
+  - Provide a full-sentence description in a "text" field written about the learner in third person using their name.
+  - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the learner.
 Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
 {
@@ -747,6 +753,7 @@ Return a JSON object exactly like this, no code fences, and vary the persona eac
 
 Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.
 Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
+Avoid learning preferences: ${existingLearningPreferences.join(" | ") || "none"}.
 
   Project Brief: ${projectBrief}
   Business Goal: ${businessGoal}
@@ -762,9 +769,17 @@ Avoid challenge keywords: ${existingChallengeKeywords.join(", ") || "none"}.
       console.error("Failed to parse AI response:", err, text);
       throw new HttpsError("internal", "Invalid AI response format.");
     }
-
-    persona.name = finalName;
-return persona;
+    if (personaName) {
+      persona.name = personaName;
+    } else if (
+      !persona.name ||
+      existingNames
+        .map((n) => n.toLowerCase())
+        .includes(persona.name.toLowerCase())
+    ) {
+      persona.name = generateUniqueName(existingNames);
+    }
+    return persona;
   }
 );
 
