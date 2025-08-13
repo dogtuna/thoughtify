@@ -1029,45 +1029,38 @@ const InitiativesNew = () => {
         Your AI Partner for End-to-End Course Creation
       </p>
       <div className="step-tracker">
-        <div
-          className="steps"
-          style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}
-        >
-          {steps.map((label, idx) => (
-            <div
-              key={label}
-              className={`step-item ${
-                idx + 1 === step ? "active" : idx + 1 < step ? "completed" : ""
-              }`}
-              onClick={() => setStep(idx + 1)}
-            >
-              <div className="step-circle">
-                {idx + 1 < step ? "\u2713" : idx + 1}
-              </div>
-              <div className="step-label">{label}</div>
-            </div>
-          ))}
-        </div>
+        {steps.map((label, idx) => (
+          <div
+            key={label}
+            className={`step-segment ${
+              idx + 1 === step ? "active" : idx + 1 < step ? "completed" : ""
+            }`}
+            onClick={() => setStep(idx + 1)}
+          >
+            {label}
+          </div>
+        ))}
       </div>
       {saveStatus && <p className="save-status">{saveStatus}</p>}
 
       {step === 1 && (
-        <form onSubmit={handleSubmit} className="generator-form">
-          <h3>Project Intake</h3>
-          <p>Tell us about your project. The more detail, the better.</p>
-          <div className="intake-grid">
-            <div className="intake-left">
-              <label>
-                Project Name
-                <input
-                  type="text"
-                  value={projectName}
-                  placeholder="e.g., 'Q3 Sales Onboarding'"
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="generator-input"
-                />
-              </label>
-              <label>
+        <div className="initiative-card">
+          <form onSubmit={handleSubmit} className="generator-form">
+            <h3>Project Intake</h3>
+            <p>Tell us about your project. The more detail, the better.</p>
+            <div className="intake-grid">
+              <div className="intake-left">
+                <label>
+                  Project Name
+                  <input
+                    type="text"
+                    value={projectName}
+                    placeholder="e.g., 'Q3 Sales Onboarding'"
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="generator-input"
+                  />
+                </label>
+                <label>
                 What is the primary business goal?
                 <input
                   type="text"
@@ -1140,10 +1133,11 @@ const InitiativesNew = () => {
           </div>
           {error && <p className="generator-error">{error}</p>}
         </form>
+        </div>
       )}
 
       {step === 2 && (
-        <div className="generator-result">
+        <div className="generator-result initiative-card">
           <p>
             Answering the questions below is optional, but it will help ensure the brief is as good as possible.
           </p>
@@ -1187,7 +1181,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 3 && (
-        <div className="generator-result" ref={projectBriefRef}>
+        <div className="generator-result initiative-card" ref={projectBriefRef}>
           <h3>Project Brief</h3>
           {isEditingBrief ? (
             <textarea
@@ -1256,7 +1250,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 4 && (
-        <div className="generator-result">
+        <div className="generator-result initiative-card">
           <div>
             <h3>Learner Personas</h3>
             {personas.length === 0 ? (
@@ -1594,7 +1588,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 5 && strategy && (
-        <div className="generator-result">
+        <div className="generator-result initiative-card">
           <h3>Select Learning Approach</h3>
           <select
             className="generator-input"

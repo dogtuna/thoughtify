@@ -17,50 +17,58 @@
     opacity: 0.8;
   }
 
-.step-tracker {
-    position: relative;
-    margin: 20px 0;
-  }
-
-.steps {
-    display: grid;
-    gap: 12px;
-    justify-content: center;
-  }
-
-.step-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    opacity: 0.5;
-    text-align: center;
-  }
-
-.step-item.active,
-.step-item.completed {
-    opacity: 1;
-  }
-
-.step-circle {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid #8C259E;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 4px;
+/* Reusable frosted glass card for each initiative step */
+.initiative-card {
     background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    padding: 20px;
+    margin: 20px auto;
+    color: #fff;
+    width: 100%;
+    max-width: 800px;
+    text-align: left;
   }
 
-.step-item.completed .step-circle {
-    background: #8C259E;
-    color: white;
+.step-tracker {
+    display: flex;
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 9999px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    overflow: hidden;
   }
 
-.step-label {
+.step-segment {
+    flex: 1;
+    padding: 8px 12px;
+    text-align: center;
+    cursor: pointer;
     font-size: 12px;
+    color: #fff;
+    transition: background 0.3s ease;
+  }
+
+.step-segment:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+.step-segment.completed {
+    background: rgba(140, 37, 158, 0.5);
+  }
+
+.step-segment.active {
+    background: rgba(140, 37, 158, 0.8);
+    font-weight: 600;
   }
 
 .save-status {

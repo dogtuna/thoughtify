@@ -237,7 +237,7 @@ const LearningObjectivesGenerator = ({
   };
 
   return (
-    <div className="generator-result learning-objectives">
+    <div className="generator-result learning-objectives initiative-card">
       <h3>Learning Objectives</h3>
       <div style={{ marginBottom: 10 }}>
         <label>
