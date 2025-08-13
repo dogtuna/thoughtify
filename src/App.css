@@ -53,21 +53,21 @@ body::before {
 }
 
 body.pulsing::before {
-  animation: pulseGradient 6s ease-in-out infinite;
+  animation: pulseGradient 5s ease-in-out infinite;
 }
 
 @keyframes pulseGradient {
   0% {
     transform: scale(1) translate(0, 0);
-    opacity: 0.6;
+    opacity: 0.55;
   }
   50% {
-    transform: scale(1.4) translate(15%, -15%);
-    opacity: 0.8;
+    transform: scale(1.8) translate(25%, -25%);
+    opacity: 0.9;
   }
   100% {
     transform: scale(1) translate(0, 0);
-    opacity: 0.6;
+    opacity: 0.55;
   }
 }
 
