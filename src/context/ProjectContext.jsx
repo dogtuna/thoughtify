@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import PropTypes from "prop-types";
 
 const ProjectContext = createContext();
@@ -36,7 +36,7 @@ export const ProjectProvider = ({ children }) => {
   const [draftContent, setDraftContent] = useState(defaultState.draftContent);
   const [mediaAssets, setMediaAssets] = useState(defaultState.mediaAssets);
 
-  const resetProject = () => {
+  const resetProject = useCallback(() => {
     setCourseOutline(defaultState.courseOutline);
     setModules(defaultState.modules);
     setSelectedModule(defaultState.selectedModule);
@@ -47,7 +47,7 @@ export const ProjectProvider = ({ children }) => {
     setLearningDesignDocument(defaultState.learningDesignDocument);
     setDraftContent(defaultState.draftContent);
     setMediaAssets(defaultState.mediaAssets);
-  };
+  }, []);
 
   const value = {
     courseOutline,

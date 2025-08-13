@@ -536,7 +536,7 @@ const InitiativesNew = () => {
         projectConstraints,
         clarifyingQuestions,
         clarifyingAnswers,
-        personaCount: 0,
+        personaCount: personas.length,
         sourceMaterial: getCombinedSource(),
       });
 
