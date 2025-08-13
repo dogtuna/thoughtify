@@ -711,12 +711,9 @@ export const generateLearnerPersona = onCall(
     if (refreshField && refreshableFields.includes(refreshField)) {
       let listPrompt;
       if (refreshField === "motivation" || refreshField === "challenges") {
-        const personaContext = finalName
-          ? `The persona's name is ${finalName}. Write each option's "text" as a third-person sentence about ${finalName}.`
-          : "Write each option's \"text\" as a third-person sentence about the learner persona.";
-        listPrompt = `You are a Senior Instructional Designer. ${personaContext} Based on the project information below, list three fresh learner ${
+        listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
           refreshField
-        } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written in full sentences. Avoid the following ${
+        } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written in full sentences describing the learner without using their name. Avoid the following ${
           refreshField
         } keywords: ${
           refreshField === "motivation"
@@ -729,7 +726,11 @@ Business Goal: ${businessGoal}
 Audience Profile: ${audienceProfile}
 Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       } else if (refreshField === "learningPreferences") {
-        listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner learning preference options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) describing a distinct modality or strategy and a "text" field that is a full-sentence about the learner. Avoid the following learning preference keywords: ${existingLearningPreferenceKeywords.join(", ") || "none"}.
+        const firstName = finalName ? finalName.split(" ")[0] : null;
+        const personaInstruction = firstName
+          ? ` Use only the first name ${firstName} in each option's "text" sentence.`
+          : "";
+        listPrompt = `You are a Senior Instructional Designer.${personaInstruction} Based on the project information below, list three fresh learner learning preference options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) describing a distinct modality or strategy and a "text" field that is a full-sentence about the learner. Avoid the following learning preference keywords: ${existingLearningPreferenceKeywords.join(", ") || "none"}.
 
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
@@ -786,11 +787,11 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       const textPrompt = `You are a Senior Instructional Designer. ${nameInstruction} The persona is in the ${ageRange} age group. Using the provided information, create one learner persona. Provide:
   - "educationLevel": select one option from [${educationList}] and "educationLevelOptions" with two other distinct options from this list.
   - "techProficiency": select one option from [${techList}] and "techProficiencyOptions" with two other distinct options from this list.
-   - "learningPreferences": {"keyword": "short concept", "text": "full-sentence about the learner"} describing the learner's preferred learning style and "learningPreferencesOptions" with two alternative objects following the same keyword/text structure. Each keyword must capture a distinct modality or strategy (e.g., "hands-on practice", "visual storytelling").
+   - "learningPreferences": {"keyword": "short concept", "text": "full-sentence about the learner using only the first name"} describing the learner's preferred learning style and "learningPreferencesOptions" with two alternative objects following the same keyword/text structure and using only the first name. Each keyword must capture a distinct modality or strategy (e.g., "hands-on practice", "visual storytelling").
   - For both the primary motivation and the primary challenge:
     - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-    - Provide a full-sentence description in a "text" field written about the learner in third person using their name.
-    - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the learner.
+    - Provide a full-sentence description in a "text" field about the learner in third person without using their name.
+    - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the learner without using their name.
   Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
   {
@@ -799,15 +800,15 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
     "educationLevelOptions": ["No College", "Bachelor's degree"],
     "techProficiency": "Intermediate",
     "techProficiencyOptions": ["Beginner", "Advanced"],
-    "learningPreferences": {"keyword": "concept", "text": "Full sentence about Name"},
+    "learningPreferences": {"keyword": "concept", "text": "Full sentence about FirstName"},
     "learningPreferencesOptions": [
-      {"keyword": "concept", "text": "Full sentence about Name"},
-      {"keyword": "concept", "text": "Full sentence about Name"}
+      {"keyword": "concept", "text": "Full sentence about FirstName"},
+      {"keyword": "concept", "text": "Full sentence about FirstName"}
     ],
-    "motivation": {"keyword": "short", "text": "full"},
-    "motivationOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}],
-    "challenges": {"keyword": "short", "text": "full"},
-    "challengeOptions": [{"keyword": "short", "text": "full"}, {"keyword": "short", "text": "full"}]
+    "motivation": {"keyword": "short", "text": "Full sentence about the learner"},
+    "motivationOptions": [{"keyword": "short", "text": "Full sentence about the learner"}, {"keyword": "short", "text": "Full sentence about the learner"}],
+    "challenges": {"keyword": "short", "text": "Full sentence about the learner"},
+    "challengeOptions": [{"keyword": "short", "text": "Full sentence about the learner"}, {"keyword": "short", "text": "Full sentence about the learner"}]
   }
 
   Avoid motivation keywords: ${existingMotivationKeywords.join(", ") || "none"}.

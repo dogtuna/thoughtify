@@ -95,19 +95,24 @@ const LearningDesignDocument = ({
 
   useEffect(() => {
     if (learningDesignDocument) {
-      const lines = learningDesignDocument.split("\n");
+      const regex = /^##\s+(.*)$/gm;
       const parsed = [];
-      let current = null;
-      lines.forEach((line) => {
-        const trimmed = line.trimStart();
-        if (/^##\s*/.test(trimmed)) {
-          if (current) parsed.push(current);
-          current = { title: trimmed.replace(/^##\s*/, ""), content: "" };
-        } else if (current) {
-          current.content += `${line}\n`;
+      let match;
+      let lastIndex = 0;
+      while ((match = regex.exec(learningDesignDocument)) !== null) {
+        if (parsed.length) {
+          parsed[parsed.length - 1].content = learningDesignDocument
+            .slice(lastIndex, match.index)
+            .trim();
         }
-      });
-      if (current) parsed.push(current);
+        parsed.push({ title: match[1].trim(), content: "" });
+        lastIndex = regex.lastIndex;
+      }
+      if (parsed.length) {
+        parsed[parsed.length - 1].content = learningDesignDocument
+          .slice(lastIndex)
+          .trim();
+      }
       setSections(parsed);
       setActiveTab(0);
     }
