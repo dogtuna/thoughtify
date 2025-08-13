@@ -130,6 +130,8 @@ const InitiativesNew = () => {
     1,
     Math.ceil(clarifyingQuestions.length / QUESTIONS_PER_PAGE)
   );
+  const isFirstQuestionPage = questionPage === 0;
+  const isLastQuestionPage = questionPage >= totalQuestionPages - 1;
 
   const [strategy, setStrategy] = useState(null);
   const [selectedModality, setSelectedModality] = useState("");
@@ -1151,7 +1153,7 @@ const InitiativesNew = () => {
       {step === 2 && (
         <div className="generator-result initiative-card">
           <p>
-            Answering the questions below is optional, but it will help ensure the brief is as good as possible.
+            These questions are optional but answering them will strengthen your project brief.
           </p>
           <p className="page-indicator">
             Page {questionPage + 1} of {totalQuestionPages}
@@ -1167,63 +1169,49 @@ const InitiativesNew = () => {
                 <div key={overallIdx}>
                   <p>{q}</p>
                   <textarea
-                    className="generator-input"
+                    className="generator-input clarify-textarea"
                     value={clarifyingAnswers[overallIdx] || ""}
                     onChange={(e) =>
                       handleAnswerChange(overallIdx, e.target.value)
                     }
-                    rows={4}
+                    rows={3}
                   />
                 </div>
               );
             })}
-          <div className="button-row">
-            <button
-              type="button"
-              onClick={() => setQuestionPage(Math.max(questionPage - 1, 0))}
-              className="generator-button back-button"
-              disabled={questionPage === 0}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setQuestionPage((prev) =>
-                  Math.min(prev + 1, totalQuestionPages - 1)
-                )
-              }
-              className="generator-button next-button"
-              disabled={questionPage >= totalQuestionPages - 1}
-            >
-              Next
-            </button>
-          </div>
           <p className="page-indicator">
             Page {questionPage + 1} of {totalQuestionPages}
           </p>
           <div className="button-row">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() =>
+                isFirstQuestionPage
+                  ? setStep(1)
+                  : setQuestionPage((prev) => Math.max(prev - 1, 0))
+              }
               className="generator-button back-button"
             >
               Back
             </button>
             <button
               type="button"
-              onClick={handleSave}
-              className="generator-button save-button"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateBrief}
+              onClick={async () => {
+                await handleSave();
+                if (isLastQuestionPage) {
+                  await handleGenerateBrief();
+                } else {
+                  setQuestionPage((prev) => prev + 1);
+                }
+              }}
               disabled={loading}
               className="generator-button next-button"
             >
-              {loading ? "Generating..." : "Generate Brief"}
+              {loading
+                ? "Generating..."
+                : isLastQuestionPage
+                ? "Next: Generate Brief"
+                : "Next"}
             </button>
           </div>
           {error && <p className="generator-error">{error}</p>}
@@ -1252,7 +1240,10 @@ const InitiativesNew = () => {
           <div className="button-row">
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                setQuestionPage(totalQuestionPages - 1);
+                setStep(2);
+              }}
               className="generator-button back-button"
             >
               Back

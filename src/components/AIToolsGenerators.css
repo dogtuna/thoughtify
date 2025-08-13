@@ -105,6 +105,12 @@
     text-align: left;
   }
 
+  .clarify-textarea {
+    width: calc(100% - 20px);
+    max-width: none;
+    margin: 0 10px 10px;
+  }
+
   .learning-objectives {
     padding-left: 30px;
   }
