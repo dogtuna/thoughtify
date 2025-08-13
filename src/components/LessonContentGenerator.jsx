@@ -1,6 +1,6 @@
 // src/LessonContentGenerator.jsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
@@ -10,6 +10,11 @@ import "./AIToolsGenerators.css";
 const LessonContentGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", loading);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading]);
 
   const { selectedModule, lessonContent, setLessonContent } = useProject();
   const navigate = useNavigate();
@@ -41,7 +46,7 @@ const LessonContentGenerator = () => {
   };
 
   return (
-    <div className="generator-container">
+    <div className="initiative-card">
       <h2>Lesson Content Generator</h2>
       <p>Module: {selectedModule || "No module selected"}</p>
       <button
