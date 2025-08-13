@@ -50,7 +50,7 @@ const StoryboardGenerator = () => {
   };
 
   return (
-    <div className={`initiative-card ${loading ? 'pulsing' : ''}`}>
+    <div className="initiative-card">
       <h2>Storyboard Generator</h2>
       <p>Module: {selectedModule || "No module selected"}</p>
       <input

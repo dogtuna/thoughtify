@@ -46,7 +46,7 @@ const LessonContentGenerator = () => {
   };
 
   return (
-    <div className={`initiative-card ${loading ? 'pulsing' : ''}`}>
+    <div className="initiative-card">
       <h2>Lesson Content Generator</h2>
       <p>Module: {selectedModule || "No module selected"}</p>
       <button

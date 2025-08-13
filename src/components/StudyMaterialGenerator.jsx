@@ -37,7 +37,7 @@ const StudyMaterialGenerator = () => {
   };
 
   return (
-    <div className={`initiative-card ${loading ? 'pulsing' : ''}`}>
+    <div className="initiative-card">
       <h2>Study Material Generator</h2>
       <form onSubmit={handleSubmit} className="generator-form">
         <input

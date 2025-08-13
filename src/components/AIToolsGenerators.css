@@ -34,57 +34,6 @@
     text-align: left;
     box-sizing: border-box;
 }
-.initiative-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: inherit;
-    filter: blur(60px);
-    opacity: 0.6;
-    transform: scale(1.2);
-    transition: transform 6s ease, opacity 6s ease;
-    z-index: 0;
-}
-.initiative-card > * {
-    position: relative;
-    z-index: 1;
-}
-.initiative-card.pulsing::before {
-    animation: pulseGradient 6s ease-in-out infinite;
-}
-@keyframes pulseGradient {
-    0% { transform: scale(1.2) translate(0,0); opacity: 0.6; }
-    50% { transform: scale(1.4) translate(-5%, -5%); opacity: 0.8; }
-    100% { transform: scale(1.2) translate(0,0); opacity: 0.6; }
-}
-
-.initiative-card::before {
-    content: "";
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background:
-      radial-gradient(circle at 30% 30%, #f97316, transparent 60%),
-      radial-gradient(circle at 70% 70%, #ec4899, transparent 60%),
-      radial-gradient(circle at 70% 30%, #667eea, transparent 60%),
-      radial-gradient(circle at 30% 70%, #8b5cf6, transparent 60%);
-    filter: blur(80px);
-    opacity: 0.6;
-    pointer-events: none;
-    z-index: 0;
-    transform: scale(1) translate(0, 0);
-  }
-
-.initiative-card > * {
-    position: relative;
-    z-index: 1;
-  }
-
-.initiative-card.pulsing::before {
-    animation: pulseGradient 6s ease-in-out infinite;
-  }
 
 .step-tracker {
     display: flex;
@@ -124,11 +73,11 @@
   }
 
 .step-segment.completed {
-    background: rgba(140, 37, 158, 0.5);
+    background: rgba(140, 37, 158, 0.3);
   }
 
 .step-segment.active {
-    background: rgba(140, 37, 158, 0.8);
+    background: rgba(140, 37, 158, 0.5);
     font-weight: 600;
   }
 

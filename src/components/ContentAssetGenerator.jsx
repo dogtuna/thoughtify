@@ -156,7 +156,7 @@ const ContentAssetGenerator = () => {
     Object.keys(draftContent || {}).length > 0 || mediaAssets.length > 0;
 
   return (
-    <div className={`initiative-card ${isLoading ? 'pulsing' : ''}`}>
+    <div className="initiative-card">
       <div className="progress-indicator">Step 9 of {TOTAL_STEPS}</div>
       <h2>Content & Asset Generator</h2>
       <p className="generator-info">

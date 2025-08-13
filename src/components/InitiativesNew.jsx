@@ -1157,7 +1157,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 2 && (
-        <div className={`initiative-card generator-result ${loading ? 'pulsing' : ''}`}>
+        <div className="initiative-card generator-result">
           <p>
             These questions are optional but answering them will strengthen your project brief.
           </p>
@@ -1225,7 +1225,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 3 && (
-        <div className={`initiative-card generator-result ${loading ? 'pulsing' : ''}`}
+        <div className="initiative-card generator-result"
           ref={projectBriefRef}
         >
           <h3>Project Brief</h3>
@@ -1299,7 +1299,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 4 && (
-        <div className={`initiative-card generator-result ${(personaLoading || nextLoading) ? 'pulsing' : ''}`}
+        <div className="initiative-card generator-result"
         >
           <div>
             <h3>Learner Personas</h3>
@@ -1638,7 +1638,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 5 && strategy && (
-        <div className={`initiative-card generator-result ${nextLoading ? 'pulsing' : ''}`}
+        <div className="initiative-card generator-result"
         >
           <h3>Select Learning Approach</h3>
           <select
