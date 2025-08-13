@@ -143,6 +143,12 @@ const InitiativesNew = () => {
   const [nextLoading, setNextLoading] = useState(false);
   const [personaLoading, setPersonaLoading] = useState(false);
 
+  useEffect(() => {
+    const isBusy = loading || nextLoading || personaLoading;
+    document.body.classList.toggle("pulsing", isBusy);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading, nextLoading, personaLoading]);
+
   const [error, setError] = useState("");
   const [nextError, setNextError] = useState("");
   const [personaError, setPersonaError] = useState("");
@@ -1058,7 +1064,7 @@ const InitiativesNew = () => {
       {saveStatus && <p className="save-status">{saveStatus}</p>}
 
       {step === 1 && (
-        <div className="initiative-card">
+        <div className={`initiative-card ${loading ? 'pulsing' : ''}`}>
           <form onSubmit={handleSubmit} className="generator-form">
             <h3>Project Intake</h3>
             <p>Tell us about your project. The more detail, the better.</p>
@@ -1151,7 +1157,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 2 && (
-        <div className="generator-result initiative-card">
+        <div className={`initiative-card generator-result ${loading ? 'pulsing' : ''}`}>
           <p>
             These questions are optional but answering them will strengthen your project brief.
           </p>
@@ -1219,7 +1225,9 @@ const InitiativesNew = () => {
       )}
 
       {step === 3 && (
-        <div className="generator-result initiative-card" ref={projectBriefRef}>
+        <div className={`initiative-card generator-result ${loading ? 'pulsing' : ''}`}
+          ref={projectBriefRef}
+        >
           <h3>Project Brief</h3>
           {isEditingBrief ? (
             <textarea
@@ -1291,7 +1299,8 @@ const InitiativesNew = () => {
       )}
 
       {step === 4 && (
-        <div className="generator-result initiative-card">
+        <div className={`initiative-card generator-result ${(personaLoading || nextLoading) ? 'pulsing' : ''}`}
+        >
           <div>
             <h3>Learner Personas</h3>
             {personas.length === 0 ? (
@@ -1629,7 +1638,8 @@ const InitiativesNew = () => {
       )}
 
       {step === 5 && strategy && (
-        <div className="generator-result initiative-card">
+        <div className={`initiative-card generator-result ${nextLoading ? 'pulsing' : ''}`}
+        >
           <h3>Select Learning Approach</h3>
           <select
             className="generator-input"

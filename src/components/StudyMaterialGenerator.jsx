@@ -1,6 +1,6 @@
 // src/components/StudyMaterialGenerator.jsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase.js";
 import "./AIToolsGenerators.css";
@@ -10,6 +10,11 @@ const StudyMaterialGenerator = () => {
   const [studyMaterial, setStudyMaterial] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", loading);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading]);
 
   const functionsInstance = getFunctions(app);
   const generateStudyMaterial = httpsCallable(functionsInstance, "generateStudyMaterial");
@@ -32,7 +37,7 @@ const StudyMaterialGenerator = () => {
   };
 
   return (
-    <div className="generator-container">
+    <div className={`initiative-card ${loading ? 'pulsing' : ''}`}>
       <h2>Study Material Generator</h2>
       <form onSubmit={handleSubmit} className="generator-form">
         <input
