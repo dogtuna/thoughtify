@@ -32,7 +32,7 @@
     max-width: 1200px;
     text-align: left;
     box-sizing: border-box;
-  }
+}
 
 .step-tracker {
     display: flex;
@@ -72,11 +72,11 @@
   }
 
 .step-segment.completed {
-    background: rgba(140, 37, 158, 0.5);
+    background: rgba(140, 37, 158, 0.3);
   }
 
 .step-segment.active {
-    background: rgba(140, 37, 158, 0.8);
+    background: rgba(140, 37, 158, 0.5);
     font-weight: 600;
   }
 
@@ -270,7 +270,7 @@
   
   /* Result container styling */
   .generator-result {
-    background: rgba(255, 255, 255, 0.1);
+    background: transparent;
     padding: 20px;
     border-radius: 12px;
     margin-top: 20px;
@@ -278,7 +278,7 @@
     overflow-y: auto;
     text-align: left;
     position: relative;
-  }
+}
   
   .generator-result h3 {
     text-align: center;
