@@ -30,6 +30,7 @@ const LearningObjectivesGenerator = ({
   audienceProfile,
   projectConstraints,
   selectedModality,
+  blendModalities = [],
   sourceMaterials,
   onBack,
   onNext,
@@ -40,7 +41,7 @@ const LearningObjectivesGenerator = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(null); // { type, index }
+  const [isEditing, setIsEditing] = useState(false);
 
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateLearningObjectives");
@@ -59,6 +60,7 @@ const LearningObjectivesGenerator = ({
         audienceProfile,
         projectConstraints,
         selectedModality,
+        blendModalities,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
         approach,
         bloomLevel,
@@ -107,6 +109,7 @@ const LearningObjectivesGenerator = ({
         audienceProfile,
         projectConstraints,
         selectedModality,
+        blendModalities,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
         approach: learningObjectives.approach,
         bloomLevel: learningObjectives.bloomLevel,
@@ -132,14 +135,6 @@ const LearningObjectivesGenerator = ({
       setError(err?.message || "Error refreshing objective.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const toggleEdit = (type, index) => {
-    if (editing && editing.type === type && editing.index === index) {
-      setEditing(null);
-    } else {
-      setEditing({ type, index });
     }
   };
 
@@ -186,25 +181,35 @@ const LearningObjectivesGenerator = ({
     }
   };
 
+  const handleToggleEdit = async () => {
+    if (isEditing) {
+      await handleSave();
+    }
+    setIsEditing((prev) => !prev);
+  };
+
   const handleNext = async () => {
     await handleSave();
+    setIsEditing(false);
     if (onNext) onNext();
   };
 
   const renderObjective = (obj, type, index) => {
     if (!obj) return null;
-    const isEditing = editing && editing.type === type && editing.index === index;
     const options = [obj.text, ...(obj.options || []).filter((o) => o !== obj.text)];
     return (
-      <div key={`${type}-${index}`}>
+      <div key={`${type}-${index}`} className={!isEditing ? "objectives-display" : ""}>
         <h4>{type === "terminal" ? "Terminal Objective" : `Enabling Objective ${index + 1}`}</h4>
-        <textarea
-          className="generator-input"
-          rows={3}
-          value={obj.text}
-          readOnly={!isEditing}
-          onChange={(e) => handleTextChange(type, index, e.target.value)}
-        />
+        {isEditing ? (
+          <textarea
+            className="generator-input"
+            rows={3}
+            value={obj.text}
+            onChange={(e) => handleTextChange(type, index, e.target.value)}
+          />
+        ) : (
+          <p>{obj.text}</p>
+        )}
         {obj.options && obj.options.length > 0 && (
           <select
             className="generator-input"
@@ -219,13 +224,6 @@ const LearningObjectivesGenerator = ({
           </select>
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => toggleEdit(type, index)}
-            className="generator-button"
-          >
-            {isEditing ? "Save" : "Edit"}
-          </button>
           <button
             type="button"
             onClick={() => handleReroll(type, index)}
@@ -311,11 +309,11 @@ const LearningObjectivesGenerator = ({
         {learningObjectives && (
           <button
             type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="generator-button save-button"
+            onClick={handleToggleEdit}
+            disabled={saving && isEditing}
+            className={`generator-button ${isEditing ? "save-button" : "edit-button"}`}
           >
-            {saving ? "Saving..." : "Save Objectives"}
+            {isEditing ? (saving ? "Saving..." : "Save") : "Edit"}
           </button>
         )}
         {learningObjectives && onNext && (
@@ -340,6 +338,7 @@ LearningObjectivesGenerator.propTypes = {
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
+  blendModalities: PropTypes.array,
   sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
   onNext: PropTypes.func,

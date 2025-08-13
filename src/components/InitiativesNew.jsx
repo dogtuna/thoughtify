@@ -20,6 +20,15 @@ import "./AIToolsGenerators.css";
 const formatKeyword = (kw = "") =>
   kw ? kw.charAt(0).toUpperCase() + kw.slice(1) : "";
 
+const BLENDED_OPTIONS = [
+  "In-Person Workshops",
+  "Virtual Instructor-Led Sessions",
+  "Self-Paced Online Modules",
+  "Discussion Forums",
+  "Coaching or Mentoring",
+  "Job Aids or Reference Guides",
+];
+
 const normalizePersona = (p = {}) => {
   const formatOption = (o = {}) => ({
     keyword: formatKeyword(o.keyword) || "General",
@@ -77,8 +86,16 @@ const normalizePersona = (p = {}) => {
     educationLevelOptions: p.educationLevelOptions || [],
     techProficiency: p.techProficiency || "",
     techProficiencyOptions: p.techProficiencyOptions || [],
-    learningPreferences: p.learningPreferences || "",
-    learningPreferencesOptions: p.learningPreferencesOptions || [],
+    learningPreferences: p.learningPreferences?.text || p.learningPreferences || "",
+    learningPreferencesKeyword: formatKeyword(
+      p.learningPreferences?.keyword
+    ) || "",
+    learningPreferencesOptions: (p.learningPreferencesOptions || []).map(
+      (o) => (typeof o === "string" ? o : o.text || "")
+    ),
+    learningPreferenceOptionKeywords: (p.learningPreferencesOptions || []).map(
+      (o) => (typeof o === "string" ? "" : formatKeyword(o.keyword))
+    ),
     motivationChoices: [...motivations, ...motivationExtras],
     challengeChoices: [...challenges, ...challengeExtras],
   };
@@ -110,6 +127,7 @@ const InitiativesNew = () => {
 
   const [strategy, setStrategy] = useState(null);
   const [selectedModality, setSelectedModality] = useState("");
+  const [blendModalities, setBlendModalities] = useState([]);
 
   const [isEditingBrief, setIsEditingBrief] = useState(false);
 
@@ -128,13 +146,16 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
   const [usedNames, setUsedNames] = useState([]);
-  const [usedLearningPrefs, setUsedLearningPrefs] = useState([]);
+  const [usedLearningPrefKeywords, setUsedLearningPrefKeywords] = useState([]);
 
   const {
     learningObjectives,
+    setLearningObjectives,
     courseOutline,
+    setCourseOutline,
     learningDesignDocument,
     setLearningDesignDocument,
+    resetProject,
   } = useProject();
 
   const projectBriefRef = useRef(null);
@@ -158,7 +179,7 @@ const InitiativesNew = () => {
     );
   };
   const addUsedLearningPref = (prefs = []) => {
-    setUsedLearningPrefs((prev) =>
+    setUsedLearningPrefKeywords((prev) =>
       Array.from(new Set([...prev, ...prefs.filter(Boolean)]))
     );
   };
@@ -181,6 +202,9 @@ const InitiativesNew = () => {
         clarifyingAnswers,
         strategy,
         selectedModality,
+        blendModalities,
+        learningObjectives,
+        courseOutline,
         learningDesignDocument,
       });
       setSaveStatus("Saved");
@@ -194,6 +218,27 @@ const InitiativesNew = () => {
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
+
+    // Reset all local and project state when switching initiatives
+    resetProject();
+    setProjectName("");
+    setBusinessGoal("");
+    setAudienceProfile("");
+    setSourceMaterials([]);
+    setProjectConstraints("");
+    setProjectBrief("");
+    setClarifyingQuestions([]);
+    setClarifyingAnswers([]);
+    setStrategy(null);
+    setSelectedModality("");
+    setPersonas([]);
+    setActivePersonaIndex(0);
+    setPersonaCount(0);
+    setUsedMotivationKeywords([]);
+    setUsedChallengeKeywords([]);
+    setUsedNames([]);
+    setUsedLearningPrefKeywords([]);
+    setBlendModalities([]);
 
     loadInitiative(uid, initiativeId)
       .then((data) => {
@@ -214,6 +259,9 @@ const InitiativesNew = () => {
           setClarifyingAnswers(data.clarifyingAnswers || []);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
+          setBlendModalities(data.blendModalities || []);
+          setLearningObjectives(data.learningObjectives || null);
+          setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
         }
       })
@@ -238,13 +286,19 @@ const InitiativesNew = () => {
           addUsedChallenge(cKeys);
           addUsedName([p.name]);
           addUsedLearningPref([
-            p.learningPreferences,
-            ...(p.learningPreferencesOptions || []),
+            p.learningPreferencesKeyword,
+            ...(p.learningPreferenceOptionKeywords || []),
           ]);
         });
       })
       .catch((err) => console.error("Error loading personas:", err));
-  }, [initiativeId, setLearningDesignDocument]);
+  }, [
+    initiativeId,
+    resetProject,
+    setLearningDesignDocument,
+    setLearningObjectives,
+    setCourseOutline,
+  ]);
 
   useEffect(() => {
     if (!projectBriefRef.current || !nextButtonRef.current) return;
@@ -503,7 +557,7 @@ const InitiativesNew = () => {
         projectConstraints,
         clarifyingQuestions,
         clarifyingAnswers,
-        personaCount: 0,
+        personaCount: personas.length,
         sourceMaterial: getCombinedSource(),
       });
 
@@ -517,12 +571,14 @@ const InitiativesNew = () => {
       }
       setStrategy(data);
       setSelectedModality(data.modalityRecommendation);
+      setBlendModalities(data.blendedModalities || []);
       const uid = auth.currentUser?.uid;
       if (uid) {
         await saveInitiative(uid, initiativeId, {
           projectName,
           strategy: data,
           selectedModality: data.modalityRecommendation,
+          blendModalities: data.blendedModalities || [],
         });
       }
       setStep(5);
@@ -537,10 +593,18 @@ const InitiativesNew = () => {
   const handleModalityChange = (e) => {
     const value = e.target.value;
     setSelectedModality(value);
-    const uid = auth.currentUser?.uid;
-    if (uid) {
-      saveInitiative(uid, initiativeId, { selectedModality: value });
-    }
+    const lower = value.toLowerCase();
+    setBlendModalities((prev) => {
+      const next = lower.includes("blended") ? prev : [];
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          selectedModality: value,
+          blendModalities: next,
+        });
+      }
+      return next;
+    });
   };
 
   const currentPersona = personas[activePersonaIndex] || null;
@@ -568,7 +632,7 @@ const InitiativesNew = () => {
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
           existingNames,
-          existingLearningPreferences: usedLearningPrefs,
+          existingLearningPreferenceKeywords: usedLearningPrefKeywords,
         });
         const personaData = normalizePersona(personaRes.data);
         if (!personaData?.name) {
@@ -629,8 +693,8 @@ const InitiativesNew = () => {
         ]);
         addUsedName([personaData.name]);
         addUsedLearningPref([
-          rest.learningPreferences,
-          ...(rest.learningPreferencesOptions || []),
+          rest.learningPreferencesKeyword,
+          ...(rest.learningPreferenceOptionKeywords || []),
         ]);
         existingNames.push(personaData.name);
         const uid = auth.currentUser?.uid;
@@ -677,7 +741,7 @@ const InitiativesNew = () => {
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         existingNames,
-        existingLearningPreferences: usedLearningPrefs,
+        existingLearningPreferenceKeywords: usedLearningPrefKeywords,
       });
       const personaData = normalizePersona(personaRes.data);
       if (!personaData?.name) {
@@ -741,8 +805,8 @@ const InitiativesNew = () => {
       ]);
       addUsedName([personaData.name]);
       addUsedLearningPref([
-        rest.learningPreferences,
-        ...(rest.learningPreferencesOptions || []),
+        rest.learningPreferencesKeyword,
+        ...(rest.learningPreferenceOptionKeywords || []),
       ]);
       const uid = auth.currentUser?.uid;
       if (uid) {
@@ -908,6 +972,10 @@ const InitiativesNew = () => {
       addUsedChallenge([
         ...challengesList.map((o) => o.keyword),
         ...challengeOptions.map((o) => o.keyword),
+      ]);
+      addUsedLearningPref([
+        rest.learningPreferencesKeyword,
+        ...(rest.learningPreferenceOptionKeywords || []),
       ]);
       setPersonas((prev) =>
         prev.map((p, i) =>
@@ -1557,6 +1625,33 @@ const InitiativesNew = () => {
                 <p>
                   <strong>Nuances:</strong> {info.nuances}
                 </p>
+                {selectedModality.toLowerCase().includes("blended") && (
+                  <div className="blend-options">
+                    {BLENDED_OPTIONS.map((mod) => (
+                      <label key={mod} className="blend-option">
+                        <input
+                          type="checkbox"
+                          checked={blendModalities.includes(mod)}
+                          onChange={() =>
+                            setBlendModalities((prev) => {
+                              const next = prev.includes(mod)
+                                ? prev.filter((m) => m !== mod)
+                                : [...prev, mod];
+                              const uid = auth.currentUser?.uid;
+                              if (uid) {
+                                saveInitiative(uid, initiativeId, {
+                                  blendModalities: next,
+                                });
+                              }
+                              return next;
+                            })
+                          }
+                        />
+                        {mod}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </>
             );
           })()}
@@ -1593,6 +1688,7 @@ const InitiativesNew = () => {
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
+          blendModalities={blendModalities}
           sourceMaterials={sourceMaterials}
           onBack={() => setStep(5)}
           onNext={() => setStep(7)}
@@ -1606,6 +1702,7 @@ const InitiativesNew = () => {
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
+          blendModalities={blendModalities}
           learningObjectives={learningObjectives}
           sourceMaterials={sourceMaterials}
           onBack={() => setStep(6)}
@@ -1621,6 +1718,7 @@ const InitiativesNew = () => {
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
           selectedModality={selectedModality}
+          blendModalities={blendModalities}
           learningObjectives={learningObjectives}
           courseOutline={courseOutline}
           sourceMaterials={sourceMaterials}

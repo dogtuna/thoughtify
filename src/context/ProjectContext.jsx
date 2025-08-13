@@ -1,19 +1,53 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import PropTypes from "prop-types";
 
 const ProjectContext = createContext();
 
+const defaultState = {
+  courseOutline: "",
+  modules: [],
+  selectedModule: "",
+  lessonContent: "",
+  storyboard: "",
+  assessment: "",
+  learningObjectives: null,
+  learningDesignDocument: "",
+  draftContent: {},
+  mediaAssets: [],
+};
+
 export const ProjectProvider = ({ children }) => {
-  const [courseOutline, setCourseOutline] = useState("");
-  const [modules, setModules] = useState([]);
-  const [selectedModule, setSelectedModule] = useState("");
-  const [lessonContent, setLessonContent] = useState("");
-  const [storyboard, setStoryboard] = useState("");
-  const [assessment, setAssessment] = useState("");
-  const [learningObjectives, setLearningObjectives] = useState(null);
-  const [learningDesignDocument, setLearningDesignDocument] = useState("");
-  const [draftContent, setDraftContent] = useState({});
-  const [mediaAssets, setMediaAssets] = useState([]);
+  const [courseOutline, setCourseOutline] = useState(defaultState.courseOutline);
+  const [modules, setModules] = useState(defaultState.modules);
+  const [selectedModule, setSelectedModule] = useState(
+    defaultState.selectedModule
+  );
+  const [lessonContent, setLessonContent] = useState(
+    defaultState.lessonContent
+  );
+  const [storyboard, setStoryboard] = useState(defaultState.storyboard);
+  const [assessment, setAssessment] = useState(defaultState.assessment);
+  const [learningObjectives, setLearningObjectives] = useState(
+    defaultState.learningObjectives
+  );
+  const [learningDesignDocument, setLearningDesignDocument] = useState(
+    defaultState.learningDesignDocument
+  );
+  const [draftContent, setDraftContent] = useState(defaultState.draftContent);
+  const [mediaAssets, setMediaAssets] = useState(defaultState.mediaAssets);
+
+  const resetProject = useCallback(() => {
+    setCourseOutline(defaultState.courseOutline);
+    setModules(defaultState.modules);
+    setSelectedModule(defaultState.selectedModule);
+    setLessonContent(defaultState.lessonContent);
+    setStoryboard(defaultState.storyboard);
+    setAssessment(defaultState.assessment);
+    setLearningObjectives(defaultState.learningObjectives);
+    setLearningDesignDocument(defaultState.learningDesignDocument);
+    setDraftContent(defaultState.draftContent);
+    setMediaAssets(defaultState.mediaAssets);
+  }, []);
 
   const value = {
     courseOutline,
@@ -36,6 +70,7 @@ export const ProjectProvider = ({ children }) => {
     setDraftContent,
     mediaAssets,
     setMediaAssets,
+    resetProject,
   };
 
   return (

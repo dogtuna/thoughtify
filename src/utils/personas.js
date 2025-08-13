@@ -12,10 +12,12 @@ export async function loadPersonas(uid, initiativeId) {
     educationLevel: "",
     techProficiency: "",
     learningPreferences: "",
+    learningPreferencesKeyword: "",
     ageRangeOptions: [],
     educationLevelOptions: [],
     techProficiencyOptions: [],
     learningPreferencesOptions: [],
+    learningPreferenceOptionKeywords: [],
     ...d.data(),
   }));
 }
@@ -30,10 +32,12 @@ export async function savePersona(uid, initiativeId, persona) {
     educationLevel: "",
     techProficiency: "",
     learningPreferences: "",
+    learningPreferencesKeyword: "",
     ageRangeOptions: [],
     educationLevelOptions: [],
     techProficiencyOptions: [],
     learningPreferencesOptions: [],
+    learningPreferenceOptionKeywords: [],
   };
   await callable({ initiativeId, personaId, persona: { ...defaults, ...persona } });
   return personaId;
