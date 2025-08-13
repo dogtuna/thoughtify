@@ -237,7 +237,11 @@ const LearningObjectivesGenerator = ({
   };
 
   return (
-    <div className="generator-result learning-objectives initiative-card">
+    <div
+      className={`initiative-card generator-result learning-objectives ${
+        loading ? "pulsing" : ""
+      }`}
+    >
       <h3>Learning Objectives</h3>
       <div style={{ marginBottom: 10 }}>
         <label>
