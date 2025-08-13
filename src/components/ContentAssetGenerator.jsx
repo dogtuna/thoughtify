@@ -31,6 +31,7 @@ const ContentAssetGenerator = () => {
   );
   const [viewing, setViewing] = useState(null);
   const [started, setStarted] = useState(false);
+  const isLoading = Object.values(status).some((s) => s === 'loading');
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
@@ -93,10 +94,9 @@ const ContentAssetGenerator = () => {
   }, [learningDesignDocument, started, handleGenerate]);
 
   useEffect(() => {
-    const isLoading = Object.values(status).some((s) => s === "loading");
     document.body.classList.toggle("pulsing", isLoading);
     return () => document.body.classList.remove("pulsing");
-  }, [status]);
+  }, [isLoading]);
 
   const handleExport = (format = "json") => {
     const data = {
@@ -156,7 +156,7 @@ const ContentAssetGenerator = () => {
     Object.keys(draftContent || {}).length > 0 || mediaAssets.length > 0;
 
   return (
-    <div className="generator-container">
+    <div className={`initiative-card ${isLoading ? 'pulsing' : ''}`}>
       <div className="progress-indicator">Step 9 of {TOTAL_STEPS}</div>
       <h2>Content & Asset Generator</h2>
       <p className="generator-info">

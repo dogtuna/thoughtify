@@ -193,7 +193,7 @@ const HierarchicalOutlineGenerator = ({
 
   return (
     <div
-      className="initiative-card generator-result"
+      className={`initiative-card generator-result ${loading ? 'pulsing' : ''}`}
     >
       <h3>Hierarchical Course Outline</h3>
       {!courseOutline && (
