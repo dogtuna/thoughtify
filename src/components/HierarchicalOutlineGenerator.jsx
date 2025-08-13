@@ -187,7 +187,7 @@ const HierarchicalOutlineGenerator = ({
   };
 
   return (
-    <div className="generator-result">
+    <div className="generator-result initiative-card">
       <h3>Hierarchical Course Outline</h3>
       {!courseOutline && (
         <button
