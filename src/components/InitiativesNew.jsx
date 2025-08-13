@@ -124,6 +124,12 @@ const InitiativesNew = () => {
   const [projectBrief, setProjectBrief] = useState("");
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
   const [clarifyingAnswers, setClarifyingAnswers] = useState([]);
+  const [questionPage, setQuestionPage] = useState(0);
+  const QUESTIONS_PER_PAGE = 3;
+  const totalQuestionPages = Math.max(
+    1,
+    Math.ceil(clarifyingQuestions.length / QUESTIONS_PER_PAGE)
+  );
 
   const [strategy, setStrategy] = useState(null);
   const [selectedModality, setSelectedModality] = useState("");
@@ -229,6 +235,7 @@ const InitiativesNew = () => {
     setProjectBrief("");
     setClarifyingQuestions([]);
     setClarifyingAnswers([]);
+    setQuestionPage(0);
     setStrategy(null);
     setSelectedModality("");
     setPersonas([]);
@@ -255,8 +262,11 @@ const InitiativesNew = () => {
           );
           setProjectConstraints(data.projectConstraints || "");
           setProjectBrief(data.projectBrief || "");
-          setClarifyingQuestions(data.clarifyingQuestions || []);
-          setClarifyingAnswers(data.clarifyingAnswers || []);
+          const qs = (data.clarifyingQuestions || []).slice(0, 9);
+          const ans = (data.clarifyingAnswers || []).slice(0, 9);
+          setClarifyingQuestions(qs);
+          setClarifyingAnswers(qs.map((_, i) => ans[i] || ""));
+          setQuestionPage(0);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
           setBlendModalities(data.blendModalities || []);
@@ -442,6 +452,7 @@ const InitiativesNew = () => {
     setProjectBrief("");
     setClarifyingQuestions([]);
     setClarifyingAnswers([]);
+    setQuestionPage(0);
     setStrategy(null);
     setPersonas([]);
     setActivePersonaIndex(0);
@@ -456,9 +467,10 @@ const InitiativesNew = () => {
         projectConstraints,
       });
 
-      const qs = data.clarifyingQuestions || [];
+      const qs = (data.clarifyingQuestions || []).slice(0, 9);
       setClarifyingQuestions(qs);
       setClarifyingAnswers(qs.map(() => ""));
+      setQuestionPage(0);
 
       const uid = auth.currentUser?.uid;
       if (uid) {
@@ -1141,17 +1153,55 @@ const InitiativesNew = () => {
           <p>
             Answering the questions below is optional, but it will help ensure the brief is as good as possible.
           </p>
-          {clarifyingQuestions.map((q, idx) => (
-            <div key={idx}>
-              <p>{q}</p>
-              <textarea
-                className="generator-input"
-                value={clarifyingAnswers[idx] || ""}
-                onChange={(e) => handleAnswerChange(idx, e.target.value)}
-                rows={2}
-              />
-            </div>
-          ))}
+          <p className="page-indicator">
+            Page {questionPage + 1} of {totalQuestionPages}
+          </p>
+          {clarifyingQuestions
+            .slice(
+              questionPage * QUESTIONS_PER_PAGE,
+              questionPage * QUESTIONS_PER_PAGE + QUESTIONS_PER_PAGE
+            )
+            .map((q, idx) => {
+              const overallIdx = questionPage * QUESTIONS_PER_PAGE + idx;
+              return (
+                <div key={overallIdx}>
+                  <p>{q}</p>
+                  <textarea
+                    className="generator-input"
+                    value={clarifyingAnswers[overallIdx] || ""}
+                    onChange={(e) =>
+                      handleAnswerChange(overallIdx, e.target.value)
+                    }
+                    rows={4}
+                  />
+                </div>
+              );
+            })}
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setQuestionPage(Math.max(questionPage - 1, 0))}
+              className="generator-button back-button"
+              disabled={questionPage === 0}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setQuestionPage((prev) =>
+                  Math.min(prev + 1, totalQuestionPages - 1)
+                )
+              }
+              className="generator-button next-button"
+              disabled={questionPage >= totalQuestionPages - 1}
+            >
+              Next
+            </button>
+          </div>
+          <p className="page-indicator">
+            Page {questionPage + 1} of {totalQuestionPages}
+          </p>
           <div className="button-row">
             <button
               type="button"
