@@ -124,6 +124,14 @@ const InitiativesNew = () => {
   const [projectBrief, setProjectBrief] = useState("");
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
   const [clarifyingAnswers, setClarifyingAnswers] = useState([]);
+  const [questionPage, setQuestionPage] = useState(0);
+  const QUESTIONS_PER_PAGE = 3;
+  const totalQuestionPages = Math.max(
+    1,
+    Math.ceil(clarifyingQuestions.length / QUESTIONS_PER_PAGE)
+  );
+  const isFirstQuestionPage = questionPage === 0;
+  const isLastQuestionPage = questionPage >= totalQuestionPages - 1;
 
   const [strategy, setStrategy] = useState(null);
   const [selectedModality, setSelectedModality] = useState("");
@@ -229,6 +237,7 @@ const InitiativesNew = () => {
     setProjectBrief("");
     setClarifyingQuestions([]);
     setClarifyingAnswers([]);
+    setQuestionPage(0);
     setStrategy(null);
     setSelectedModality("");
     setPersonas([]);
@@ -255,8 +264,11 @@ const InitiativesNew = () => {
           );
           setProjectConstraints(data.projectConstraints || "");
           setProjectBrief(data.projectBrief || "");
-          setClarifyingQuestions(data.clarifyingQuestions || []);
-          setClarifyingAnswers(data.clarifyingAnswers || []);
+          const qs = (data.clarifyingQuestions || []).slice(0, 9);
+          const ans = (data.clarifyingAnswers || []).slice(0, 9);
+          setClarifyingQuestions(qs);
+          setClarifyingAnswers(qs.map((_, i) => ans[i] || ""));
+          setQuestionPage(0);
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
           setBlendModalities(data.blendModalities || []);
@@ -442,6 +454,7 @@ const InitiativesNew = () => {
     setProjectBrief("");
     setClarifyingQuestions([]);
     setClarifyingAnswers([]);
+    setQuestionPage(0);
     setStrategy(null);
     setPersonas([]);
     setActivePersonaIndex(0);
@@ -456,9 +469,10 @@ const InitiativesNew = () => {
         projectConstraints,
       });
 
-      const qs = data.clarifyingQuestions || [];
+      const qs = (data.clarifyingQuestions || []).slice(0, 9);
       setClarifyingQuestions(qs);
       setClarifyingAnswers(qs.map(() => ""));
+      setQuestionPage(0);
 
       const uid = auth.currentUser?.uid;
       if (uid) {
@@ -1139,41 +1153,65 @@ const InitiativesNew = () => {
       {step === 2 && (
         <div className="generator-result initiative-card">
           <p>
-            Answering the questions below is optional, but it will help ensure the brief is as good as possible.
+            These questions are optional but answering them will strengthen your project brief.
           </p>
-          {clarifyingQuestions.map((q, idx) => (
-            <div key={idx}>
-              <p>{q}</p>
-              <textarea
-                className="generator-input"
-                value={clarifyingAnswers[idx] || ""}
-                onChange={(e) => handleAnswerChange(idx, e.target.value)}
-                rows={2}
-              />
-            </div>
-          ))}
+          <p className="page-indicator">
+            Page {questionPage + 1} of {totalQuestionPages}
+          </p>
+          {clarifyingQuestions
+            .slice(
+              questionPage * QUESTIONS_PER_PAGE,
+              questionPage * QUESTIONS_PER_PAGE + QUESTIONS_PER_PAGE
+            )
+            .map((q, idx) => {
+              const overallIdx = questionPage * QUESTIONS_PER_PAGE + idx;
+              return (
+                <div key={overallIdx}>
+                  <p>{q}</p>
+                  <textarea
+                    className="generator-input clarify-textarea"
+                    value={clarifyingAnswers[overallIdx] || ""}
+                    onChange={(e) =>
+                      handleAnswerChange(overallIdx, e.target.value)
+                    }
+                    rows={3}
+                  />
+                </div>
+              );
+            })}
+          <p className="page-indicator">
+            Page {questionPage + 1} of {totalQuestionPages}
+          </p>
           <div className="button-row">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() =>
+                isFirstQuestionPage
+                  ? setStep(1)
+                  : setQuestionPage((prev) => Math.max(prev - 1, 0))
+              }
               className="generator-button back-button"
             >
               Back
             </button>
             <button
               type="button"
-              onClick={handleSave}
-              className="generator-button save-button"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateBrief}
+              onClick={async () => {
+                await handleSave();
+                if (isLastQuestionPage) {
+                  await handleGenerateBrief();
+                } else {
+                  setQuestionPage((prev) => prev + 1);
+                }
+              }}
               disabled={loading}
               className="generator-button next-button"
             >
-              {loading ? "Generating..." : "Generate Brief"}
+              {loading
+                ? "Generating..."
+                : isLastQuestionPage
+                ? "Next: Generate Brief"
+                : "Next"}
             </button>
           </div>
           {error && <p className="generator-error">{error}</p>}
@@ -1202,7 +1240,10 @@ const InitiativesNew = () => {
           <div className="button-row">
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => {
+                setQuestionPage(totalQuestionPages - 1);
+                setStep(2);
+              }}
               className="generator-button back-button"
             >
               Back
