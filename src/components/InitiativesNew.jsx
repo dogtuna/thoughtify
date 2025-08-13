@@ -1064,7 +1064,7 @@ const InitiativesNew = () => {
       {saveStatus && <p className="save-status">{saveStatus}</p>}
 
       {step === 1 && (
-        <div className="initiative-card">
+        <div className={`initiative-card ${loading ? "pulsing" : ""}`}>
           <form onSubmit={handleSubmit} className="generator-form">
             <h3>Project Intake</h3>
             <p>Tell us about your project. The more detail, the better.</p>
