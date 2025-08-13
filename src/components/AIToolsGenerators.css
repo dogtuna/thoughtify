@@ -202,7 +202,7 @@
     max-width: 80%;
   }
 
-  .button-row {
+.button-row {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
@@ -264,6 +264,18 @@
     font-size: 16px;
     line-height: 1.5;
     margin: 0;
+}
+
+.blend-options {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.blend-option {
+  font-size: 14px;
 }
 
 .outline-display {

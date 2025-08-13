@@ -13,6 +13,7 @@ const HierarchicalOutlineGenerator = ({
   audienceProfile,
   projectConstraints,
   selectedModality,
+  blendModalities = [],
   learningObjectives,
   sourceMaterials,
   onBack,
@@ -97,6 +98,7 @@ const HierarchicalOutlineGenerator = ({
         audienceProfile,
         projectConstraints,
         selectedModality,
+        blendModalities,
         learningObjectives,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
@@ -296,6 +298,7 @@ HierarchicalOutlineGenerator.propTypes = {
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
+  blendModalities: PropTypes.array,
   learningObjectives: PropTypes.object.isRequired,
   sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
