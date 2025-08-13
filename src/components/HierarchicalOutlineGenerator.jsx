@@ -24,6 +24,11 @@ const HierarchicalOutlineGenerator = ({
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [lines, setLines] = useState([]);
+
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", loading);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading]);
   const [expandedSections, setExpandedSections] = useState({});
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateHierarchicalOutline");
@@ -188,7 +193,7 @@ const HierarchicalOutlineGenerator = ({
 
   return (
     <div
-      className={`initiative-card generator-result ${loading ? "pulsing" : ""}`}
+      className="initiative-card generator-result"
     >
       <h3>Hierarchical Course Outline</h3>
       {!courseOutline && (

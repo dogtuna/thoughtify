@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { useSearchParams } from "react-router-dom";
 import { app, auth } from "../firebase.js";
@@ -42,6 +42,11 @@ const LearningObjectivesGenerator = ({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", loading);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading]);
 
   const functions = getFunctions(app, "us-central1");
   const callGenerate = httpsCallable(functions, "generateLearningObjectives");
@@ -237,11 +242,7 @@ const LearningObjectivesGenerator = ({
   };
 
   return (
-    <div
-      className={`initiative-card generator-result learning-objectives ${
-        loading ? "pulsing" : ""
-      }`}
-    >
+    <div className="initiative-card generator-result learning-objectives">
       <h3>Learning Objectives</h3>
       <div style={{ marginBottom: 10 }}>
         <label>

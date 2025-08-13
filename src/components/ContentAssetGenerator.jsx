@@ -92,6 +92,12 @@ const ContentAssetGenerator = () => {
     }
   }, [learningDesignDocument, started, handleGenerate]);
 
+  useEffect(() => {
+    const isLoading = Object.values(status).some((s) => s === "loading");
+    document.body.classList.toggle("pulsing", isLoading);
+    return () => document.body.classList.remove("pulsing");
+  }, [status]);
+
   const handleExport = (format = "json") => {
     const data = {
       ...draftContent,

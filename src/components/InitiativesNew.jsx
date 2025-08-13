@@ -143,6 +143,12 @@ const InitiativesNew = () => {
   const [nextLoading, setNextLoading] = useState(false);
   const [personaLoading, setPersonaLoading] = useState(false);
 
+  useEffect(() => {
+    const isBusy = loading || nextLoading || personaLoading;
+    document.body.classList.toggle("pulsing", isBusy);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading, nextLoading, personaLoading]);
+
   const [error, setError] = useState("");
   const [nextError, setNextError] = useState("");
   const [personaError, setPersonaError] = useState("");
@@ -1151,7 +1157,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 2 && (
-        <div className={`initiative-card generator-result ${loading ? "pulsing" : ""}`}>
+        <div className="initiative-card generator-result">
           <p>
             These questions are optional but answering them will strengthen your project brief.
           </p>
@@ -1220,7 +1226,7 @@ const InitiativesNew = () => {
 
       {step === 3 && (
         <div
-          className={`initiative-card generator-result ${loading ? "pulsing" : ""}`}
+          className="initiative-card generator-result"
           ref={projectBriefRef}
         >
           <h3>Project Brief</h3>
@@ -1295,9 +1301,7 @@ const InitiativesNew = () => {
 
       {step === 4 && (
         <div
-          className={`initiative-card generator-result ${
-            personaLoading || nextLoading ? "pulsing" : ""
-          }`}
+          className="initiative-card generator-result"
         >
           <div>
             <h3>Learner Personas</h3>
@@ -1637,9 +1641,7 @@ const InitiativesNew = () => {
 
       {step === 5 && strategy && (
         <div
-          className={`initiative-card generator-result ${
-            nextLoading ? "pulsing" : ""
-          }`}
+          className="initiative-card generator-result"
         >
           <h3>Select Learning Approach</h3>
           <select

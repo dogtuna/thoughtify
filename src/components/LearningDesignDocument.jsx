@@ -37,6 +37,11 @@ const LearningDesignDocument = ({
     return () => document.body.classList.remove("design-doc-page");
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", loading);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading]);
+
   const renderMarkdown = (text) => {
     if (!text) return "";
     let html = text
