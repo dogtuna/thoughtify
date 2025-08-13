@@ -139,10 +139,10 @@ const HierarchicalOutlineGenerator = ({
     }
   }, [courseOutline, initiativeId]);
 
-  const handleManualSave = async () => {
+  const handleManualSave = async (outline = courseOutline) => {
     const uid = auth.currentUser?.uid;
     if (uid) {
-      await saveInitiative(uid, initiativeId, { courseOutline });
+      await saveInitiative(uid, initiativeId, { courseOutline: outline });
     }
   };
 
@@ -169,13 +169,18 @@ const HierarchicalOutlineGenerator = ({
     if (isEditing) {
       const updated = formatOutline(renumber(lines));
       setCourseOutline(updated);
-      await handleManualSave();
+      await handleManualSave(updated);
     }
     setIsEditing((prev) => !prev);
   };
 
   const handleNext = async () => {
-    await handleManualSave();
+    let outlineToSave = courseOutline;
+    if (isEditing) {
+      outlineToSave = formatOutline(renumber(lines));
+      setCourseOutline(outlineToSave);
+    }
+    await handleManualSave(outlineToSave);
     if (onNext) onNext();
   };
 
