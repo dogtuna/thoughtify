@@ -4,13 +4,21 @@
 body {
   margin: 0;
   font-family: "Poppins", sans-serif;
-  background: linear-gradient(135deg, #522C81, #FB852A);
+  background: linear-gradient(
+    135deg,
+    #667eea,
+    #764ba2,
+    #f97316,
+    #ec4899,
+    #8b5cf6
+  );
   color: white;
   min-height: 100vh;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
 }
 
 #root {
@@ -28,25 +36,38 @@ button:focus-visible {
 body::before {
   content: "";
   position: fixed;
-  top: 0;
-  left: 0;
+  top: -50%;
+  left: -50%;
   width: 200%;
   height: 200%;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.3) 2px, transparent 3px) 0 0/60px 60px,
-    radial-gradient(circle, rgba(255, 255, 255, 0.15) 2px, transparent 3px) 30px 30px/60px 60px;
-  animation: nodesMove 25s linear infinite;
-  opacity: 0.3;
-  z-index: -1;
+    radial-gradient(circle at 30% 30%, #f97316, transparent 60%),
+    radial-gradient(circle at 70% 70%, #ec4899, transparent 60%),
+    radial-gradient(circle at 70% 30%, #667eea, transparent 60%),
+    radial-gradient(circle at 30% 70%, #8b5cf6, transparent 60%);
+  filter: blur(120px);
+  opacity: 0.6;
   pointer-events: none;
+  z-index: -1;
+  transform: scale(1) translate(0, 0);
 }
 
-@keyframes nodesMove {
-  from {
-    transform: translateY(0);
+body.pulsing::before {
+  animation: pulseGradient 5s ease-in-out infinite;
+}
+
+@keyframes pulseGradient {
+  0% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.55;
   }
-  to {
-    transform: translateY(-60px);
+  50% {
+    transform: scale(1.8) translate(25%, -25%);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.55;
   }
 }
 
