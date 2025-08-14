@@ -19,7 +19,7 @@ const FIELD_LABELS = {
   supportLevel: "Support Level",
   accessibility: "Accessibility Needs",
   summary: "Summary",
-  type: "Persona Name",
+  type: "Persona Nickname",
 };
 
 function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
@@ -35,7 +35,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             />
           )}
           <EditableField
-            label="Persona Name"
+            label="Persona Nickname"
             value={persona.type}
             onSave={(v) => onUpdate("type", v)}
             onRegenerate={() => onRegenerate("type")}

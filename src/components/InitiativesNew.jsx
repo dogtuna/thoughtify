@@ -68,11 +68,37 @@ const ACCESSIBILITY_OPTIONS = [
   "Keyboard Navigation",
   "High Contrast",
 ];
-const TYPE_OPTIONS = [
-  "The Curious Explorer",
-  "The Diligent Specialist",
-  "The Agile Innovator",
+const TYPE_ADJECTIVES = [
+  "Curious",
+  "Diligent",
+  "Agile",
+  "Visionary",
+  "Resilient",
+  "Empathetic",
+  "Strategic",
+  "Creative",
 ];
+const TYPE_NOUNS = [
+  "Explorer",
+  "Specialist",
+  "Innovator",
+  "Mentor",
+  "Navigator",
+  "Strategist",
+  "Scholar",
+  "Builder",
+];
+const generatePersonaType = (existing = []) => {
+  let name = "";
+  let attempts = 0;
+  do {
+    const adj = getRandomItem(TYPE_ADJECTIVES);
+    const noun = getRandomItem(TYPE_NOUNS);
+    name = `The ${adj} ${noun}`;
+    attempts++;
+  } while (existing.includes(name) && attempts < 20);
+  return name;
+};
 const SUMMARY_OPTIONS = [
   "A seasoned professional balancing innovation and tradition.",
   "An enthusiastic learner eager to grow within the organization.",
@@ -179,7 +205,7 @@ const normalizePersona = (p = {}) => {
 
   return {
     ...p,
-    type: p.type || p.name || "",
+    type: p.type || p.name || generatePersonaType(),
     role: p.role || "",
     department: p.department || "",
     careerStage: p.careerStage || "",
@@ -194,7 +220,7 @@ const normalizePersona = (p = {}) => {
     assessmentComfort: p.assessmentComfort || "",
     supportLevel: p.supportLevel || "",
     accessibility: p.accessibility || [],
-    summary: p.summary || "",
+    summary: p.summary || getRandomItem(SUMMARY_OPTIONS),
     ageRange: p.ageRange || "",
     ageRangeOptions: p.ageRangeOptions || [],
     educationLevel: p.educationLevel || "",
@@ -340,7 +366,11 @@ const InitiativesNew = () => {
   const regeneratePersonaField = (field) => {
     switch (field) {
       case "type":
-        updatePersonaField("type", getRandomItem(TYPE_OPTIONS));
+        {
+          const newType = generatePersonaType(usedTypes);
+          updatePersonaField("type", newType);
+          addUsedType([newType]);
+        }
         break;
       case "role":
         updatePersonaField("role", getRandomItem(ROLE_OPTIONS));
@@ -875,7 +905,10 @@ const InitiativesNew = () => {
           existingLearningPreferenceKeywords: usedLearningPrefKeywords,
           selectedTraits: personaQualities,
         });
-        const personaData = normalizePersona(personaRes.data);
+        let personaData = normalizePersona(personaRes.data);
+        personaData.summary =
+          personaData.summary || getRandomItem(SUMMARY_OPTIONS);
+        personaData.type = generatePersonaType(existingTypes);
         if (!personaData?.type) {
           throw new Error("Persona generation returned no type.");
         }
@@ -985,7 +1018,10 @@ const InitiativesNew = () => {
         existingLearningPreferenceKeywords: usedLearningPrefKeywords,
         selectedTraits: personaQualities,
       });
-      const personaData = normalizePersona(personaRes.data);
+      let personaData = normalizePersona(personaRes.data);
+      personaData.summary =
+        personaData.summary || getRandomItem(SUMMARY_OPTIONS);
+      personaData.type = generatePersonaType(existingTypes);
       if (!personaData?.type) {
         throw new Error("Persona generation returned no type.");
       }
