@@ -88,16 +88,51 @@ const TYPE_NOUNS = [
   "Scholar",
   "Builder",
 ];
-const generatePersonaType = (existing = []) => {
+const generatePersonaType = (
+  existing = [],
+  usedAdjs = [],
+  usedNouns = []
+) => {
   let name = "";
+  let adj = "";
+  let noun = "";
   let attempts = 0;
+  const availableAdjs = TYPE_ADJECTIVES.filter((a) => !usedAdjs.includes(a));
+  const availableNouns = TYPE_NOUNS.filter((n) => !usedNouns.includes(n));
   do {
-    const adj = getRandomItem(TYPE_ADJECTIVES);
-    const noun = getRandomItem(TYPE_NOUNS);
+    adj = getRandomItem(availableAdjs.length ? availableAdjs : TYPE_ADJECTIVES);
+    noun = getRandomItem(availableNouns.length ? availableNouns : TYPE_NOUNS);
     name = `The ${adj} ${noun}`;
     attempts++;
   } while (existing.includes(name) && attempts < 20);
-  return name;
+  return { name, adj, noun };
+};
+
+const parsePersonaType = (type = "") => {
+  const parts = type.replace(/^The\s+/i, "").split(" ");
+  return { adj: parts[0] || "", noun: parts[1] || "" };
+};
+
+const ROLE_DEPARTMENT_MAP = {
+  Trainer: ["Operations"],
+  Analyst: ["Sales"],
+  Engineer: ["IT"],
+  Manager: ["HR", "Operations"],
+};
+
+const DEPARTMENT_ROLE_MAP = {
+  Operations: ["Trainer", "Manager"],
+  Sales: ["Analyst", "Manager"],
+  HR: ["Manager"],
+  IT: ["Engineer"],
+};
+
+const alignRoleDepartment = (p) => {
+  const validDepts = ROLE_DEPARTMENT_MAP[p.role] || DEPARTMENT_OPTIONS;
+  if (!validDepts.includes(p.department)) {
+    p.department = getRandomItem(validDepts);
+  }
+  return p;
 };
 const SUMMARY_OPTIONS = [
   "A seasoned professional balancing innovation and tradition.",
@@ -301,6 +336,8 @@ const InitiativesNew = () => {
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
   const [usedTypes, setUsedTypes] = useState([]);
+  const [usedAdjectives, setUsedAdjectives] = useState([]);
+  const [usedNouns, setUsedNouns] = useState([]);
   const [usedLearningPrefKeywords, setUsedLearningPrefKeywords] = useState([]);
 
   const {
@@ -332,6 +369,25 @@ const InitiativesNew = () => {
     setUsedTypes((prev) =>
       Array.from(new Set([...prev, ...types.filter(Boolean)]))
     );
+  };
+  const addUsedAdjective = (words = []) => {
+    setUsedAdjectives((prev) =>
+      Array.from(new Set([...prev, ...words.filter(Boolean)]))
+    );
+  };
+  const addUsedNoun = (words = []) => {
+    setUsedNouns((prev) =>
+      Array.from(new Set([...prev, ...words.filter(Boolean)]))
+    );
+  };
+  const removeUsedType = (type) => {
+    setUsedTypes((prev) => prev.filter((t) => t !== type));
+  };
+  const removeUsedAdjective = (word) => {
+    setUsedAdjectives((prev) => prev.filter((w) => w !== word));
+  };
+  const removeUsedNoun = (word) => {
+    setUsedNouns((prev) => prev.filter((w) => w !== word));
   };
   const addUsedLearningPref = (prefs = []) => {
     setUsedLearningPrefKeywords((prev) =>
@@ -367,16 +423,43 @@ const InitiativesNew = () => {
     switch (field) {
       case "type":
         {
-          const newType = generatePersonaType(usedTypes);
-          updatePersonaField("type", newType);
-          addUsedType([newType]);
+          const persona = personas[activePersonaIndex];
+          if (!persona) break;
+          const { adj: oldAdj, noun: oldNoun } = parsePersonaType(persona.type);
+          removeUsedType(persona.type);
+          removeUsedAdjective(oldAdj);
+          removeUsedNoun(oldNoun);
+          const existing = personas
+            .filter((_, i) => i !== activePersonaIndex)
+            .map((p) => p.type);
+          const { name, adj, noun } = generatePersonaType(
+            [...usedTypes.filter((t) => t !== persona.type), ...existing],
+            usedAdjectives.filter((a) => a !== oldAdj),
+            usedNouns.filter((n) => n !== oldNoun)
+          );
+          updatePersonaField("type", name);
+          addUsedType([name]);
+          addUsedAdjective([adj]);
+          addUsedNoun([noun]);
         }
         break;
       case "role":
-        updatePersonaField("role", getRandomItem(ROLE_OPTIONS));
+        {
+          const role = getRandomItem(ROLE_OPTIONS);
+          const dept = getRandomItem(ROLE_DEPARTMENT_MAP[role] || DEPARTMENT_OPTIONS);
+          updatePersonaField("role", role);
+          updatePersonaField("department", dept);
+        }
         break;
       case "department":
-        updatePersonaField("department", getRandomItem(DEPARTMENT_OPTIONS));
+        {
+          const department = getRandomItem(DEPARTMENT_OPTIONS);
+          const roles = DEPARTMENT_ROLE_MAP[department] || ROLE_OPTIONS;
+          updatePersonaField("department", department);
+          if (!roles.includes(personas[activePersonaIndex]?.role)) {
+            updatePersonaField("role", getRandomItem(roles));
+          }
+        }
         break;
       case "careerStage":
         updatePersonaField("careerStage", getRandomItem(CAREER_STAGE_OPTIONS));
@@ -539,10 +622,25 @@ const InitiativesNew = () => {
     loadPersonas(uid, initiativeId)
       .then((items) => {
         const normalized = items.map((p) => normalizePersona(p));
-        setPersonas(normalized);
-        setActivePersonaIndex(0);
-        // populate used keyword sets
+        // ensure each loaded persona has unique nickname components
         normalized.forEach((p) => {
+          if (!p.type) {
+            const { name, adj, noun } = generatePersonaType(
+              usedTypes,
+              usedAdjectives,
+              usedNouns
+            );
+            p.type = name;
+            addUsedAdjective([adj]);
+            addUsedNoun([noun]);
+            addUsedType([name]);
+          } else {
+            const { adj, noun } = parsePersonaType(p.type);
+            addUsedAdjective([adj]);
+            addUsedNoun([noun]);
+            addUsedType([p.type]);
+          }
+          alignRoleDepartment(p);
           const mKeys = [
             p.motivation?.keyword,
             ...(p.motivationOptions || []).map((o) => o.keyword),
@@ -553,12 +651,13 @@ const InitiativesNew = () => {
           ].filter(Boolean);
           addUsedMotivation(mKeys);
           addUsedChallenge(cKeys);
-          addUsedType([p.type]);
           addUsedLearningPref([
             p.learningPreferencesKeyword,
             ...(p.learningPreferenceOptionKeywords || []),
           ]);
         });
+        setPersonas(normalized);
+        setActivePersonaIndex(0);
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [
@@ -892,6 +991,8 @@ const InitiativesNew = () => {
       const startIndex = personas.length;
       const newPersonas = [];
       let existingTypes = [...usedTypes, ...personas.map((p) => p.type)];
+      let usedAdjLocal = [...usedAdjectives];
+      let usedNounLocal = [...usedNouns];
       for (let i = 0; i < toGenerate; i++) {
         const personaRes = await generateLearnerPersona({
           projectBrief,
@@ -908,7 +1009,13 @@ const InitiativesNew = () => {
         let personaData = normalizePersona(personaRes.data);
         personaData.summary =
           personaData.summary || getRandomItem(SUMMARY_OPTIONS);
-        personaData.type = generatePersonaType(existingTypes);
+        const { name, adj, noun } = generatePersonaType(
+          existingTypes,
+          usedAdjLocal,
+          usedNounLocal
+        );
+        personaData.type = name;
+        alignRoleDepartment(personaData);
         if (!personaData?.type) {
           throw new Error("Persona generation returned no type.");
         }
@@ -966,6 +1073,10 @@ const InitiativesNew = () => {
           ...challengeOptions.map((o) => o.keyword),
         ]);
         addUsedType([personaData.type]);
+        addUsedAdjective([adj]);
+        addUsedNoun([noun]);
+        usedAdjLocal.push(adj);
+        usedNounLocal.push(noun);
         addUsedLearningPref([
           rest.learningPreferencesKeyword,
           ...(rest.learningPreferenceOptionKeywords || []),
@@ -1021,7 +1132,13 @@ const InitiativesNew = () => {
       let personaData = normalizePersona(personaRes.data);
       personaData.summary =
         personaData.summary || getRandomItem(SUMMARY_OPTIONS);
-      personaData.type = generatePersonaType(existingTypes);
+      const { name, adj, noun } = generatePersonaType(
+        existingTypes,
+        usedAdjectives,
+        usedNouns
+      );
+      personaData.type = name;
+      alignRoleDepartment(personaData);
       if (!personaData?.type) {
         throw new Error("Persona generation returned no type.");
       }
@@ -1081,11 +1198,22 @@ const InitiativesNew = () => {
         ...challengesList.map((o) => o.keyword),
         ...challengeOptions.map((o) => o.keyword),
       ]);
+      if (action === "replace" && currentPersona) {
+        const { adj: oldAdj, noun: oldNoun } = parsePersonaType(
+          currentPersona.type
+        );
+        removeUsedType(currentPersona.type);
+        removeUsedAdjective(oldAdj);
+        removeUsedNoun(oldNoun);
+      }
       addUsedType([personaData.type]);
+      addUsedAdjective([adj]);
+      addUsedNoun([noun]);
       addUsedLearningPref([
         rest.learningPreferencesKeyword,
         ...(rest.learningPreferenceOptionKeywords || []),
       ]);
+      existingTypes.push(personaData.type);
       const uid = auth.currentUser?.uid;
       if (uid) {
         if (action === "replace" && currentPersona) {
@@ -1136,6 +1264,10 @@ const InitiativesNew = () => {
       if (uid && persona.id) {
         await deletePersona(uid, initiativeId, persona.id);
       }
+      const { adj, noun } = parsePersonaType(persona.type);
+      removeUsedType(persona.type);
+      removeUsedAdjective(adj);
+      removeUsedNoun(noun);
       const updated = personas.filter((_, i) => i !== index);
       setPersonas(updated);
       const newActive =
@@ -1145,7 +1277,7 @@ const InitiativesNew = () => {
           ? activePersonaIndex - 1
           : Math.min(activePersonaIndex, updated.length - 1);
       setActivePersonaIndex(newActive);
-          } catch (err) {
+    } catch (err) {
       console.error("Error deleting persona:", err);
       setPersonaError(err?.message || "Error deleting persona.");
     } finally {
@@ -1451,7 +1583,13 @@ const InitiativesNew = () => {
                   ))}
                 </div>
                 <div
-                  style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    columnGap: 8,
+                    rowGap: 12,
+                    marginTop: 10,
+                  }}
                 >
                   <button
                     onClick={() => handleGeneratePersonas(personaCount)}
@@ -1496,7 +1634,15 @@ const InitiativesNew = () => {
                       onUpdate={updatePersonaField}
                       onRegenerate={regeneratePersonaField}
                     />
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        columnGap: 8,
+                        rowGap: 12,
+                        marginTop: 16,
+                        marginBottom: 16,
+                      }}
                     >
                       <button
                         onClick={() => handleGeneratePersona("replace")}
