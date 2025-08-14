@@ -14,6 +14,7 @@ import { useSearchParams } from "react-router-dom";
 import LearningObjectivesGenerator from "./LearningObjectivesGenerator.jsx";
 import HierarchicalOutlineGenerator from "./HierarchicalOutlineGenerator.jsx";
 import LearningDesignDocument from "./LearningDesignDocument.jsx";
+import TrainingPlanGenerator from "./TrainingPlanGenerator.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 import PersonaDisplay from "./PersonaDisplay.jsx";
@@ -284,9 +285,10 @@ const InitiativesNew = () => {
     "Brief",
     "Personas",
     "Approach",
+    "Plan",
+    "Design",
     "Objectives",
     "Outline",
-    "Design",
   ];
   const [step, setStep] = useState(1);
   const [projectName, setProjectName] = useState("");
@@ -312,6 +314,7 @@ const InitiativesNew = () => {
   const [strategy, setStrategy] = useState(null);
   const [selectedModality, setSelectedModality] = useState("");
   const [blendModalities, setBlendModalities] = useState([]);
+  const [trainingPlan, setTrainingPlan] = useState("");
 
   const [isEditingBrief, setIsEditingBrief] = useState(false);
 
@@ -551,6 +554,7 @@ const InitiativesNew = () => {
         strategy,
         selectedModality,
         blendModalities,
+        trainingPlan,
         learningObjectives,
         courseOutline,
         learningDesignDocument,
@@ -588,6 +592,7 @@ const InitiativesNew = () => {
     setUsedTypes([]);
     setUsedLearningPrefKeywords([]);
     setBlendModalities([]);
+    setTrainingPlan("");
 
     loadInitiative(uid, initiativeId)
       .then((data) => {
@@ -612,6 +617,7 @@ const InitiativesNew = () => {
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
           setBlendModalities(data.blendModalities || []);
+          setTrainingPlan(data.trainingPlan || "");
           setLearningObjectives(data.learningObjectives || null);
           setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
@@ -1796,7 +1802,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 6 && (
-        <LearningObjectivesGenerator
+        <TrainingPlanGenerator
           projectBrief={projectBrief}
           businessGoal={businessGoal}
           audienceProfile={audienceProfile}
@@ -1804,27 +1810,14 @@ const InitiativesNew = () => {
           selectedModality={selectedModality}
           blendModalities={blendModalities}
           sourceMaterials={sourceMaterials}
+          trainingPlan={trainingPlan}
+          setTrainingPlan={setTrainingPlan}
           onBack={() => setStep(5)}
           onNext={() => setStep(7)}
         />
       )}
 
       {step === 7 && (
-        <HierarchicalOutlineGenerator
-          projectBrief={projectBrief}
-          businessGoal={businessGoal}
-          audienceProfile={audienceProfile}
-          projectConstraints={projectConstraints}
-          selectedModality={selectedModality}
-          blendModalities={blendModalities}
-          learningObjectives={learningObjectives}
-          sourceMaterials={sourceMaterials}
-          onBack={() => setStep(6)}
-          onNext={() => setStep(8)}
-        />
-      )}
-
-      {step === 8 && (
         <LearningDesignDocument
           projectName={projectName}
           projectBrief={projectBrief}
@@ -1835,8 +1828,37 @@ const InitiativesNew = () => {
           blendModalities={blendModalities}
           learningObjectives={learningObjectives}
           courseOutline={courseOutline}
+          trainingPlan={trainingPlan}
+          sourceMaterials={sourceMaterials}
+          onBack={() => setStep(6)}
+        />
+      )}
+
+      {step === 8 && (
+        <LearningObjectivesGenerator
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          blendModalities={blendModalities}
           sourceMaterials={sourceMaterials}
           onBack={() => setStep(7)}
+          onNext={() => setStep(9)}
+        />
+      )}
+
+      {step === 9 && (
+        <HierarchicalOutlineGenerator
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          blendModalities={blendModalities}
+          learningObjectives={learningObjectives}
+          sourceMaterials={sourceMaterials}
+          onBack={() => setStep(8)}
         />
       )}
 
