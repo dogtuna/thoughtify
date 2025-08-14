@@ -16,6 +16,7 @@ import HierarchicalOutlineGenerator from "./HierarchicalOutlineGenerator.jsx";
 import LearningDesignDocument from "./LearningDesignDocument.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
+import PersonaDisplay from "./PersonaDisplay.jsx";
 
 const formatKeyword = (kw = "") =>
   kw ? kw.charAt(0).toUpperCase() + kw.slice(1) : "";
@@ -27,6 +28,146 @@ const BLENDED_OPTIONS = [
   "Discussion Forums",
   "Coaching or Mentoring",
   "Job Aids or Reference Guides",
+];
+
+const getRandomItem = (arr = []) =>
+  arr[Math.floor(Math.random() * arr.length)];
+
+const getRandomItems = (arr = [], count = 2) =>
+  [...arr].sort(() => 0.5 - Math.random()).slice(0, count);
+
+const ROLE_OPTIONS = ["Trainer", "Analyst", "Engineer", "Manager"];
+const DEPARTMENT_OPTIONS = ["Operations", "Sales", "HR", "IT"];
+const CAREER_STAGE_OPTIONS = ["Junior", "Mid-Level", "Senior"];
+const TENURE_OPTIONS = ["0-6 mo", "6-12 mo", "1-3 yr", "3+ yr"];
+const REGION_OPTIONS = [
+  "North America",
+  "South America",
+  "Europe",
+  "Asia",
+  "Africa",
+];
+const WORK_SETTING_OPTIONS = ["Field", "Office", "Hybrid", "Remote"];
+const SHIFT_OPTIONS = ["Day", "Night", "Flexible"];
+const LANGUAGE_OPTIONS = ["English", "Spanish", "French", "German"];
+const EDUCATION_OPTIONS = [
+  "High School",
+  "Bachelors",
+  "Masters",
+  "Doctorate",
+];
+const TECH_OPTIONS = ["Low", "Medium", "High"];
+const DEVICE_OPTIONS = ["Desktop", "Laptop", "Tablet", "Mobile"];
+const BANDWIDTH_OPTIONS = ["Low", "Medium", "High"];
+const BASELINE_OPTIONS = ["Novice", "Intermediate", "Expert"];
+const ASSESSMENT_OPTIONS = ["Low", "Medium", "High"];
+const SUPPORT_OPTIONS = ["Low", "Medium", "High"];
+const ACCESSIBILITY_OPTIONS = [
+  "Screen Reader",
+  "Captions",
+  "Keyboard Navigation",
+  "High Contrast",
+];
+const TYPE_ADJECTIVES = [
+  "Curious",
+  "Diligent",
+  "Agile",
+  "Visionary",
+  "Resilient",
+  "Empathetic",
+  "Strategic",
+  "Creative",
+];
+const TYPE_NOUNS = [
+  "Explorer",
+  "Specialist",
+  "Innovator",
+  "Mentor",
+  "Navigator",
+  "Strategist",
+  "Scholar",
+  "Builder",
+];
+const generatePersonaType = (
+  existing = [],
+  usedAdjs = [],
+  usedNouns = []
+) => {
+  let name = "";
+  let adj = "";
+  let noun = "";
+  let attempts = 0;
+  const availableAdjs = TYPE_ADJECTIVES.filter((a) => !usedAdjs.includes(a));
+  const availableNouns = TYPE_NOUNS.filter((n) => !usedNouns.includes(n));
+  do {
+    adj = getRandomItem(availableAdjs.length ? availableAdjs : TYPE_ADJECTIVES);
+    noun = getRandomItem(availableNouns.length ? availableNouns : TYPE_NOUNS);
+    name = `The ${adj} ${noun}`;
+    attempts++;
+  } while (existing.includes(name) && attempts < 20);
+  return { name, adj, noun };
+};
+
+const parsePersonaType = (type = "") => {
+  const parts = type.replace(/^The\s+/i, "").split(" ");
+  return { adj: parts[0] || "", noun: parts[1] || "" };
+};
+
+const ROLE_DEPARTMENT_MAP = {
+  Trainer: ["Operations"],
+  Analyst: ["Sales"],
+  Engineer: ["IT"],
+  Manager: ["HR", "Operations"],
+};
+
+const DEPARTMENT_ROLE_MAP = {
+  Operations: ["Trainer", "Manager"],
+  Sales: ["Analyst", "Manager"],
+  HR: ["Manager"],
+  IT: ["Engineer"],
+};
+
+const alignRoleDepartment = (p) => {
+  const validDepts = ROLE_DEPARTMENT_MAP[p.role] || DEPARTMENT_OPTIONS;
+  if (!validDepts.includes(p.department)) {
+    p.department = getRandomItem(validDepts);
+  }
+  return p;
+};
+const SUMMARY_OPTIONS = [
+  "A seasoned professional balancing innovation and tradition.",
+  "An enthusiastic learner eager to grow within the organization.",
+  "A pragmatic team player focused on efficiency.",
+];
+const LEARNING_PREF_OPTIONS = [
+  "Learns best through interactive workshops.",
+  "Prefers visual aids and infographics.",
+  "Enjoys self-paced modules for flexibility.",
+];
+const MOTIVATION_OPTIONS = [
+  {
+    keyword: "Growth",
+    text: "Motivated by continuous improvement and skill development.",
+  },
+  {
+    keyword: "Recognition",
+    text: "Driven by acknowledgement from peers and leaders.",
+  },
+  {
+    keyword: "Impact",
+    text: "Inspired by making a meaningful difference in work.",
+  },
+];
+const CHALLENGE_OPTIONS = [
+  { keyword: "Time", text: "Struggles to find time for formal training." },
+  {
+    keyword: "Resources",
+    text: "Lacks access to updated learning materials.",
+  },
+  {
+    keyword: "Technology",
+    text: "Faces technical barriers during online sessions.",
+  },
 ];
 
 const PERSONA_FIELDS = [
@@ -114,6 +255,7 @@ const normalizePersona = (p = {}) => {
     assessmentComfort: p.assessmentComfort || "",
     supportLevel: p.supportLevel || "",
     accessibility: p.accessibility || [],
+    summary: p.summary || getRandomItem(SUMMARY_OPTIONS),
     ageRange: p.ageRange || "",
     ageRangeOptions: p.ageRangeOptions || [],
     educationLevel: p.educationLevel || "",
@@ -189,12 +331,13 @@ const InitiativesNew = () => {
 
   const [personas, setPersonas] = useState([]);
   const [activePersonaIndex, setActivePersonaIndex] = useState(0);
-  const [editingPersona, setEditingPersona] = useState(null);
   const [personaCount, setPersonaCount] = useState(0);
   const [personaQualities, setPersonaQualities] = useState([]);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
   const [usedTypes, setUsedTypes] = useState([]);
+  const [usedAdjectives, setUsedAdjectives] = useState([]);
+  const [usedNouns, setUsedNouns] = useState([]);
   const [usedLearningPrefKeywords, setUsedLearningPrefKeywords] = useState([]);
 
   const {
@@ -227,6 +370,25 @@ const InitiativesNew = () => {
       Array.from(new Set([...prev, ...types.filter(Boolean)]))
     );
   };
+  const addUsedAdjective = (words = []) => {
+    setUsedAdjectives((prev) =>
+      Array.from(new Set([...prev, ...words.filter(Boolean)]))
+    );
+  };
+  const addUsedNoun = (words = []) => {
+    setUsedNouns((prev) =>
+      Array.from(new Set([...prev, ...words.filter(Boolean)]))
+    );
+  };
+  const removeUsedType = (type) => {
+    setUsedTypes((prev) => prev.filter((t) => t !== type));
+  };
+  const removeUsedAdjective = (word) => {
+    setUsedAdjectives((prev) => prev.filter((w) => w !== word));
+  };
+  const removeUsedNoun = (word) => {
+    setUsedNouns((prev) => prev.filter((w) => w !== word));
+  };
   const addUsedLearningPref = (prefs = []) => {
     setUsedLearningPrefKeywords((prev) =>
       Array.from(new Set([...prev, ...prefs.filter(Boolean)]))
@@ -237,6 +399,137 @@ const InitiativesNew = () => {
     setPersonaQualities((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
+  };
+
+  const updatePersonaField = async (field, value) => {
+    const uid = auth.currentUser?.uid;
+    const persona = personas[activePersonaIndex];
+    if (!persona) return;
+    const updated = { ...persona, [field]: value };
+    setPersonas((prev) =>
+      prev.map((p, i) => (i === activePersonaIndex ? updated : p))
+    );
+    try {
+      if (uid) {
+        await savePersona(uid, initiativeId, updated);
+      }
+    } catch (err) {
+      console.error("Error saving persona:", err);
+      setPersonaError(err?.message || "Error saving persona.");
+    }
+  };
+
+  const regeneratePersonaField = (field) => {
+    switch (field) {
+      case "type":
+        {
+          const persona = personas[activePersonaIndex];
+          if (!persona) break;
+          const { adj: oldAdj, noun: oldNoun } = parsePersonaType(persona.type);
+          removeUsedType(persona.type);
+          removeUsedAdjective(oldAdj);
+          removeUsedNoun(oldNoun);
+          const existing = personas
+            .filter((_, i) => i !== activePersonaIndex)
+            .map((p) => p.type);
+          const { name, adj, noun } = generatePersonaType(
+            [...usedTypes.filter((t) => t !== persona.type), ...existing],
+            usedAdjectives.filter((a) => a !== oldAdj),
+            usedNouns.filter((n) => n !== oldNoun)
+          );
+          updatePersonaField("type", name);
+          addUsedType([name]);
+          addUsedAdjective([adj]);
+          addUsedNoun([noun]);
+        }
+        break;
+      case "role":
+        {
+          const role = getRandomItem(ROLE_OPTIONS);
+          const dept = getRandomItem(ROLE_DEPARTMENT_MAP[role] || DEPARTMENT_OPTIONS);
+          updatePersonaField("role", role);
+          updatePersonaField("department", dept);
+        }
+        break;
+      case "department":
+        {
+          const department = getRandomItem(DEPARTMENT_OPTIONS);
+          const roles = DEPARTMENT_ROLE_MAP[department] || ROLE_OPTIONS;
+          updatePersonaField("department", department);
+          if (!roles.includes(personas[activePersonaIndex]?.role)) {
+            updatePersonaField("role", getRandomItem(roles));
+          }
+        }
+        break;
+      case "careerStage":
+        updatePersonaField("careerStage", getRandomItem(CAREER_STAGE_OPTIONS));
+        break;
+      case "tenure":
+        updatePersonaField("tenure", getRandomItem(TENURE_OPTIONS));
+        break;
+      case "region":
+        updatePersonaField("region", getRandomItem(REGION_OPTIONS));
+        break;
+      case "workSetting":
+        updatePersonaField("workSetting", getRandomItem(WORK_SETTING_OPTIONS));
+        break;
+      case "shift":
+        updatePersonaField("shift", getRandomItem(SHIFT_OPTIONS));
+        break;
+      case "languages":
+        updatePersonaField("languages", getRandomItems(LANGUAGE_OPTIONS, 2));
+        break;
+      case "educationLevel":
+        updatePersonaField("educationLevel", getRandomItem(EDUCATION_OPTIONS));
+        break;
+      case "techProficiency":
+        updatePersonaField("techProficiency", getRandomItem(TECH_OPTIONS));
+        break;
+      case "devices":
+        updatePersonaField("devices", getRandomItems(DEVICE_OPTIONS, 2));
+        break;
+      case "bandwidth":
+        updatePersonaField("bandwidth", getRandomItem(BANDWIDTH_OPTIONS));
+        break;
+      case "baselineKnowledge":
+        updatePersonaField(
+          "baselineKnowledge",
+          getRandomItem(BASELINE_OPTIONS)
+        );
+        break;
+      case "assessmentComfort":
+        updatePersonaField(
+          "assessmentComfort",
+          getRandomItem(ASSESSMENT_OPTIONS)
+        );
+        break;
+      case "supportLevel":
+        updatePersonaField("supportLevel", getRandomItem(SUPPORT_OPTIONS));
+        break;
+      case "accessibility":
+        updatePersonaField(
+          "accessibility",
+          getRandomItems(ACCESSIBILITY_OPTIONS, 2)
+        );
+        break;
+      case "summary":
+        updatePersonaField("summary", getRandomItem(SUMMARY_OPTIONS));
+        break;
+      case "learningPreferences":
+        updatePersonaField(
+          "learningPreferences",
+          getRandomItem(LEARNING_PREF_OPTIONS)
+        );
+        break;
+      case "motivation":
+        updatePersonaField("motivation", getRandomItem(MOTIVATION_OPTIONS));
+        break;
+      case "challenges":
+        updatePersonaField("challenges", getRandomItem(CHALLENGE_OPTIONS));
+        break;
+      default:
+        break;
+    }
   };
 
   const [searchParams] = useSearchParams();
@@ -329,10 +622,25 @@ const InitiativesNew = () => {
     loadPersonas(uid, initiativeId)
       .then((items) => {
         const normalized = items.map((p) => normalizePersona(p));
-        setPersonas(normalized);
-        setActivePersonaIndex(0);
-        // populate used keyword sets
+        // ensure each loaded persona has unique nickname components
         normalized.forEach((p) => {
+          if (!p.type) {
+            const { name, adj, noun } = generatePersonaType(
+              usedTypes,
+              usedAdjectives,
+              usedNouns
+            );
+            p.type = name;
+            addUsedAdjective([adj]);
+            addUsedNoun([noun]);
+            addUsedType([name]);
+          } else {
+            const { adj, noun } = parsePersonaType(p.type);
+            addUsedAdjective([adj]);
+            addUsedNoun([noun]);
+            addUsedType([p.type]);
+          }
+          alignRoleDepartment(p);
           const mKeys = [
             p.motivation?.keyword,
             ...(p.motivationOptions || []).map((o) => o.keyword),
@@ -343,12 +651,13 @@ const InitiativesNew = () => {
           ].filter(Boolean);
           addUsedMotivation(mKeys);
           addUsedChallenge(cKeys);
-          addUsedType([p.type]);
           addUsedLearningPref([
             p.learningPreferencesKeyword,
             ...(p.learningPreferenceOptionKeywords || []),
           ]);
         });
+        setPersonas(normalized);
+        setActivePersonaIndex(0);
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [
@@ -505,8 +814,7 @@ const InitiativesNew = () => {
     setStrategy(null);
     setPersonas([]);
     setActivePersonaIndex(0);
-    setEditingPersona(null);
-    setPersonaCount(0);
+        setPersonaCount(0);
 
     try {
       const { data } = await generateProjectBrief({
@@ -683,6 +991,8 @@ const InitiativesNew = () => {
       const startIndex = personas.length;
       const newPersonas = [];
       let existingTypes = [...usedTypes, ...personas.map((p) => p.type)];
+      let usedAdjLocal = [...usedAdjectives];
+      let usedNounLocal = [...usedNouns];
       for (let i = 0; i < toGenerate; i++) {
         const personaRes = await generateLearnerPersona({
           projectBrief,
@@ -696,7 +1006,16 @@ const InitiativesNew = () => {
           existingLearningPreferenceKeywords: usedLearningPrefKeywords,
           selectedTraits: personaQualities,
         });
-        const personaData = normalizePersona(personaRes.data);
+        let personaData = normalizePersona(personaRes.data);
+        personaData.summary =
+          personaData.summary || getRandomItem(SUMMARY_OPTIONS);
+        const { name, adj, noun } = generatePersonaType(
+          existingTypes,
+          usedAdjLocal,
+          usedNounLocal
+        );
+        personaData.type = name;
+        alignRoleDepartment(personaData);
         if (!personaData?.type) {
           throw new Error("Persona generation returned no type.");
         }
@@ -754,6 +1073,10 @@ const InitiativesNew = () => {
           ...challengeOptions.map((o) => o.keyword),
         ]);
         addUsedType([personaData.type]);
+        addUsedAdjective([adj]);
+        addUsedNoun([noun]);
+        usedAdjLocal.push(adj);
+        usedNounLocal.push(noun);
         addUsedLearningPref([
           rest.learningPreferencesKeyword,
           ...(rest.learningPreferenceOptionKeywords || []),
@@ -806,7 +1129,16 @@ const InitiativesNew = () => {
         existingLearningPreferenceKeywords: usedLearningPrefKeywords,
         selectedTraits: personaQualities,
       });
-      const personaData = normalizePersona(personaRes.data);
+      let personaData = normalizePersona(personaRes.data);
+      personaData.summary =
+        personaData.summary || getRandomItem(SUMMARY_OPTIONS);
+      const { name, adj, noun } = generatePersonaType(
+        existingTypes,
+        usedAdjectives,
+        usedNouns
+      );
+      personaData.type = name;
+      alignRoleDepartment(personaData);
       if (!personaData?.type) {
         throw new Error("Persona generation returned no type.");
       }
@@ -866,11 +1198,22 @@ const InitiativesNew = () => {
         ...challengesList.map((o) => o.keyword),
         ...challengeOptions.map((o) => o.keyword),
       ]);
+      if (action === "replace" && currentPersona) {
+        const { adj: oldAdj, noun: oldNoun } = parsePersonaType(
+          currentPersona.type
+        );
+        removeUsedType(currentPersona.type);
+        removeUsedAdjective(oldAdj);
+        removeUsedNoun(oldNoun);
+      }
       addUsedType([personaData.type]);
+      addUsedAdjective([adj]);
+      addUsedNoun([noun]);
       addUsedLearningPref([
         rest.learningPreferencesKeyword,
         ...(rest.learningPreferenceOptionKeywords || []),
       ]);
+      existingTypes.push(personaData.type);
       const uid = auth.currentUser?.uid;
       if (uid) {
         if (action === "replace" && currentPersona) {
@@ -911,153 +1254,6 @@ const InitiativesNew = () => {
     }
   };
 
-  const handlePersonaFieldChange = (field, value) => {
-    setEditingPersona((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const toggleChoice = (field, index) => {
-    const key = field === "motivation" ? "motivationChoices" : "challengeChoices";
-    setEditingPersona((prev) => {
-      const updated = [...(prev[key] || [])];
-      const selectedCount = updated.filter((c) => c.selected).length;
-      if (updated[index]) {
-        if (updated[index].selected) {
-          updated[index].selected = false;
-        } else if (selectedCount < 3) {
-          updated[index].selected = true;
-        }
-      }
-      return { ...prev, [key]: updated };
-    });
-  };
-
-  const refreshChoices = async (field) => {
-    if (!editingPersona) return;
-    setPersonaLoading(true);
-    setPersonaError("");
-    try {
-      const { data } = await generateLearnerPersona({
-        projectBrief,
-        businessGoal,
-        audienceProfile,
-        projectConstraints,
-        sourceMaterial: getCombinedSource(),
-        existingMotivationKeywords: usedMotivationKeywords,
-        existingChallengeKeywords: usedChallengeKeywords,
-        refreshField: field === "motivation" ? "motivation" : "challenges",
-        personaType: editingPersona.type,
-      });
-      const list =
-        field === "motivation"
-          ? data.motivationOptions || []
-          : data.challengeOptions || [];
-      const formatted = list.map((o) => ({
-        keyword: formatKeyword(o.keyword),
-        text: o.text,
-        selected: false,
-      }));
-      if (formatted.length === 0) {
-        setPersonaError("No new options available.");
-      } else {
-        setEditingPersona((prev) => {
-          const key = field === "motivation" ? "motivationChoices" : "challengeChoices";
-          const updated = [...(prev[key] || [])];
-          const unselectedIdx = [];
-          updated.forEach((c, i) => {
-            if (!c.selected) unselectedIdx.push(i);
-          });
-          unselectedIdx.forEach((idx, i) => {
-            if (formatted[i]) updated[idx] = formatted[i];
-          });
-          if (field === "motivation") {
-            addUsedMotivation(formatted.map((o) => o.keyword));
-          } else {
-            addUsedChallenge(formatted.map((o) => o.keyword));
-          }
-          return { ...prev, [key]: updated };
-        });
-      }
-    } catch (err) {
-      console.error("Error generating options:", err);
-      setPersonaError(err?.message || "Error generating options.");
-    } finally {
-      setPersonaLoading(false);
-    }
-  };
-
-  const handleSavePersonaEdits = async () => {
-    if (!editingPersona) return;
-    const uid = auth.currentUser?.uid;
-    const { id, motivationChoices = [], challengeChoices = [], ...rest } =
-      editingPersona;
-    const motivations = motivationChoices
-      .filter((m) => m.selected)
-      .map(({ selected, ...o }) => {
-        void selected;
-        return o;
-      });
-    const motivationOptions = motivationChoices
-      .filter((m) => !m.selected)
-      .map(({ selected, ...o }) => {
-        void selected;
-        return o;
-      });
-    const challengesList = challengeChoices
-      .filter((c) => c.selected)
-      .map(({ selected, ...o }) => {
-        void selected;
-        return o;
-      });
-    const challengeOptions = challengeChoices
-      .filter((c) => !c.selected)
-      .map(({ selected, ...o }) => {
-        void selected;
-        return o;
-      });
-    const personaToSave = {
-      id,
-      ...rest,
-      motivations,
-      motivation: motivations[0] || null,
-      motivationOptions,
-      challengesList,
-      challenges: challengesList[0] || null,
-      challengeOptions,
-    };
-    try {
-      if (uid) {
-        await savePersona(uid, initiativeId, personaToSave);
-      }
-      addUsedMotivation([
-        ...motivations.map((o) => o.keyword),
-        ...motivationOptions.map((o) => o.keyword),
-      ]);
-      addUsedChallenge([
-        ...challengesList.map((o) => o.keyword),
-        ...challengeOptions.map((o) => o.keyword),
-      ]);
-      addUsedType([rest.type]);
-      addUsedLearningPref([
-        rest.learningPreferencesKeyword,
-        ...(rest.learningPreferenceOptionKeywords || []),
-      ]);
-      setPersonas((prev) =>
-        prev.map((p, i) =>
-          i === activePersonaIndex ? normalizePersona(personaToSave) : p
-        )
-      );
-      setEditingPersona(null);
-    } catch (err) {
-      console.error("Error saving persona:", err);
-      setPersonaError(err?.message || "Error saving persona.");
-    }
-  };
-
-  const handleRegeneratePersonaEdit = async () => {
-    await handleGeneratePersona("replace");
-    setEditingPersona(null);
-  };
-
   const handleDeletePersona = async (index) => {
     const persona = personas[index];
     if (!persona) return;
@@ -1068,6 +1264,10 @@ const InitiativesNew = () => {
       if (uid && persona.id) {
         await deletePersona(uid, initiativeId, persona.id);
       }
+      const { adj, noun } = parsePersonaType(persona.type);
+      removeUsedType(persona.type);
+      removeUsedAdjective(adj);
+      removeUsedNoun(noun);
       const updated = personas.filter((_, i) => i !== index);
       setPersonas(updated);
       const newActive =
@@ -1077,7 +1277,6 @@ const InitiativesNew = () => {
           ? activePersonaIndex - 1
           : Math.min(activePersonaIndex, updated.length - 1);
       setActivePersonaIndex(newActive);
-      setEditingPersona(null);
     } catch (err) {
       console.error("Error deleting persona:", err);
       setPersonaError(err?.message || "Error deleting persona.");
@@ -1346,7 +1545,7 @@ const InitiativesNew = () => {
         <div className="initiative-card generator-result"
         >
           <div>
-            <h3>Learner Personas</h3>
+            <h3 className="text-white">Learner Personas</h3>
             {personas.length === 0 ? (
               <>
                 <p>
@@ -1384,7 +1583,13 @@ const InitiativesNew = () => {
                   ))}
                 </div>
                 <div
-                  style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    columnGap: 8,
+                    rowGap: 12,
+                    marginTop: 10,
+                  }}
                 >
                   <button
                     onClick={() => handleGeneratePersonas(personaCount)}
@@ -1405,7 +1610,6 @@ const InitiativesNew = () => {
                         type="button"
                         onClick={() => {
                           setActivePersonaIndex(i);
-                          setEditingPersona(null);
                         }}
                         className={`persona-tab ${i === activePersonaIndex ? "active" : ""}`}
                       >
@@ -1422,268 +1626,24 @@ const InitiativesNew = () => {
                   </div>
                 )}
 
-                {editingPersona ? (
+                                {currentPersona && (
                   <>
-                    <div className="persona-edit-grid">
-                      <div className="grid-item glass-card top-row">
-                        {editingPersona.avatar && (
-                      <img
-                        src={editingPersona.avatar}
-                        alt={`${editingPersona.type} avatar`}
-                        className="persona-avatar"
-                      />
-                        )}
-                        <input
-                          className="generator-input"
-                          value={editingPersona.type || ""}
-                          onChange={(e) =>
-                            handlePersonaFieldChange("type", e.target.value)
-                          }
-                        />
-                        <textarea
-                          className="generator-input"
-                          placeholder="Brief Bio"
-                          value={editingPersona.learningPreferences || ""}
-                          onChange={(e) =>
-                            handlePersonaFieldChange(
-                              "learningPreferences",
-                              e.target.value
-                            )
-                          }
-                          rows={3}
-                        />
-                      </div>
-                      <div className="grid-item glass-card top-row">
-                        <div className="field-group">
-                          <label>Age Group</label>
-                          <select
-                            className="generator-input"
-                            value={editingPersona.ageRange}
-                            onChange={(e) =>
-                              handlePersonaFieldChange("ageRange", e.target.value)
-                            }
-                          >
-                            {[editingPersona.ageRange,
-                              ...editingPersona.ageRangeOptions].map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="field-group">
-                          <label>Education Level</label>
-                          <select
-                            className="generator-input"
-                            value={editingPersona.educationLevel}
-                            onChange={(e) =>
-                              handlePersonaFieldChange(
-                                "educationLevel",
-                                e.target.value
-                              )
-                            }
-                          >
-                            {[editingPersona.educationLevel,
-                              ...editingPersona.educationLevelOptions].map(
-                              (opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-                        <div className="field-group">
-                          <label>Tech Proficiency</label>
-                          <select
-                            className="generator-input"
-                            value={editingPersona.techProficiency}
-                            onChange={(e) =>
-                              handlePersonaFieldChange(
-                                "techProficiency",
-                                e.target.value
-                              )
-                            }
-                          >
-                            {[editingPersona.techProficiency,
-                              ...editingPersona.techProficiencyOptions].map(
-                              (opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="grid-item glass-card bottom-row">
-                        <h5>Motivation</h5>
-                        <div className="pill-row">
-                          {editingPersona.motivationChoices?.map((m, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              className={`pill ${m.selected ? "selected" : ""}`}
-                              onClick={() => toggleChoice("motivation", i)}
-                            >
-                              {m.keyword}
-                            </button>
-                          ))}
-                        </div>
-                        {(editingPersona.motivationChoices?.filter((m) => m.selected) || []).length < 3 && (
-                          <button
-                            type="button"
-                            onClick={() => refreshChoices("motivation")}
-                            className="generator-button"
-                          >
-                            Generate more
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid-item glass-card bottom-row">
-                        <h5>Challenges</h5>
-                        <div className="pill-row">
-                          {editingPersona.challengeChoices?.map((c, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              className={`pill ${c.selected ? "selected" : ""}`}
-                              onClick={() => toggleChoice("challenge", i)}
-                            >
-                              {c.keyword}
-                            </button>
-                          ))}
-                        </div>
-                        {(editingPersona.challengeChoices?.filter((c) => c.selected) || []).length < 3 && (
-                          <button
-                            type="button"
-                            onClick={() => refreshChoices("challenge")}
-                            className="generator-button"
-                          >
-                            Generate more
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="button-row">
-                      <button
-                        onClick={() => handleRegeneratePersonaEdit()}
-                        disabled={personaLoading}
-                        className="generator-button"
-                        type="button"
-                      >
-                        {personaLoading ? "Generating..." : "Regenerate Persona"}
-                      </button>
-                      <button
-                        onClick={() => setEditingPersona(null)}
-                        className="generator-button cancel-button"
-                        type="button"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSavePersonaEdits}
-                        disabled={personaLoading}
-                        className="generator-button save-button"
-                        type="button"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="persona-two-column">
-                      <div className="persona-col-left">
-                        {currentPersona.avatar && (
-                          <img
-                            src={currentPersona.avatar}
-                            alt={`${currentPersona.type} avatar`}
-                            className="persona-avatar"
-                          />
-                        )}
-                        <h5>{currentPersona.type}</h5>
-                        {currentPersona.role && (
-                          <p><strong>Role:</strong> {currentPersona.role}</p>
-                        )}
-                        {currentPersona.department && (
-                          <p><strong>Department:</strong> {currentPersona.department}</p>
-                        )}
-                        {currentPersona.careerStage && (
-                          <p><strong>Career Stage:</strong> {currentPersona.careerStage}</p>
-                        )}
-                        {currentPersona.tenure && (
-                          <p><strong>Tenure:</strong> {currentPersona.tenure}</p>
-                        )}
-                        {currentPersona.region && (
-                          <p><strong>Region:</strong> {currentPersona.region}</p>
-                        )}
-                        {currentPersona.workSetting && (
-                          <p><strong>Work Setting:</strong> {currentPersona.workSetting}</p>
-                        )}
-                        {currentPersona.shift && (
-                          <p><strong>Shift:</strong> {currentPersona.shift}</p>
-                        )}
-                        {currentPersona.languages?.length > 0 && (
-                          <p>
-                            <strong>Languages:</strong> {currentPersona.languages.join(", ")}
-                          </p>
-                        )}
-                        {currentPersona.devices?.length > 0 && (
-                          <p>
-                            <strong>Devices:</strong> {currentPersona.devices.join(", ")}
-                          </p>
-                        )}
-                        {currentPersona.bandwidth && (
-                          <p><strong>Bandwidth:</strong> {currentPersona.bandwidth}</p>
-                        )}
-                        {currentPersona.baselineKnowledge && (
-                          <p>
-                            <strong>Baseline Knowledge:</strong> {currentPersona.baselineKnowledge}
-                          </p>
-                        )}
-                        {currentPersona.supportLevel && (
-                          <p><strong>Support Level:</strong> {currentPersona.supportLevel}</p>
-                        )}
-                        {currentPersona.accessibility?.length > 0 && (
-                          <p>
-                            <strong>Accessibility:</strong> {currentPersona.accessibility.join(", ")}
-                          </p>
-                        )}
-                        <p>
-                          <strong>Age Range:</strong> {currentPersona.ageRange}
-                        </p>
-                        <p>
-                          <strong>Education Level:</strong> {currentPersona.educationLevel}
-                        </p>
-                        <p>
-                          <strong>Tech Proficiency:</strong> {currentPersona.techProficiency}
-                        </p>
-                      </div>
-                      <div className="persona-col-right">
-                        <p>
-                          <strong>Learning Preferences:</strong> {currentPersona.learningPreferences}
-                        </p>
-                        <p>
-                          <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
-                        </p>
-                        <p>
-                          <strong>Challenges - {currentPersona.challenges?.keyword}:</strong> {currentPersona.challenges?.text}
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() =>
-                          setEditingPersona(
-                            JSON.parse(JSON.stringify(currentPersona))
-                          )
-                        }
-                        className="generator-button"
-                        type="button"
-                      >
-                        Edit Persona
-                      </button>
+                    <PersonaDisplay
+                      persona={currentPersona}
+                      personaQualities={personaQualities}
+                      onUpdate={updatePersonaField}
+                      onRegenerate={regeneratePersonaField}
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        columnGap: 8,
+                        rowGap: 12,
+                        marginTop: 16,
+                        marginBottom: 16,
+                      }}
+                    >
                       <button
                         onClick={() => handleGeneratePersona("replace")}
                         disabled={personaLoading}
@@ -1713,36 +1673,35 @@ const InitiativesNew = () => {
                     </div>
                   </>
                 )}
+
               </div>
             )}
           </div>
           {personaError && <p className="generator-error">{personaError}</p>}
-          {!editingPersona && (
-            <div className="button-row">
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                className="generator-button back-button"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="generator-button save-button"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={handleGenerateStrategy}
-                disabled={nextLoading}
-                className="generator-button next-button"
-              >
-                {nextLoading ? "Generating..." : "Next"}
-              </button>
-            </div>
-          )}
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="generator-button back-button"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="generator-button save-button"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateStrategy}
+              disabled={nextLoading}
+              className="generator-button next-button"
+            >
+              {nextLoading ? "Generating..." : "Next"}
+            </button>
+          </div>
           {nextError && <p className="generator-error">{nextError}</p>}
         </div>
       )}
