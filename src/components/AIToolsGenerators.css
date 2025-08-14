@@ -17,7 +17,7 @@
     opacity: 0.8;
   }
 
-/* Reusable frosted glass card for each initiative step */
+/* Reusable initiative card with gradient background and pulsing overlay */
 .initiative-card {
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(30px);
@@ -802,5 +802,20 @@
 
 .design-doc-panel .button-row {
   margin-top: 20px;
+}
+
+@keyframes pulseGradient {
+  0% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15) translate(10%, -10%);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.6;
+  }
 }
 
