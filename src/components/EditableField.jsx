@@ -12,6 +12,7 @@ function EditableField({
   valueClass,
   hideLabel,
   divider,
+  autoSave,
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(
@@ -34,6 +35,12 @@ function EditableField({
     setEditing(false);
   };
 
+  const handleBlur = () => {
+    if (autoSave) {
+      handleSave();
+    }
+  };
+
   const containerClasses = containerClass || "info-card editable-element";
 
   return (
@@ -45,24 +52,27 @@ function EditableField({
             className="generator-input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onBlur={handleBlur}
             rows={isArray ? 2 : 3}
           />
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button
-              className="generator-button"
-              type="button"
-              onClick={handleSave}
-            >
-              Save
-            </button>
-            <button
-              className="generator-button"
-              type="button"
-              onClick={handleCancel}
-            >
-              Cancel
-            </button>
-          </div>
+          {!autoSave && (
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button
+                className="generator-button"
+                type="button"
+                onClick={handleSave}
+              >
+                Save
+              </button>
+              <button
+                className="generator-button"
+                type="button"
+                onClick={handleCancel}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -136,6 +146,7 @@ EditableField.propTypes = {
   valueClass: PropTypes.string,
   hideLabel: PropTypes.bool,
   divider: PropTypes.bool,
+  autoSave: PropTypes.bool,
 };
 
 EditableField.defaultProps = {
@@ -146,6 +157,7 @@ EditableField.defaultProps = {
   valueClass: "",
   hideLabel: false,
   divider: false,
+  autoSave: false,
 };
 
 export default EditableField;

@@ -14,6 +14,7 @@ import { useSearchParams } from "react-router-dom";
 import LearningObjectivesGenerator from "./LearningObjectivesGenerator.jsx";
 import HierarchicalOutlineGenerator from "./HierarchicalOutlineGenerator.jsx";
 import LearningDesignDocument from "./LearningDesignDocument.jsx";
+import TrainingPlanGenerator from "./TrainingPlanGenerator.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 import PersonaDisplay from "./PersonaDisplay.jsx";
@@ -256,6 +257,7 @@ const normalizePersona = (p = {}) => {
     supportLevel: p.supportLevel || "",
     accessibility: p.accessibility || [],
     summary: p.summary || getRandomItem(SUMMARY_OPTIONS),
+    selectedTraits: p.selectedTraits || [],
     ageRange: p.ageRange || "",
     ageRangeOptions: p.ageRangeOptions || [],
     educationLevel: p.educationLevel || "",
@@ -284,9 +286,10 @@ const InitiativesNew = () => {
     "Brief",
     "Personas",
     "Approach",
+    "Plan",
+    "Design",
     "Objectives",
     "Outline",
-    "Design",
   ];
   const [step, setStep] = useState(1);
   const [projectName, setProjectName] = useState("");
@@ -312,6 +315,7 @@ const InitiativesNew = () => {
   const [strategy, setStrategy] = useState(null);
   const [selectedModality, setSelectedModality] = useState("");
   const [blendModalities, setBlendModalities] = useState([]);
+  const [trainingPlan, setTrainingPlan] = useState("");
 
   const [isEditingBrief, setIsEditingBrief] = useState(false);
 
@@ -551,6 +555,7 @@ const InitiativesNew = () => {
         strategy,
         selectedModality,
         blendModalities,
+        trainingPlan,
         learningObjectives,
         courseOutline,
         learningDesignDocument,
@@ -588,6 +593,7 @@ const InitiativesNew = () => {
     setUsedTypes([]);
     setUsedLearningPrefKeywords([]);
     setBlendModalities([]);
+    setTrainingPlan("");
 
     loadInitiative(uid, initiativeId)
       .then((data) => {
@@ -612,6 +618,7 @@ const InitiativesNew = () => {
           setStrategy(data.strategy || null);
           setSelectedModality(data.selectedModality || "");
           setBlendModalities(data.blendModalities || []);
+          setTrainingPlan(data.trainingPlan || "");
           setLearningObjectives(data.learningObjectives || null);
           setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
@@ -658,6 +665,14 @@ const InitiativesNew = () => {
         });
         setPersonas(normalized);
         setActivePersonaIndex(0);
+        const loadedTraits = Array.from(
+          new Set(
+            normalized.flatMap((p) => p.selectedTraits || [])
+          )
+        );
+        if (loadedTraits.length > 0) {
+          setPersonaQualities(loadedTraits);
+        }
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [
@@ -1063,6 +1078,7 @@ const InitiativesNew = () => {
           challenges: challengesList[0] || null,
           challengeOptions,
           avatar: avatarRes?.data?.avatar || null,
+          selectedTraits: personaQualities,
         };
         addUsedMotivation([
           ...motivations.map((o) => o.keyword),
@@ -1179,16 +1195,17 @@ const InitiativesNew = () => {
           void selected;
           return o;
         });
-      const personaToSave = {
-        ...rest,
-        motivations,
-        motivation: motivations[0] || null,
-        motivationOptions,
-        challengesList,
-        challenges: challengesList[0] || null,
-        challengeOptions,
-        avatar: avatarRes?.data?.avatar || null,
-      };
+        const personaToSave = {
+          ...rest,
+          motivations,
+          motivation: motivations[0] || null,
+          motivationOptions,
+          challengesList,
+          challenges: challengesList[0] || null,
+          challengeOptions,
+          avatar: avatarRes?.data?.avatar || null,
+          selectedTraits: personaQualities,
+        };
       // record used keywords
       addUsedMotivation([
         ...motivations.map((o) => o.keyword),
@@ -1545,15 +1562,15 @@ const InitiativesNew = () => {
         <div className="initiative-card generator-result"
         >
           <div>
-            <h3 className="text-white">Learner Personas</h3>
+            <h3 className="learning-personas-title">Learning Personas</h3>
             {personas.length === 0 ? (
               <>
                 <p>
-                  Learner personas help tailor the training to different
-                  audience segments by highlighting motivations, challenges,
-                  and preferences. They can influence project decisions and
-                  outcomes. You may generate up to three personas, but none are
-                  required.
+                  Learning personas help tailor the training to different
+                  audience segments by highlighting motivation, challenges,
+                  and preferences. These insights can influence project
+                  decisions and outcomes. You may generate up to three personas,
+                  but none are required.
                 </p>
                 <label>
                   How many personas would you like to generate? (0-3)
@@ -1796,7 +1813,7 @@ const InitiativesNew = () => {
       )}
 
       {step === 6 && (
-        <LearningObjectivesGenerator
+        <TrainingPlanGenerator
           projectBrief={projectBrief}
           businessGoal={businessGoal}
           audienceProfile={audienceProfile}
@@ -1804,27 +1821,14 @@ const InitiativesNew = () => {
           selectedModality={selectedModality}
           blendModalities={blendModalities}
           sourceMaterials={sourceMaterials}
+          trainingPlan={trainingPlan}
+          setTrainingPlan={setTrainingPlan}
           onBack={() => setStep(5)}
           onNext={() => setStep(7)}
         />
       )}
 
       {step === 7 && (
-        <HierarchicalOutlineGenerator
-          projectBrief={projectBrief}
-          businessGoal={businessGoal}
-          audienceProfile={audienceProfile}
-          projectConstraints={projectConstraints}
-          selectedModality={selectedModality}
-          blendModalities={blendModalities}
-          learningObjectives={learningObjectives}
-          sourceMaterials={sourceMaterials}
-          onBack={() => setStep(6)}
-          onNext={() => setStep(8)}
-        />
-      )}
-
-      {step === 8 && (
         <LearningDesignDocument
           projectName={projectName}
           projectBrief={projectBrief}
@@ -1835,8 +1839,37 @@ const InitiativesNew = () => {
           blendModalities={blendModalities}
           learningObjectives={learningObjectives}
           courseOutline={courseOutline}
+          trainingPlan={trainingPlan}
+          sourceMaterials={sourceMaterials}
+          onBack={() => setStep(6)}
+        />
+      )}
+
+      {step === 8 && (
+        <LearningObjectivesGenerator
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          blendModalities={blendModalities}
           sourceMaterials={sourceMaterials}
           onBack={() => setStep(7)}
+          onNext={() => setStep(9)}
+        />
+      )}
+
+      {step === 9 && (
+        <HierarchicalOutlineGenerator
+          projectBrief={projectBrief}
+          businessGoal={businessGoal}
+          audienceProfile={audienceProfile}
+          projectConstraints={projectConstraints}
+          selectedModality={selectedModality}
+          blendModalities={blendModalities}
+          learningObjectives={learningObjectives}
+          sourceMaterials={sourceMaterials}
+          onBack={() => setStep(8)}
         />
       )}
 
