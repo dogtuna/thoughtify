@@ -24,9 +24,9 @@ const FIELD_LABELS = {
 
 function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
   return (
-    <div className="persona-card">
+    <div className="persona-wrapper">
       <div className="persona-top">
-        <div className="persona-left">
+        <div className="persona-identity-card info-card">
           {persona.avatar && (
             <img
               src={persona.avatar}
@@ -39,7 +39,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             value={persona.type}
             onSave={(v) => onUpdate("type", v)}
             onRegenerate={() => onRegenerate("type")}
-            containerClass="editable-element"
+            containerClass="editable-element persona-field"
             hideLabel
             valueClass="persona-nickname"
           />
@@ -48,7 +48,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             value={persona.role}
             onSave={(v) => onUpdate("role", v)}
             onRegenerate={() => onRegenerate("role")}
-            containerClass="editable-element"
+            containerClass="editable-element persona-field"
             hideLabel
             valueClass="persona-role"
           />
@@ -57,7 +57,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             value={persona.department}
             onSave={(v) => onUpdate("department", v)}
             onRegenerate={() => onRegenerate("department")}
-            containerClass="editable-element"
+            containerClass="editable-element persona-field"
             hideLabel
             valueClass="persona-department"
           />
@@ -66,7 +66,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             value={persona.summary}
             onSave={(v) => onUpdate("summary", v)}
             onRegenerate={() => onRegenerate("summary")}
-            containerClass="editable-element"
+            containerClass="editable-element persona-field"
             hideLabel
             valueClass="persona-summary"
           />

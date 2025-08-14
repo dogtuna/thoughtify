@@ -6,11 +6,11 @@ body {
   font-family: "Poppins", sans-serif;
   background: linear-gradient(
     135deg,
-    #667eea,
-    #764ba2,
-    #f97316,
-    #ec4899,
-    #8b5cf6
+    #1e3a8a,
+    #4338ca,
+    #4f46e5,
+    #0d9488,
+    #059669
   );
   color: white;
   min-height: 100vh;
@@ -42,10 +42,10 @@ body::before {
   width: 200%;
   height: 200%;
   background:
-    radial-gradient(circle at 30% 30%, #f97316, transparent 60%),
-    radial-gradient(circle at 70% 70%, #ec4899, transparent 60%),
-    radial-gradient(circle at 70% 30%, #667eea, transparent 60%),
-    radial-gradient(circle at 30% 70%, #8b5cf6, transparent 60%);
+    radial-gradient(circle at 30% 30%, #4f46e5, transparent 60%),
+    radial-gradient(circle at 70% 70%, #0d9488, transparent 60%),
+    radial-gradient(circle at 70% 30%, #1e3a8a, transparent 60%),
+    radial-gradient(circle at 30% 70%, #059669, transparent 60%);
   filter: blur(120px);
   opacity: 0.7;
   pointer-events: none;
