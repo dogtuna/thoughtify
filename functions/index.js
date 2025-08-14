@@ -29,19 +29,6 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-const FIRST_NAMES = [
-  "Anika", "Leo", "Maya", "Jonah", "Sophia", "Ethan", "Lila",
-  "Noah", "Ava", "Mason", "Isla", "Liam", "Zoe", "Kai",
-  "Emma", "Lucas", "Aria", "Owen", "Mila", "Finn",
-];
-
-const LAST_NAMES = [
-  "Fischer", "Kim", "Gupta", "O'Neill", "Rodriguez", "Chen",
-  "Patel", "Johnson", "Khan", "Liu", "Garcia", "Singh",
-  "Lopez", "Mori", "Smith", "Williams", "Brown", "Davis",
-  "Martinez", "Wilson",
-];
-
 const AGE_RANGES = ["18-24", "25-34", "35-44", "45-54", "55+"];
 const EDUCATION_LEVELS = [
   "No College",
@@ -53,6 +40,54 @@ const EDUCATION_LEVELS = [
 ];
 const TECH_LEVELS = ["Beginner", "Intermediate", "Advanced"];
 
+// Additional persona trait option lists
+const ROLES = [
+  "Sales Associate",
+  "Project Manager",
+  "Technician",
+  "Customer Support Agent",
+  "Consultant",
+  "Engineer",
+  "Trainer",
+];
+
+const DEPARTMENTS = [
+  "Sales",
+  "Marketing",
+  "Engineering",
+  "HR",
+  "Operations",
+  "Support",
+  "Finance",
+];
+
+const CAREER_STAGES = ["Entry", "Mid", "Senior", "Lead/Manager"];
+const TENURE_OPTIONS = ["0-6 mo", "6-12 mo", "1-3 yr", "3+ yr"];
+const REGIONS = [
+  "North America",
+  "Europe",
+  "Asia",
+  "South America",
+  "Africa",
+  "Australia",
+];
+const WORK_SETTINGS = ["Onsite", "Hybrid", "Remote", "Field"];
+const SHIFT_WINDOWS = ["Weekdays 9-5", "Weekends", "Evenings", "Flexible"];
+const LANGUAGES = ["English", "Spanish", "French", "German", "Mandarin", "Hindi"];
+const DEVICES = ["Desktop", "Laptop", "Tablet", "Phone"];
+const BANDWIDTH_LEVELS = ["Low", "Medium", "High"];
+const KNOWLEDGE_LEVELS = ["Novice", "Intermediate", "Expert"];
+const ASSESSMENT_COMFORTS = ["Quizzes", "Sims", "Role-play"];
+const SUPPORT_LEVELS = ["Low", "Medium", "High"];
+const ACCESSIBILITY_NEEDS = [
+  "Captions",
+  "Screen reader",
+  "Keyboard-only",
+  "Color contrast",
+  "Audio descriptions",
+  "Extra time",
+];
+
 function getRandomItems(arr, count) {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -62,15 +97,25 @@ function getRandomItems(arr, count) {
   return copy.slice(0, count);
 }
 
-function generateUniqueName(existing = []) {
+function getRandomItem(arr) {
+  return arr[crypto.randomInt(0, arr.length)];
+}
+
+function generateUniquePersonaType(existing = []) {
   const used = new Set(existing.map((n) => n.toLowerCase()));
   for (let i = 0; i < 100; i++) {
-    const first = FIRST_NAMES[crypto.randomInt(0, FIRST_NAMES.length)];
-    const last = LAST_NAMES[crypto.randomInt(0, LAST_NAMES.length)];
-    const name = `${first} ${last}`;
-    if (!used.has(name.toLowerCase())) return name;
+    const role = getRandomItem(ROLES);
+    const stage = getRandomItem(CAREER_STAGES);
+    const type = `${stage} ${role}`;
+    if (!used.has(type.toLowerCase())) {
+      return { type, role, careerStage: stage };
+    }
   }
-  return `Learner ${crypto.randomInt(1000, 9999)}`;
+  return {
+    type: `Persona ${crypto.randomInt(1000, 9999)}`,
+    role: getRandomItem(ROLES),
+    careerStage: getRandomItem(CAREER_STAGES),
+  };
 }
 
 // Retrieve the API key from environment variables (using Firebase secrets)
@@ -676,8 +721,9 @@ export const generateLearnerPersona = onCall(
       existingChallengeKeywords = [],
       existingLearningPreferenceKeywords = [],
       refreshField,
-      personaName,
-      existingNames = [],
+      personaType,
+      existingTypes = [],
+      selectedTraits = [],
     } = req.data || {};
 
     if (!projectBrief) {
@@ -693,7 +739,12 @@ export const generateLearnerPersona = onCall(
     });
 
     const randomSeed = Math.random().toString(36).substring(2, 8);
-    const finalName = personaName || generateUniqueName(existingNames);
+    const typeInfo = personaType
+      ? { type: personaType, role: null, careerStage: null }
+      : generateUniquePersonaType(existingTypes);
+    const finalType = typeInfo.type;
+    const defaultRole = typeInfo.role;
+    const defaultStage = typeInfo.careerStage;
     const ageRange = AGE_RANGES[crypto.randomInt(0, AGE_RANGES.length)];
     const ageRangeOptions = getRandomItems(
       AGE_RANGES.filter((a) => a !== ageRange),
@@ -726,10 +777,7 @@ Business Goal: ${businessGoal}
 Audience Profile: ${audienceProfile}
 Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       } else if (refreshField === "learningPreferences") {
-        const firstName = finalName ? finalName.split(" ")[0] : null;
-        const personaInstruction = firstName
-          ? ` Use only the first name ${firstName} in each option's "text" sentence.`
-          : "";
+        const personaInstruction = "";
         listPrompt = `You are a Senior Instructional Designer.${personaInstruction} Based on the project information below, list three fresh learner learning preference options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) describing a distinct modality or strategy and a "text" field that is a full-sentence about the learner. Avoid the following learning preference keywords: ${existingLearningPreferenceKeywords.join(", ") || "none"}.
 
 Project Brief: ${projectBrief}
@@ -777,17 +825,13 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       return { [key]: data.options || [] };
     }
 
-      const nameInstruction = personaName
-        ? `The persona's name is ${personaName}.`
-        : `Create a unique first and last name for the learner persona that is not in this list: ${
-            existingNames.join(", ") || "none"
-          }.`;
+      const nameInstruction = ``;
       const educationList = EDUCATION_LEVELS.join(", ");
       const techList = TECH_LEVELS.join(", ");
       const textPrompt = `You are a Senior Instructional Designer. ${nameInstruction} The persona is in the ${ageRange} age group. Using the provided information, create one learner persona. Provide:
   - "educationLevel": select one option from [${educationList}] and "educationLevelOptions" with two other distinct options from this list.
   - "techProficiency": select one option from [${techList}] and "techProficiencyOptions" with two other distinct options from this list.
-   - "learningPreferences": {"keyword": "short concept", "text": "full-sentence about the learner using only the first name"} describing the learner's preferred learning style and "learningPreferencesOptions" with two alternative objects following the same keyword/text structure and using only the first name. Each keyword must capture a distinct modality or strategy (e.g., "hands-on practice", "visual storytelling").
+   - "learningPreferences": {"keyword": "short concept", "text": "full-sentence about the learner"} describing the learner's preferred learning style and "learningPreferencesOptions" with two alternative objects following the same keyword/text structure. Each keyword must capture a distinct modality or strategy (e.g., "hands-on practice", "visual storytelling").
   - For both the primary motivation and the primary challenge:
     - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
     - Provide a full-sentence description in a "text" field about the learner in third person without using their name.
@@ -795,7 +839,7 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
   Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
   {
-    "name": "Name",
+    "type": "Persona Type",
     "educationLevel": "High school diploma",
     "educationLevelOptions": ["No College", "Bachelor's degree"],
     "techProficiency": "Intermediate",
@@ -831,15 +875,54 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       console.error("Failed to parse AI response:", err, text);
       throw new HttpsError("internal", "Invalid AI response format.");
     }
-      if (personaName) {
-        persona.name = personaName;
-      } else if (
-        !persona.name ||
-        existingNames
-          .map((n) => n.toLowerCase())
-          .includes(persona.name.toLowerCase())
-      ) {
-        persona.name = generateUniqueName(existingNames);
+      persona.type = finalType;
+      if (selectedTraits.includes("role")) {
+        persona.role = persona.role || defaultRole || getRandomItem(ROLES);
+      }
+      if (selectedTraits.includes("careerStage")) {
+        persona.careerStage =
+          persona.careerStage || defaultStage || getRandomItem(CAREER_STAGES);
+      }
+      if (selectedTraits.includes("department")) {
+        persona.department = persona.department || getRandomItem(DEPARTMENTS);
+      }
+      if (selectedTraits.includes("tenure")) {
+        persona.tenure = persona.tenure || getRandomItem(TENURE_OPTIONS);
+      }
+      if (selectedTraits.includes("region")) {
+        persona.region = persona.region || getRandomItem(REGIONS);
+      }
+      if (selectedTraits.includes("workSetting")) {
+        persona.workSetting =
+          persona.workSetting || getRandomItem(WORK_SETTINGS);
+      }
+      if (selectedTraits.includes("shift")) {
+        persona.shift = persona.shift || getRandomItem(SHIFT_WINDOWS);
+      }
+      if (selectedTraits.includes("languages")) {
+        persona.languages = persona.languages || getRandomItems(LANGUAGES, 2);
+      }
+      if (selectedTraits.includes("devices")) {
+        persona.devices = persona.devices || getRandomItems(DEVICES, 2);
+      }
+      if (selectedTraits.includes("bandwidth")) {
+        persona.bandwidth = persona.bandwidth || getRandomItem(BANDWIDTH_LEVELS);
+      }
+      if (selectedTraits.includes("baselineKnowledge")) {
+        persona.baselineKnowledge =
+          persona.baselineKnowledge || getRandomItem(KNOWLEDGE_LEVELS);
+      }
+      if (selectedTraits.includes("assessmentComfort")) {
+        persona.assessmentComfort =
+          persona.assessmentComfort || getRandomItem(ASSESSMENT_COMFORTS);
+      }
+      if (selectedTraits.includes("supportLevel")) {
+        persona.supportLevel =
+          persona.supportLevel || getRandomItem(SUPPORT_LEVELS);
+      }
+      if (selectedTraits.includes("accessibility")) {
+        persona.accessibility =
+          persona.accessibility || getRandomItems(ACCESSIBILITY_NEEDS, 2);
       }
       persona.ageRange = ageRange;
       persona.ageRangeOptions = ageRangeOptions;
@@ -1339,8 +1422,8 @@ export const savePersona = onCall(async (request) => {
       "Missing initiativeId, personaId, or persona data"
     );
   }
-  if (!persona.name) {
-    throw new HttpsError("invalid-argument", "Persona must include a name");
+  if (!persona.type) {
+    throw new HttpsError("invalid-argument", "Persona must include a type");
   }
   const initiativeRef = db
     .collection("users")
