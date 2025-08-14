@@ -19,10 +19,9 @@
 
 /* Reusable initiative card with gradient background and pulsing overlay */
 .initiative-card {
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg, #667eea, #764ba2, #f97316, #ec4899, #8b5cf6);
-    background-size: 300% 300%;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 1.5rem;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
