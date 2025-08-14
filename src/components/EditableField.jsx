@@ -1,7 +1,18 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
 
-function EditableField({ label, value, onSave, onRegenerate, isArray }) {
+function EditableField({
+  label,
+  value,
+  onSave,
+  onRegenerate,
+  isArray,
+  containerClass,
+  labelClass,
+  valueClass,
+  hideLabel,
+  divider,
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(
     isArray ? (Array.isArray(value) ? value.join(", ") : value || "") : value || ""
@@ -23,11 +34,13 @@ function EditableField({ label, value, onSave, onRegenerate, isArray }) {
     setEditing(false);
   };
 
+  const containerClasses = containerClass || "info-card editable-element";
+
   return (
-    <div className="info-card editable-element">
+    <div className={containerClasses}>
       {editing ? (
         <div>
-          <p className="info-label">{label}</p>
+          <p className={`info-label ${labelClass || ""}`}>{label}</p>
           <textarea
             className="generator-input"
             value={draft}
@@ -53,8 +66,13 @@ function EditableField({ label, value, onSave, onRegenerate, isArray }) {
         </div>
       ) : (
         <>
-          <p className="info-label">{label}</p>
-          <p className="info-value">{isArray && Array.isArray(value) ? value.join(", ") : value || "-"}</p>
+          {!hideLabel && (
+            <p className={`info-label ${labelClass || ""}`}>{label}</p>
+          )}
+          {!hideLabel && divider && <hr className="info-divider" />}
+          <p className={`info-value ${valueClass || ""}`}>
+            {isArray && Array.isArray(value) ? value.join(", ") : value || "-"}
+          </p>
           <div className="edit-controls">
             <button
               className="control-btn"
@@ -113,11 +131,21 @@ EditableField.propTypes = {
   onSave: PropTypes.func.isRequired,
   onRegenerate: PropTypes.func.isRequired,
   isArray: PropTypes.bool,
+  containerClass: PropTypes.string,
+  labelClass: PropTypes.string,
+  valueClass: PropTypes.string,
+  hideLabel: PropTypes.bool,
+  divider: PropTypes.bool,
 };
 
 EditableField.defaultProps = {
   value: "",
   isArray: false,
+  containerClass: "",
+  labelClass: "",
+  valueClass: "",
+  hideLabel: false,
+  divider: false,
 };
 
 export default EditableField;

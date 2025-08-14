@@ -512,7 +512,51 @@
 
 .info-value {
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 400;
+  margin: 0;
+}
+
+.info-card .info-value {
+  font-weight: 700;
+}
+
+.info-divider {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 4px 0 8px;
+}
+
+.persona-nickname {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.persona-role {
+  font-size: 1.25rem;
+  color: #fb923c;
+}
+
+.persona-department {
+  font-size: 1rem;
+}
+
+.persona-summary {
+  font-size: 0.875rem;
+}
+
+.bottom-field {
+  text-align: left;
+}
+
+.bottom-label {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.bottom-value {
+  font-size: 1rem;
+  font-weight: 700;
   margin: 0;
 }
 

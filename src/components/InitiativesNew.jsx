@@ -1413,7 +1413,7 @@ const InitiativesNew = () => {
         <div className="initiative-card generator-result"
         >
           <div>
-            <h3>Learner Personas</h3>
+            <h3 className="text-white">Learner Personas</h3>
             {personas.length === 0 ? (
               <>
                 <p>

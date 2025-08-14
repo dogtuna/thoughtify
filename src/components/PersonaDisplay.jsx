@@ -39,24 +39,36 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             value={persona.type}
             onSave={(v) => onUpdate("type", v)}
             onRegenerate={() => onRegenerate("type")}
+            containerClass="editable-element"
+            hideLabel
+            valueClass="persona-nickname"
           />
           <EditableField
             label="Role / Job Title"
             value={persona.role}
             onSave={(v) => onUpdate("role", v)}
             onRegenerate={() => onRegenerate("role")}
+            containerClass="editable-element"
+            hideLabel
+            valueClass="persona-role"
           />
           <EditableField
             label="Department / Team"
             value={persona.department}
             onSave={(v) => onUpdate("department", v)}
             onRegenerate={() => onRegenerate("department")}
+            containerClass="editable-element"
+            hideLabel
+            valueClass="persona-department"
           />
           <EditableField
             label="Summary"
             value={persona.summary}
             onSave={(v) => onUpdate("summary", v)}
             onRegenerate={() => onRegenerate("summary")}
+            containerClass="editable-element"
+            hideLabel
+            valueClass="persona-summary"
           />
         </div>
         <div className="persona-right-grid">
@@ -78,6 +90,10 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
           value={persona.learningPreferences}
           onSave={(v) => onUpdate("learningPreferences", v)}
           onRegenerate={() => onRegenerate("learningPreferences")}
+          containerClass="editable-element bottom-field"
+          labelClass="bottom-label"
+          valueClass="bottom-value"
+          divider
         />
         <EditableField
           label="Motivation"
@@ -86,6 +102,10 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             onUpdate("motivation", { ...persona.motivation, text: v })
           }
           onRegenerate={() => onRegenerate("motivation")}
+          containerClass="editable-element bottom-field"
+          labelClass="bottom-label"
+          valueClass="bottom-value"
+          divider
         />
         <EditableField
           label="Challenges"
@@ -94,6 +114,10 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
             onUpdate("challenges", { ...persona.challenges, text: v })
           }
           onRegenerate={() => onRegenerate("challenges")}
+          containerClass="editable-element bottom-field"
+          labelClass="bottom-label"
+          valueClass="bottom-value"
+          divider
         />
       </div>
     </div>
