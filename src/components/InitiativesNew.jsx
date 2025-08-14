@@ -29,6 +29,25 @@ const BLENDED_OPTIONS = [
   "Job Aids or Reference Guides",
 ];
 
+const PERSONA_FIELDS = [
+  { key: "role", label: "Role / Job Title" },
+  { key: "department", label: "Department / Team" },
+  { key: "careerStage", label: "Career Stage / Seniority" },
+  { key: "tenure", label: "Tenure in Role" },
+  { key: "region", label: "Region / Time Zone" },
+  { key: "workSetting", label: "Work Setting" },
+  { key: "shift", label: "Shift / Availability Window" },
+  { key: "languages", label: "Language(s) for Training" },
+  { key: "educationLevel", label: "Education Level" },
+  { key: "techProficiency", label: "Tech Proficiency" },
+  { key: "devices", label: "Primary Devices" },
+  { key: "bandwidth", label: "Bandwidth / Access Reliability" },
+  { key: "baselineKnowledge", label: "Baseline Knowledge of Topic" },
+  { key: "assessmentComfort", label: "Practice & Assessment Comfort" },
+  { key: "supportLevel", label: "Manager / Peer Support Level" },
+  { key: "accessibility", label: "Accessibility Needs" },
+];
+
 const normalizePersona = (p = {}) => {
   const formatOption = (o = {}) => ({
     keyword: formatKeyword(o.keyword) || "General",
@@ -80,6 +99,21 @@ const normalizePersona = (p = {}) => {
 
   return {
     ...p,
+    type: p.type || p.name || "",
+    role: p.role || "",
+    department: p.department || "",
+    careerStage: p.careerStage || "",
+    tenure: p.tenure || "",
+    region: p.region || "",
+    workSetting: p.workSetting || "",
+    shift: p.shift || "",
+    languages: p.languages || [],
+    devices: p.devices || [],
+    bandwidth: p.bandwidth || "",
+    baselineKnowledge: p.baselineKnowledge || "",
+    assessmentComfort: p.assessmentComfort || "",
+    supportLevel: p.supportLevel || "",
+    accessibility: p.accessibility || [],
     ageRange: p.ageRange || "",
     ageRangeOptions: p.ageRangeOptions || [],
     educationLevel: p.educationLevel || "",
@@ -157,9 +191,10 @@ const InitiativesNew = () => {
   const [activePersonaIndex, setActivePersonaIndex] = useState(0);
   const [editingPersona, setEditingPersona] = useState(null);
   const [personaCount, setPersonaCount] = useState(0);
+  const [personaQualities, setPersonaQualities] = useState([]);
   const [usedMotivationKeywords, setUsedMotivationKeywords] = useState([]);
   const [usedChallengeKeywords, setUsedChallengeKeywords] = useState([]);
-  const [usedNames, setUsedNames] = useState([]);
+  const [usedTypes, setUsedTypes] = useState([]);
   const [usedLearningPrefKeywords, setUsedLearningPrefKeywords] = useState([]);
 
   const {
@@ -187,14 +222,20 @@ const InitiativesNew = () => {
       Array.from(new Set([...prev, ...keywords.filter(Boolean)]))
     );
   };
-  const addUsedName = (names = []) => {
-    setUsedNames((prev) =>
-      Array.from(new Set([...prev, ...names.filter(Boolean)]))
+  const addUsedType = (types = []) => {
+    setUsedTypes((prev) =>
+      Array.from(new Set([...prev, ...types.filter(Boolean)]))
     );
   };
   const addUsedLearningPref = (prefs = []) => {
     setUsedLearningPrefKeywords((prev) =>
       Array.from(new Set([...prev, ...prefs.filter(Boolean)]))
+    );
+  };
+
+  const togglePersonaQuality = (key) => {
+    setPersonaQualities((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
   };
 
@@ -251,7 +292,7 @@ const InitiativesNew = () => {
     setPersonaCount(0);
     setUsedMotivationKeywords([]);
     setUsedChallengeKeywords([]);
-    setUsedNames([]);
+    setUsedTypes([]);
     setUsedLearningPrefKeywords([]);
     setBlendModalities([]);
 
@@ -302,7 +343,7 @@ const InitiativesNew = () => {
           ].filter(Boolean);
           addUsedMotivation(mKeys);
           addUsedChallenge(cKeys);
-          addUsedName([p.name]);
+          addUsedType([p.type]);
           addUsedLearningPref([
             p.learningPreferencesKeyword,
             ...(p.learningPreferenceOptionKeywords || []),
@@ -641,7 +682,7 @@ const InitiativesNew = () => {
     try {
       const startIndex = personas.length;
       const newPersonas = [];
-      let existingNames = [...usedNames, ...personas.map((p) => p.name)];
+      let existingTypes = [...usedTypes, ...personas.map((p) => p.type)];
       for (let i = 0; i < toGenerate; i++) {
         const personaRes = await generateLearnerPersona({
           projectBrief,
@@ -651,15 +692,16 @@ const InitiativesNew = () => {
           sourceMaterial: getCombinedSource(),
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
-          existingNames,
+          existingTypes,
           existingLearningPreferenceKeywords: usedLearningPrefKeywords,
+          selectedTraits: personaQualities,
         });
         const personaData = normalizePersona(personaRes.data);
-        if (!personaData?.name) {
-          throw new Error("Persona generation returned no name.");
+        if (!personaData?.type) {
+          throw new Error("Persona generation returned no type.");
         }
         const avatarRes = await generateAvatar({
-          name: personaData.name,
+          name: personaData.type,
           motivation: personaData.motivation?.text || "",
           challenges: personaData.challenges?.text || "",
           ageRange: personaData.ageRange || "",
@@ -711,12 +753,12 @@ const InitiativesNew = () => {
           ...challengesList.map((o) => o.keyword),
           ...challengeOptions.map((o) => o.keyword),
         ]);
-        addUsedName([personaData.name]);
+        addUsedType([personaData.type]);
         addUsedLearningPref([
           rest.learningPreferencesKeyword,
           ...(rest.learningPreferenceOptionKeywords || []),
         ]);
-        existingNames.push(personaData.name);
+        existingTypes.push(personaData.type);
         const uid = auth.currentUser?.uid;
         let savedPersona = personaToSave;
         if (uid) {
@@ -745,12 +787,12 @@ const InitiativesNew = () => {
     setPersonaLoading(true);
     setPersonaError("");
     try {
-      const existingNamesCurrent = personas
+      const existingTypesCurrent = personas
         .filter((_, i) => !(action === "replace" && i === activePersonaIndex))
-        .map((p) => p.name);
-      const existingNames = [
-        ...usedNames,
-        ...existingNamesCurrent,
+        .map((p) => p.type);
+      const existingTypes = [
+        ...usedTypes,
+        ...existingTypesCurrent,
       ];
       const personaRes = await generateLearnerPersona({
         projectBrief,
@@ -760,16 +802,17 @@ const InitiativesNew = () => {
         sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
-        existingNames,
+        existingTypes,
         existingLearningPreferenceKeywords: usedLearningPrefKeywords,
+        selectedTraits: personaQualities,
       });
       const personaData = normalizePersona(personaRes.data);
-      if (!personaData?.name) {
-        throw new Error("Persona generation returned no name.");
+      if (!personaData?.type) {
+        throw new Error("Persona generation returned no type.");
       }
 
       const avatarRes = await generateAvatar({
-        name: personaData.name,
+        name: personaData.type,
         motivation: personaData.motivation?.text || "",
         challenges: personaData.challenges?.text || "",
         ageRange: personaData.ageRange || "",
@@ -823,7 +866,7 @@ const InitiativesNew = () => {
         ...challengesList.map((o) => o.keyword),
         ...challengeOptions.map((o) => o.keyword),
       ]);
-      addUsedName([personaData.name]);
+      addUsedType([personaData.type]);
       addUsedLearningPref([
         rest.learningPreferencesKeyword,
         ...(rest.learningPreferenceOptionKeywords || []),
@@ -902,7 +945,7 @@ const InitiativesNew = () => {
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
         refreshField: field === "motivation" ? "motivation" : "challenges",
-        personaName: editingPersona.name,
+        personaType: editingPersona.type,
       });
       const list =
         field === "motivation"
@@ -993,6 +1036,7 @@ const InitiativesNew = () => {
         ...challengesList.map((o) => o.keyword),
         ...challengeOptions.map((o) => o.keyword),
       ]);
+      addUsedType([rest.type]);
       addUsedLearningPref([
         rest.learningPreferencesKeyword,
         ...(rest.learningPreferenceOptionKeywords || []),
@@ -1326,6 +1370,19 @@ const InitiativesNew = () => {
                   <option value={2}>2</option>
                   <option value={3}>3</option>
                 </select>
+                <p style={{ marginTop: 10 }}>Select persona characteristics:</p>
+                <div className="persona-options">
+                  {PERSONA_FIELDS.map((f) => (
+                    <label key={f.key} className="blend-option">
+                      <input
+                        type="checkbox"
+                        checked={personaQualities.includes(f.key)}
+                        onChange={() => togglePersonaQuality(f.key)}
+                      />
+                      {f.label}
+                    </label>
+                  ))}
+                </div>
                 <div
                   style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
                 >
@@ -1355,11 +1412,11 @@ const InitiativesNew = () => {
                         {p.avatar && (
                           <img
                             src={p.avatar}
-                            alt={`${p.name} avatar`}
+                            alt={`${p.type} avatar`}
                             className="persona-tab-avatar"
                           />
                         )}
-                        {p.name}
+                        {p.type}
                       </button>
                     ))}
                   </div>
@@ -1370,17 +1427,17 @@ const InitiativesNew = () => {
                     <div className="persona-edit-grid">
                       <div className="grid-item glass-card top-row">
                         {editingPersona.avatar && (
-                          <img
-                            src={editingPersona.avatar}
-                            alt={`${editingPersona.name} avatar`}
-                            className="persona-avatar"
-                          />
+                      <img
+                        src={editingPersona.avatar}
+                        alt={`${editingPersona.type} avatar`}
+                        className="persona-avatar"
+                      />
                         )}
                         <input
                           className="generator-input"
-                          value={editingPersona.name || ""}
+                          value={editingPersona.type || ""}
                           onChange={(e) =>
-                            handlePersonaFieldChange("name", e.target.value)
+                            handlePersonaFieldChange("type", e.target.value)
                           }
                         />
                         <textarea
@@ -1536,32 +1593,85 @@ const InitiativesNew = () => {
                   </>
                 ) : (
                   <>
-                    {currentPersona.avatar && (
-                      <img
-                        src={currentPersona.avatar}
-                        alt={`${currentPersona.name} avatar`}
-                        className="persona-avatar"
-                      />
-                    )}
-                    <h5>{currentPersona.name}</h5>
-                    <p>
-                      <strong>Age Range:</strong> {currentPersona.ageRange}
-                    </p>
-                    <p>
-                      <strong>Education Level:</strong> {currentPersona.educationLevel}
-                    </p>
-                    <p>
-                      <strong>Tech Proficiency:</strong> {currentPersona.techProficiency}
-                    </p>
-                    <p>
-                      <strong>Learning Preferences:</strong> {currentPersona.learningPreferences}
-                    </p>
-                    <p>
-                      <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
-                    </p>
-                    <p>
-                      <strong>Challenges - {currentPersona.challenges?.keyword}:</strong> {currentPersona.challenges?.text}
-                    </p>
+                    <div className="persona-two-column">
+                      <div className="persona-col-left">
+                        {currentPersona.avatar && (
+                          <img
+                            src={currentPersona.avatar}
+                            alt={`${currentPersona.type} avatar`}
+                            className="persona-avatar"
+                          />
+                        )}
+                        <h5>{currentPersona.type}</h5>
+                        {currentPersona.role && (
+                          <p><strong>Role:</strong> {currentPersona.role}</p>
+                        )}
+                        {currentPersona.department && (
+                          <p><strong>Department:</strong> {currentPersona.department}</p>
+                        )}
+                        {currentPersona.careerStage && (
+                          <p><strong>Career Stage:</strong> {currentPersona.careerStage}</p>
+                        )}
+                        {currentPersona.tenure && (
+                          <p><strong>Tenure:</strong> {currentPersona.tenure}</p>
+                        )}
+                        {currentPersona.region && (
+                          <p><strong>Region:</strong> {currentPersona.region}</p>
+                        )}
+                        {currentPersona.workSetting && (
+                          <p><strong>Work Setting:</strong> {currentPersona.workSetting}</p>
+                        )}
+                        {currentPersona.shift && (
+                          <p><strong>Shift:</strong> {currentPersona.shift}</p>
+                        )}
+                        {currentPersona.languages?.length > 0 && (
+                          <p>
+                            <strong>Languages:</strong> {currentPersona.languages.join(", ")}
+                          </p>
+                        )}
+                        {currentPersona.devices?.length > 0 && (
+                          <p>
+                            <strong>Devices:</strong> {currentPersona.devices.join(", ")}
+                          </p>
+                        )}
+                        {currentPersona.bandwidth && (
+                          <p><strong>Bandwidth:</strong> {currentPersona.bandwidth}</p>
+                        )}
+                        {currentPersona.baselineKnowledge && (
+                          <p>
+                            <strong>Baseline Knowledge:</strong> {currentPersona.baselineKnowledge}
+                          </p>
+                        )}
+                        {currentPersona.supportLevel && (
+                          <p><strong>Support Level:</strong> {currentPersona.supportLevel}</p>
+                        )}
+                        {currentPersona.accessibility?.length > 0 && (
+                          <p>
+                            <strong>Accessibility:</strong> {currentPersona.accessibility.join(", ")}
+                          </p>
+                        )}
+                        <p>
+                          <strong>Age Range:</strong> {currentPersona.ageRange}
+                        </p>
+                        <p>
+                          <strong>Education Level:</strong> {currentPersona.educationLevel}
+                        </p>
+                        <p>
+                          <strong>Tech Proficiency:</strong> {currentPersona.techProficiency}
+                        </p>
+                      </div>
+                      <div className="persona-col-right">
+                        <p>
+                          <strong>Learning Preferences:</strong> {currentPersona.learningPreferences}
+                        </p>
+                        <p>
+                          <strong>Motivation - {currentPersona.motivation?.keyword}:</strong> {currentPersona.motivation?.text}
+                        </p>
+                        <p>
+                          <strong>Challenges - {currentPersona.challenges?.keyword}:</strong> {currentPersona.challenges?.text}
+                        </p>
+                      </div>
+                    </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         onClick={() =>

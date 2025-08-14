@@ -429,6 +429,20 @@
   border: 4px solid purple;
 }
 
+.persona-two-column {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.persona-col-left,
+.persona-col-right {
+  flex: 1;
+  min-width: 200px;
+  text-align: left;
+}
+
 .persona-tabs {
   display: flex;
   gap: 8px;
