@@ -240,7 +240,7 @@ const normalizePersona = (p = {}) => {
 
   return {
     ...p,
-    type: p.type || p.name || "",
+    type: p.type || p.name || generatePersonaType(),
     role: p.role || "",
     department: p.department || "",
     careerStage: p.careerStage || "",
