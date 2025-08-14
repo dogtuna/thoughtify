@@ -86,7 +86,11 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
       </div>
       <div className="persona-bottom-row">
         <EditableField
-          label="Learning Preferences"
+          label={`Learning Preferences${
+            persona.learningPreferencesKeyword
+              ? ` - ${persona.learningPreferencesKeyword}`
+              : ""
+          }`}
           value={persona.learningPreferences}
           onSave={(v) => onUpdate("learningPreferences", v)}
           onRegenerate={() => onRegenerate("learningPreferences")}
@@ -96,7 +100,9 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
           divider
         />
         <EditableField
-          label="Motivation"
+          label={`Motivation${
+            persona.motivation?.keyword ? ` - ${persona.motivation.keyword}` : ""
+          }`}
           value={persona.motivation?.text || ""}
           onSave={(v) =>
             onUpdate("motivation", { ...persona.motivation, text: v })
@@ -108,7 +114,9 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
           divider
         />
         <EditableField
-          label="Challenges"
+          label={`Challenge${
+            persona.challenges?.keyword ? ` - ${persona.challenges.keyword}` : ""
+          }`}
           value={persona.challenges?.text || ""}
           onSave={(v) =>
             onUpdate("challenges", { ...persona.challenges, text: v })

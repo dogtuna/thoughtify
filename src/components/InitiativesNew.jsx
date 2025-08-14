@@ -1545,15 +1545,15 @@ const InitiativesNew = () => {
         <div className="initiative-card generator-result"
         >
           <div>
-            <h3 className="text-white">Learner Personas</h3>
+            <h3 className="learning-personas-title">Learning Personas</h3>
             {personas.length === 0 ? (
               <>
                 <p>
-                  Learner personas help tailor the training to different
-                  audience segments by highlighting motivations, challenges,
-                  and preferences. They can influence project decisions and
-                  outcomes. You may generate up to three personas, but none are
-                  required.
+                  Learning personas help tailor the training to different
+                  audience segments by highlighting motivation, challenges,
+                  and preferences. These insights can influence project
+                  decisions and outcomes. You may generate up to three personas,
+                  but none are required.
                 </p>
                 <label>
                   How many personas would you like to generate? (0-3)
