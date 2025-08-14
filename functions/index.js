@@ -764,7 +764,7 @@ export const generateLearnerPersona = onCall(
       if (refreshField === "motivation" || refreshField === "challenges") {
         listPrompt = `You are a Senior Instructional Designer. Based on the project information below, list three fresh learner ${
           refreshField
-        } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written in full sentences describing the learner without using their name. Avoid the following ${
+        } options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) that captures the theme — do not use generic terms like "general" or "other" — and a "text" field written as a full sentence about the learner without using their name or pronouns. Vary the sentence openings and do not begin with "The learner." Avoid the following ${
           refreshField
         } keywords: ${
           refreshField === "motivation"
@@ -778,7 +778,7 @@ Audience Profile: ${audienceProfile}
 Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       } else if (refreshField === "learningPreferences") {
         const personaInstruction = "";
-        listPrompt = `You are a Senior Instructional Designer.${personaInstruction} Based on the project information below, list three fresh learner learning preference options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) describing a distinct modality or strategy and a "text" field that is a full-sentence about the learner. Avoid the following learning preference keywords: ${existingLearningPreferenceKeywords.join(", ") || "none"}.
+        listPrompt = `You are a Senior Instructional Designer.${personaInstruction} Based on the project information below, list three fresh learner learning preference options in JSON with an array called "options". Each option must have a short, specific "keyword" (1-3 words) describing a distinct modality or strategy and a "text" field that is a full sentence about the learner without using their name or pronouns. Vary the sentence openings and do not begin with "The learner." Avoid the following learning preference keywords: ${existingLearningPreferenceKeywords.join(", ") || "none"}.
 
 Project Brief: ${projectBrief}
 Business Goal: ${businessGoal}
@@ -831,11 +831,11 @@ Project Constraints: ${projectConstraints}\nSource Material: ${sourceMaterial}`;
       const textPrompt = `You are a Senior Instructional Designer. ${nameInstruction} The persona is in the ${ageRange} age group. Using the provided information, create one learner persona. Provide:
   - "educationLevel": select one option from [${educationList}] and "educationLevelOptions" with two other distinct options from this list.
   - "techProficiency": select one option from [${techList}] and "techProficiencyOptions" with two other distinct options from this list.
-   - "learningPreferences": {"keyword": "short concept", "text": "full-sentence about the learner"} describing the learner's preferred learning style and "learningPreferencesOptions" with two alternative objects following the same keyword/text structure. Each keyword must capture a distinct modality or strategy (e.g., "hands-on practice", "visual storytelling").
+   - "learningPreferences": {"keyword": "short concept", "text": "full sentence about the learner without using their name or pronouns"} describing the learner's preferred learning style and "learningPreferencesOptions" with two alternative objects following the same keyword/text structure. Each keyword must capture a distinct modality or strategy (e.g., "hands-on practice", "visual storytelling"). Vary sentence openings and do not begin with "The learner." 
   - For both the primary motivation and the primary challenge:
     - Provide a short, specific keyword (1-3 words) that summarizes the item. Avoid generic labels such as "general" or "other".
-    - Provide a full-sentence description in a "text" field about the learner in third person without using their name.
-    - Also supply exactly two alternative options for motivations and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" is also a full-sentence description about the learner without using their name.
+    - Provide a full-sentence description in a "text" field about the learner without using their name or pronouns. Vary the sentence openings and do not begin with "The learner." 
+    - Also supply exactly two alternative options for motivation and two for challenges, each following the same keyword/text structure with unique keywords. Ensure each option's "text" also avoids pronouns and does not begin with "The learner." 
   Return a JSON object exactly like this, no code fences, and vary the persona each time using this seed: ${randomSeed}
 
   {
@@ -1161,10 +1161,11 @@ export const generateLearningDesignDocument = onCall(
       blendModalities = [],
       learningObjectives,
       courseOutline,
+      trainingPlan,
       sourceMaterial = "",
     } = req.data || {};
 
-    if (!projectBrief || !learningObjectives || !courseOutline) {
+    if (!projectBrief) {
       throw new HttpsError(
         "invalid-argument",
         "Required information is missing."
@@ -1196,7 +1197,12 @@ export const generateLearningDesignDocument = onCall(
         Array.isArray(blendModalities) && blendModalities.length
           ? `\nBlended Modalities: ${blendModalities.join(", ")}`
           : "";
-      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}${blendedInfo}\nSource Material: ${sourceMaterial}\nCourse Outline:\n${courseOutline}\nLearning Objectives:\n${lines.join("\n")}`;
+      const outlineInfo = courseOutline ? `\nCourse Outline:\n${courseOutline}` : "";
+      const objectivesInfo = lines.length
+        ? `\nLearning Objectives:\n${lines.join("\n")}`
+        : "";
+      const planInfo = trainingPlan ? `\nTraining Plan:\n${trainingPlan}` : "";
+      const baseInfo = `Project Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Learning Approach: ${selectedModality}${blendedInfo}\nSource Material: ${sourceMaterial}${planInfo}${outlineInfo}${objectivesInfo}`;
 
       const prompt = `You are a Senior Instructional Designer. Using the information below, create a comprehensive Learning Design Document that serves as the single source of truth for the project. Include the following sections: 1. Front Matter & Executive Summary (Project Title, Project Overview, Key Stakeholders) 2. Audience Analysis (Learner Demographics, Prior Knowledge & Skills, Learner Motivation, Technical Environment, Learner Personas) 3. Business Goals & Learning Objectives (Business Goal, Terminal Learning Objective, Enabling Learning Objectives) 4. Instructional Strategy (Delivery Modality, Instructional Approach, Tone & Style, Interaction Strategy) 5. Curriculum Blueprint (Hierarchical Outline, Objective Mapping, Content Summary, Estimated Seat Time) 6. Assessment & Evaluation Strategy (Formative Assessment, Summative Assessment, Evaluation Plan for Kirkpatrick Levels 1-4, xAPI Strategy if applicable). Present the document in clear markdown with headings and subheadings.\n\n${baseInfo}`;
 

@@ -17,6 +17,7 @@ const LearningDesignDocument = ({
   blendModalities = [],
   learningObjectives,
   courseOutline,
+  trainingPlan,
   sourceMaterials,
   onBack,
 }) => {
@@ -71,6 +72,7 @@ const LearningDesignDocument = ({
         blendModalities,
         learningObjectives,
         courseOutline,
+        trainingPlan,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
       });
       setBaseDocument(data.document);
@@ -413,8 +415,9 @@ LearningDesignDocument.propTypes = {
   projectConstraints: PropTypes.string.isRequired,
   selectedModality: PropTypes.string.isRequired,
   blendModalities: PropTypes.array,
-  learningObjectives: PropTypes.object.isRequired,
-  courseOutline: PropTypes.string.isRequired,
+  learningObjectives: PropTypes.object,
+  courseOutline: PropTypes.string,
+  trainingPlan: PropTypes.string,
   sourceMaterials: PropTypes.array.isRequired,
   onBack: PropTypes.func.isRequired,
 };

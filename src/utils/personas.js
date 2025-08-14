@@ -34,6 +34,13 @@ export async function loadPersonas(uid, initiativeId) {
     techProficiencyOptions: [],
     learningPreferencesOptions: [],
     learningPreferenceOptionKeywords: [],
+    motivations: [],
+    motivation: null,
+    motivationOptions: [],
+    challengesList: [],
+    challenges: null,
+    challengeOptions: [],
+    avatar: null,
     ...d.data(),
   }));
 }
@@ -70,6 +77,13 @@ export async function savePersona(uid, initiativeId, persona) {
     techProficiencyOptions: [],
     learningPreferencesOptions: [],
     learningPreferenceOptionKeywords: [],
+    motivations: [],
+    motivation: null,
+    motivationOptions: [],
+    challengesList: [],
+    challenges: null,
+    challengeOptions: [],
+    avatar: null,
   };
   await callable({ initiativeId, personaId, persona: { ...defaults, ...persona } });
   return personaId;
