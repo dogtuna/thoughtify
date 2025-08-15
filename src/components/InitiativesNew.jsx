@@ -299,6 +299,7 @@ const InitiativesNew = () => {
   const getCombinedSource = () =>
     sourceMaterials.map((f) => f.content).join("\n");
   const [projectConstraints, setProjectConstraints] = useState("");
+  const [keyContacts, setKeyContacts] = useState([{ name: "", role: "" }]);
 
   const [projectBrief, setProjectBrief] = useState("");
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
@@ -552,6 +553,7 @@ const InitiativesNew = () => {
         projectBrief,
         clarifyingQuestions,
         clarifyingAnswers,
+        keyContacts,
         strategy,
         selectedModality,
         blendModalities,
@@ -622,6 +624,11 @@ const InitiativesNew = () => {
           setLearningObjectives(data.learningObjectives || null);
           setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
+          setKeyContacts(
+            data.keyContacts && data.keyContacts.length
+              ? data.keyContacts
+              : [{ name: "", role: "" }]
+          );
         }
       })
       .catch((err) => console.error("Error loading initiative:", err));
@@ -818,6 +825,22 @@ const InitiativesNew = () => {
     setSourceMaterials((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleContactChange = (index, field, value) => {
+    setKeyContacts((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addKeyContact = () => {
+    setKeyContacts((prev) => [...prev, { name: "", role: "" }]);
+  };
+
+  const removeKeyContact = (index) => {
+    setKeyContacts((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -837,6 +860,7 @@ const InitiativesNew = () => {
         audienceProfile,
         sourceMaterial: getCombinedSource(),
         projectConstraints,
+        keyContacts,
       });
 
       const qs = (data.clarifyingQuestions || []).slice(0, 9);
@@ -852,6 +876,7 @@ const InitiativesNew = () => {
           audienceProfile,
           sourceMaterials,
           projectConstraints,
+          keyContacts,
           clarifyingQuestions: qs,
           clarifyingAnswers: qs.map(() => ""),
         });
@@ -875,6 +900,7 @@ const InitiativesNew = () => {
         audienceProfile,
         sourceMaterial: getCombinedSource(),
         projectConstraints,
+        keyContacts,
         clarifyingQuestions,
         clarifyingAnswers,
       });
@@ -893,6 +919,7 @@ const InitiativesNew = () => {
           audienceProfile,
           sourceMaterials,
           projectConstraints,
+          keyContacts,
           projectBrief: data.projectBrief,
           clarifyingQuestions,
           clarifyingAnswers,
@@ -939,6 +966,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        keyContacts,
         clarifyingQuestions,
         clarifyingAnswers,
         personaCount: personas.length,
@@ -960,6 +988,7 @@ const InitiativesNew = () => {
       if (uid) {
         await saveInitiative(uid, initiativeId, {
           projectName,
+          keyContacts,
           strategy: data,
           selectedModality: data.modalityRecommendation,
           blendModalities: data.blendedModalities || [],
@@ -985,6 +1014,7 @@ const InitiativesNew = () => {
         saveInitiative(uid, initiativeId, {
           selectedModality: value,
           blendModalities: next,
+          keyContacts,
         });
       }
       return next;
@@ -1014,6 +1044,7 @@ const InitiativesNew = () => {
           businessGoal,
           audienceProfile,
           projectConstraints,
+          keyContacts,
           sourceMaterial: getCombinedSource(),
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
@@ -1138,6 +1169,7 @@ const InitiativesNew = () => {
         businessGoal,
         audienceProfile,
         projectConstraints,
+        keyContacts,
         sourceMaterial: getCombinedSource(),
         existingMotivationKeywords: usedMotivationKeywords,
         existingChallengeKeywords: usedChallengeKeywords,
@@ -1360,6 +1392,43 @@ const InitiativesNew = () => {
                   rows={3}
                 />
               </label>
+              <div className="contacts-section">
+                <p>Key Contacts</p>
+                {keyContacts.map((c, idx) => (
+                  <div key={idx} className="contact-row">
+                    <input
+                      type="text"
+                      value={c.name}
+                      placeholder="Name"
+                      onChange={(e) => handleContactChange(idx, "name", e.target.value)}
+                      className="generator-input"
+                    />
+                    <input
+                      type="text"
+                      value={c.role}
+                      placeholder="Role"
+                      onChange={(e) => handleContactChange(idx, "role", e.target.value)}
+                      className="generator-input"
+                    />
+                    {keyContacts.length > 1 && (
+                      <button
+                        type="button"
+                        className="remove-file"
+                        onClick={() => removeKeyContact(idx)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="generator-button add-contact-button"
+                  onClick={addKeyContact}
+                >
+                  +
+                </button>
+              </div>
             </div>
             <div
               className="upload-card"
@@ -1772,6 +1841,7 @@ const InitiativesNew = () => {
                               if (uid) {
                                 saveInitiative(uid, initiativeId, {
                                   blendModalities: next,
+                                  keyContacts,
                                 });
                               }
                               return next;
@@ -1818,6 +1888,7 @@ const InitiativesNew = () => {
           businessGoal={businessGoal}
           audienceProfile={audienceProfile}
           projectConstraints={projectConstraints}
+          keyContacts={keyContacts}
           selectedModality={selectedModality}
           blendModalities={blendModalities}
           sourceMaterials={sourceMaterials}
@@ -1828,50 +1899,53 @@ const InitiativesNew = () => {
         />
       )}
 
-      {step === 7 && (
-        <LearningDesignDocument
-          projectName={projectName}
-          projectBrief={projectBrief}
-          businessGoal={businessGoal}
-          audienceProfile={audienceProfile}
-          projectConstraints={projectConstraints}
-          selectedModality={selectedModality}
-          blendModalities={blendModalities}
-          learningObjectives={learningObjectives}
-          courseOutline={courseOutline}
-          trainingPlan={trainingPlan}
-          sourceMaterials={sourceMaterials}
-          onBack={() => setStep(6)}
-        />
-      )}
+        {step === 7 && (
+          <LearningDesignDocument
+            projectName={projectName}
+            projectBrief={projectBrief}
+            businessGoal={businessGoal}
+            audienceProfile={audienceProfile}
+            projectConstraints={projectConstraints}
+            keyContacts={keyContacts}
+            selectedModality={selectedModality}
+            blendModalities={blendModalities}
+            learningObjectives={learningObjectives}
+            courseOutline={courseOutline}
+            trainingPlan={trainingPlan}
+            sourceMaterials={sourceMaterials}
+            onBack={() => setStep(6)}
+          />
+        )}
 
-      {step === 8 && (
-        <LearningObjectivesGenerator
-          projectBrief={projectBrief}
-          businessGoal={businessGoal}
-          audienceProfile={audienceProfile}
-          projectConstraints={projectConstraints}
-          selectedModality={selectedModality}
-          blendModalities={blendModalities}
-          sourceMaterials={sourceMaterials}
-          onBack={() => setStep(7)}
-          onNext={() => setStep(9)}
-        />
-      )}
+        {step === 8 && (
+          <LearningObjectivesGenerator
+            projectBrief={projectBrief}
+            businessGoal={businessGoal}
+            audienceProfile={audienceProfile}
+            projectConstraints={projectConstraints}
+            keyContacts={keyContacts}
+            selectedModality={selectedModality}
+            blendModalities={blendModalities}
+            sourceMaterials={sourceMaterials}
+            onBack={() => setStep(7)}
+            onNext={() => setStep(9)}
+          />
+        )}
 
-      {step === 9 && (
-        <HierarchicalOutlineGenerator
-          projectBrief={projectBrief}
-          businessGoal={businessGoal}
-          audienceProfile={audienceProfile}
-          projectConstraints={projectConstraints}
-          selectedModality={selectedModality}
-          blendModalities={blendModalities}
-          learningObjectives={learningObjectives}
-          sourceMaterials={sourceMaterials}
-          onBack={() => setStep(8)}
-        />
-      )}
+        {step === 9 && (
+          <HierarchicalOutlineGenerator
+            projectBrief={projectBrief}
+            businessGoal={businessGoal}
+            audienceProfile={audienceProfile}
+            projectConstraints={projectConstraints}
+            keyContacts={keyContacts}
+            selectedModality={selectedModality}
+            blendModalities={blendModalities}
+            learningObjectives={learningObjectives}
+            sourceMaterials={sourceMaterials}
+            onBack={() => setStep(8)}
+          />
+        )}
 
     </div>
   );

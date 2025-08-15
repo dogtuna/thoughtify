@@ -13,6 +13,7 @@ const LearningDesignDocument = ({
   businessGoal,
   audienceProfile,
   projectConstraints,
+  keyContacts,
   selectedModality,
   blendModalities = [],
   learningObjectives,
@@ -68,6 +69,7 @@ const LearningDesignDocument = ({
         businessGoal,
         audienceProfile,
         projectConstraints,
+        keyContacts,
         selectedModality,
         blendModalities,
         learningObjectives,
@@ -413,6 +415,9 @@ LearningDesignDocument.propTypes = {
   businessGoal: PropTypes.string.isRequired,
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
+  keyContacts: PropTypes.arrayOf(
+    PropTypes.shape({ name: PropTypes.string, role: PropTypes.string })
+  ).isRequired,
   selectedModality: PropTypes.string.isRequired,
   blendModalities: PropTypes.array,
   learningObjectives: PropTypes.object,

@@ -11,6 +11,7 @@ const TrainingPlanGenerator = ({
   businessGoal,
   audienceProfile,
   projectConstraints,
+  keyContacts,
   selectedModality,
   blendModalities = [],
   sourceMaterials,
@@ -26,6 +27,12 @@ const TrainingPlanGenerator = ({
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId") || "default";
 
+  const formatContacts = (contacts = []) =>
+    contacts
+      .filter((c) => c.name || c.role)
+      .map((c) => (c.role ? `${c.name} (${c.role})` : c.name))
+      .join("; ");
+
   useEffect(() => {
     document.body.classList.toggle("pulsing", loading);
     return () => document.body.classList.remove("pulsing");
@@ -35,7 +42,7 @@ const TrainingPlanGenerator = ({
     setLoading(true);
     setError("");
     try {
-      const prompt = `You are a senior instructional designer. Using the information below, create a blended learning plan. For each selected modality, provide the rationale and recommended topics.\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nSelected Approach: ${selectedModality}\nBlended Modalities: ${blendModalities.join(", ")}\nSource Material:\n${sourceMaterials
+      const prompt = `You are a senior instructional designer. Using the information below, create a blended learning plan. For each selected modality, provide the rationale and recommended topics.\n\nProject Brief: ${projectBrief}\nBusiness Goal: ${businessGoal}\nAudience Profile: ${audienceProfile}\nProject Constraints: ${projectConstraints}\nKey Contacts: ${formatContacts(keyContacts)}\nSelected Approach: ${selectedModality}\nBlended Modalities: ${blendModalities.join(", ")}\nSource Material:\n${sourceMaterials
         .map((f) => f.content)
         .join("\n")}`;
       const { data } = await callGenerate({ prompt });
@@ -137,6 +144,9 @@ TrainingPlanGenerator.propTypes = {
   businessGoal: PropTypes.string.isRequired,
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
+  keyContacts: PropTypes.arrayOf(
+    PropTypes.shape({ name: PropTypes.string, role: PropTypes.string })
+  ).isRequired,
   selectedModality: PropTypes.string.isRequired,
   blendModalities: PropTypes.array,
   sourceMaterials: PropTypes.array.isRequired,
