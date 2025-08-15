@@ -175,6 +175,7 @@ const ProjectSetup = () => {
           keyContacts,
           clarifyingQuestions: qs,
           clarifyingAnswers: qs.map(() => ""),
+          clarifyingContacts: qs.map(() => ""),
         });
       }
       navigate(`/discovery?initiativeId=${initiativeId}`);
