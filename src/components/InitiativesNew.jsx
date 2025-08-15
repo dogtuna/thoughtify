@@ -713,9 +713,22 @@ const InitiativesNew = () => {
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
 
-  const generateProjectBrief = httpsCallable(functions, "generateProjectBrief");
-  const generateLearningStrategy = httpsCallable(functions, "generateLearningStrategy");
-  const generateLearnerPersona = httpsCallable(functions, "generateLearnerPersona");
+  const generateClarifyingQuestions = httpsCallable(
+    functions,
+    "generateClarifyingQuestions"
+  );
+  const generateProjectBrief = httpsCallable(
+    functions,
+    "generateProjectBrief"
+  );
+  const generateLearningStrategy = httpsCallable(
+    functions,
+    "generateLearningStrategy"
+  );
+  const generateLearnerPersona = httpsCallable(
+    functions,
+    "generateLearnerPersona"
+  );
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
   const extractTextFromPdf = async (buffer) => {
@@ -865,7 +878,7 @@ const InitiativesNew = () => {
         setPersonaCount(0);
 
     try {
-      const { data } = await generateProjectBrief({
+      const { data } = await generateClarifyingQuestions({
         businessGoal,
         audienceProfile,
         sourceMaterial: getCombinedSource(),
