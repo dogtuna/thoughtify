@@ -45,6 +45,9 @@
   border-radius: 4px;
   font-size: 0.8rem;
   color: #000;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .contact-select {
@@ -53,5 +56,16 @@
 
 .ask-selected {
   margin-bottom: 0.5rem;
+}
+
+.role-group {
+  margin-bottom: 1rem;
+}
+
+.contact-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
 }
 

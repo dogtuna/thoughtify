@@ -174,8 +174,9 @@ const ProjectSetup = () => {
           projectConstraints,
           keyContacts,
           clarifyingQuestions: qs,
-          clarifyingAnswers: qs.map(() => ""),
-          clarifyingContacts: qs.map(() => ""),
+          clarifyingContacts: qs.map((q) => q.stakeholders || []),
+          clarifyingAnswers: qs.map(() => ({})),
+          clarifyingAsked: qs.map(() => false),
         });
       }
       navigate(`/discovery?initiativeId=${initiativeId}`);

@@ -37,10 +37,10 @@ const DiscoveryHub = () => {
           }));
           setContacts(contactsInit);
           const qs = (init?.clarifyingQuestions || []).map((q, idx) => ({
-            ...q,
-            contact: init?.clarifyingContacts?.[idx] || "",
-            answer: init?.clarifyingAnswers?.[idx] || "",
-            status: init?.clarifyingAnswers?.[idx] ? "answered" : "toask",
+            question: typeof q === "string" ? q : q.question,
+            contacts: init?.clarifyingContacts?.[idx] || q.stakeholders || [],
+            answers: init?.clarifyingAnswers?.[idx] || {},
+            asked: init?.clarifyingAsked?.[idx] || false,
             id: idx,
           }));
           setQuestions(qs);
@@ -53,29 +53,18 @@ const DiscoveryHub = () => {
     return () => unsubscribe();
   }, [initiativeId]);
 
-  const updateAnswer = (idx, value) => {
+  const updateAnswer = (idx, role, value) => {
     setQuestions((prev) => {
       const updated = [...prev];
-      updated[idx].answer = value;
-      updated[idx].status = value ? "answered" : updated[idx].status;
+      const q = updated[idx];
+      q.answers = { ...q.answers, [role]: value };
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingAnswers: updated.map((qq) => qq.answers),
+        });
+      }
       return updated;
     });
-    if (uid) {
-      const answers = questions.map((q, i) => (i === idx ? value : q.answer));
-      saveInitiative(uid, initiativeId, { clarifyingAnswers: answers });
-    }
-  };
-
-  const updateContact = (idx, value) => {
-    setQuestions((prev) => {
-      const updated = [...prev];
-      updated[idx].contact = value;
-      return updated;
-    });
-    if (uid) {
-      const contactsArr = questions.map((q, i) => (i === idx ? value : q.contact));
-      saveInitiative(uid, initiativeId, { clarifyingContacts: contactsArr });
-    }
   };
 
   const addContact = () => {
@@ -94,12 +83,46 @@ const DiscoveryHub = () => {
     return role;
   };
 
-  const handleContactChange = (idx, value) => {
+  const addContactToQuestion = (idx, role) => {
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const q = updated[idx];
+      if (!q.contacts.includes(role)) {
+        q.contacts = [...q.contacts, role];
+      }
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingContacts: updated.map((qq) => qq.contacts),
+        });
+      }
+      return updated;
+    });
+  };
+
+  const removeContactFromQuestion = (idx, role) => {
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const q = updated[idx];
+      q.contacts = q.contacts.filter((r) => r !== role);
+      if (q.answers[role]) {
+        delete q.answers[role];
+      }
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingContacts: updated.map((qq) => qq.contacts),
+          clarifyingAnswers: updated.map((qq) => qq.answers),
+        });
+      }
+      return updated;
+    });
+  };
+
+  const handleContactSelect = (idx, value) => {
     if (value === "__add__") {
       const newRole = addContact();
-      if (newRole) updateContact(idx, newRole);
-    } else {
-      updateContact(idx, value);
+      if (newRole) addContactToQuestion(idx, newRole);
+    } else if (value) {
+      addContactToQuestion(idx, value);
     }
   };
 
@@ -109,9 +132,14 @@ const DiscoveryHub = () => {
     setQuestions((prev) => {
       const updated = [...prev];
       indices.forEach((i) => {
-        updated[i].status = "asked";
+        updated[i].asked = true;
         texts.push(updated[i].question);
       });
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingAsked: updated.map((qq) => qq.asked),
+        });
+      }
       return updated;
     });
     if (navigator.clipboard && texts.length) {
@@ -123,8 +151,15 @@ const DiscoveryHub = () => {
   const moveToToAsk = (idx) => {
     setQuestions((prev) => {
       const updated = [...prev];
-      updated[idx].status = "toask";
-      updated[idx].answer = "";
+      const q = updated[idx];
+      q.asked = false;
+      q.answers = {};
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingAsked: updated.map((qq) => qq.asked),
+          clarifyingAnswers: updated.map((qq) => qq.answers),
+        });
+      }
       return updated;
     });
   };
@@ -152,21 +187,43 @@ const DiscoveryHub = () => {
     );
   }
 
-  const toAsk = questions
-    .map((q, idx) => ({ ...q, idx }))
-    .filter(
-      (q) =>
-        q.status === "toask" && (!filterRole || q.contact === filterRole)
-    );
-  const asked = questions
-    .map((q, idx) => ({ ...q, idx }))
-    .filter(
-      (q) =>
-        q.status === "asked" && !q.answer && (!filterRole || q.contact === filterRole)
-    );
-  const answered = questions
-    .map((q, idx) => ({ ...q, idx }))
-    .filter((q) => q.answer && (!filterRole || q.contact === filterRole));
+  const tasks = [];
+  questions.forEach((q, idx) => {
+    const roles = q.contacts.length ? q.contacts : ["Unassigned"];
+    roles.forEach((role) => {
+      const allAnswered =
+        q.contacts.length && q.contacts.every((r) => (q.answers[r] || "").trim());
+      const status = !q.asked
+        ? "toask"
+        : allAnswered
+        ? "answered"
+        : "asked";
+      tasks.push({ ...q, idx, role, contactAnswer: q.answers[role] || "", status });
+    });
+  });
+
+  const toAsk = tasks.filter(
+    (t) => t.status === "toask" && (!filterRole || t.role === filterRole)
+  );
+  const asked = tasks.filter(
+    (t) => t.status === "asked" && (!filterRole || t.role === filterRole)
+  );
+  const answered = tasks.filter(
+    (t) => t.status === "answered" && (!filterRole || t.role === filterRole)
+  );
+
+  const groupByRole = (arr) => {
+    const groups = {};
+    arr.forEach((t) => {
+      groups[t.role] = groups[t.role] || [];
+      groups[t.role].push(t);
+    });
+    return groups;
+  };
+
+  const groupedToAsk = groupByRole(toAsk);
+  const groupedAsked = groupByRole(asked);
+  const groupedAnswered = groupByRole(answered);
 
   return (
     <div className="dashboard-container discovery-hub">
@@ -198,122 +255,129 @@ const DiscoveryHub = () => {
               Ask Selected
             </button>
           )}
-          {toAsk.map((q) => (
-            <div key={q.idx} className="initiative-card question-card">
-              <div className="question-header">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(q.idx)}
-                  onChange={() => toggleSelect(q.idx)}
-                />
-                <p>{q.question}</p>
-              </div>
-              <div className="contact-row">
-                <span
-                  className="contact-tag"
-                  style={{ backgroundColor: getColor(q.contact) }}
+          {Object.entries(groupedToAsk).map(([role, items]) => (
+            <div key={role} className="role-group">
+              <h4>{role}</h4>
+              {items.map((q) => (
+                <div
+                  key={`${q.idx}-${role}`}
+                  className="initiative-card question-card"
                 >
-                  {q.contact || "Unassigned"}
-                </span>
-                <select
-                  className="contact-select"
-                  value={q.contact}
-                  onChange={(e) => handleContactChange(q.idx, e.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {contacts.map((c) => (
-                    <option key={c.role} value={c.role}>
-                      {c.role}
-                    </option>
-                  ))}
-                  <option value="__add__">Add New Contact</option>
-                </select>
-              </div>
-              <button
-                className="generator-button"
-                onClick={() => markAsked(q.idx)}
-              >
-                Ask
-              </button>
+                  <div className="question-header">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(q.idx)}
+                      onChange={() => toggleSelect(q.idx)}
+                    />
+                    <p>{q.question}</p>
+                  </div>
+                  <div className="contact-row">
+                    {q.contacts.map((r) => (
+                      <span
+                        key={r}
+                        className="contact-tag"
+                        style={{ backgroundColor: getColor(r) }}
+                      >
+                        {r}
+                        <button
+                          onClick={() => removeContactFromQuestion(q.idx, r)}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <select
+                      className="contact-select"
+                      value=""
+                      onChange={(e) => handleContactSelect(q.idx, e.target.value)}
+                    >
+                      <option value="">Add Contact</option>
+                      {contacts
+                        .filter((c) => !q.contacts.includes(c.role))
+                        .map((c) => (
+                          <option key={c.role} value={c.role}>
+                            {c.role}
+                          </option>
+                        ))}
+                      <option value="__add__">Add New Contact</option>
+                    </select>
+                  </div>
+                  <button
+                    className="generator-button"
+                    onClick={() => markAsked(q.idx)}
+                  >
+                    Ask
+                  </button>
+                </div>
+              ))}
             </div>
           ))}
         </div>
         <div className="column">
           <h3>Asked</h3>
-          {asked.map((q) => (
-            <div key={q.idx} className="initiative-card question-card">
-              <p>{q.question}</p>
-              <div className="contact-row">
-                <span
-                  className="contact-tag"
-                  style={{ backgroundColor: getColor(q.contact) }}
+          {Object.entries(groupedAsked).map(([role, items]) => (
+            <div key={role} className="role-group">
+              <h4>{role}</h4>
+              {items.map((q) => (
+                <div
+                  key={`${q.idx}-${role}`}
+                  className="initiative-card question-card"
                 >
-                  {q.contact || "Unassigned"}
-                </span>
-                <select
-                  className="contact-select"
-                  value={q.contact}
-                  onChange={(e) => handleContactChange(q.idx, e.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {contacts.map((c) => (
-                    <option key={c.role} value={c.role}>
-                      {c.role}
-                    </option>
-                  ))}
-                  <option value="__add__">Add New Contact</option>
-                </select>
-              </div>
-              <textarea
-                className="generator-input"
-                placeholder="Paste Answer/Notes Here"
-                value={q.answer}
-                onChange={(e) => updateAnswer(q.idx, e.target.value)}
-                rows={3}
-              />
-              <button
-                className="generator-button secondary"
-                onClick={() => moveToToAsk(q.idx)}
-              >
-                Move to To Ask
-              </button>
+                  <p>{q.question}</p>
+                  <div className="contact-row">
+                    <span
+                      className="contact-tag"
+                      style={{ backgroundColor: getColor(role) }}
+                    >
+                      {role}
+                    </span>
+                  </div>
+                  <textarea
+                    className="generator-input"
+                    placeholder="Paste Answer/Notes Here"
+                    value={q.contactAnswer}
+                    onChange={(e) => updateAnswer(q.idx, role, e.target.value)}
+                    rows={3}
+                  />
+                  <button
+                    className="generator-button secondary"
+                    onClick={() => moveToToAsk(q.idx)}
+                  >
+                    Move to To Ask
+                  </button>
+                </div>
+              ))}
             </div>
           ))}
         </div>
         <div className="column">
           <h3>Answered</h3>
-          {answered.map((q) => (
-            <div key={q.idx} className="initiative-card question-card answered">
-              <p>{q.question}</p>
-              <div className="contact-row">
-                <span
-                  className="contact-tag"
-                  style={{ backgroundColor: getColor(q.contact) }}
+          {Object.entries(groupedAnswered).map(([role, items]) => (
+            <div key={role} className="role-group">
+              <h4>{role}</h4>
+              {items.map((q) => (
+                <div
+                  key={`${q.idx}-${role}`}
+                  className="initiative-card question-card answered"
                 >
-                  {q.contact || "Unassigned"}
-                </span>
-                <select
-                  className="contact-select"
-                  value={q.contact}
-                  onChange={(e) => handleContactChange(q.idx, e.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {contacts.map((c) => (
-                    <option key={c.role} value={c.role}>
-                      {c.role}
-                    </option>
-                  ))}
-                  <option value="__add__">Add New Contact</option>
-                </select>
-              </div>
-              <p className="answer">{q.answer}</p>
-              <button
-                className="generator-button secondary"
-                onClick={() => moveToToAsk(q.idx)}
-              >
-                Move to To Ask
-              </button>
-
+                  <p>{q.question}</p>
+                  <div className="contact-row">
+                    <span
+                      className="contact-tag"
+                      style={{ backgroundColor: getColor(role) }}
+                    >
+                      {role}
+                    </span>
+                  </div>
+                  <p className="answer">{q.contactAnswer}</p>
+                  <button
+                    className="generator-button secondary"
+                    onClick={() => moveToToAsk(q.idx)}
+                  >
+                    Move to To Ask
+                  </button>
+                </div>
+              ))}
             </div>
           ))}
         </div>
