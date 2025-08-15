@@ -56,7 +56,7 @@ export default function App() {
 
   return (
     <Router>
-      <NavBar user={user} />
+      <NavBar />
       <Routes>
         <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />

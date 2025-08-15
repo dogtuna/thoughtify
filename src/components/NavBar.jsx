@@ -1,93 +1,76 @@
 import { Link } from "react-router-dom";
-import PropTypes from "prop-types";
 
 // src/components/NavBar.jsx
-// Smart navigation bar with conditional rendering for logged in users
+// Updated header component using glass effect and profile actions
 
-const NavBar = ({ user }) => {
+const NavBar = () => {
   return (
-    <nav className="navbar">
-      <ul className="nav-list">
-        {user ? (
-          <>
-            <li className="nav-item">
-              <Link to="/dashboard" className="nav-link">
-                Home
-              </Link>
-            </li>
-            <li className="nav-item dropdown">
-              <span className="nav-link">Tools</span>
-              <ul className="dropdown-menu">
-                <li>
-                  <Link to="/ai-tools" className="dropdown-link">
-                    Initiatives
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/ai-tools/course-outline" className="dropdown-link">
-                    Outlines
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/ai-tools/study-material" className="dropdown-link">
-                    Study Materials
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/ai-tools/assessment" className="dropdown-link">
-                    Assessments
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/ai-tools/lesson-content" className="dropdown-link">
-                    Lesson Content
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/ai-tools/storyboard" className="dropdown-link">
-                    Storyboards
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/ai-tools/content-assets" className="dropdown-link">
-                    Content & Assets
-                  </Link>
-                </li>
-              </ul>
-            </li>
-            <li className="nav-item">
-              <Link to="/settings" className="nav-link">
-                Settings
-              </Link>
-            </li>
-          </>
-        ) : (
-          <>
-            <li className="nav-item">
-              <a href="#home" className="nav-link">
-                Home
-              </a>
-            </li>
-            <li className="nav-item">
-              <a href="#pricing" className="nav-link">
-                Pricing
-              </a>
-            </li>
-            <li className="nav-item">
-              <a href="#contact" className="nav-link">
-                Contact
-              </a>
-            </li>
-          </>
-        )}
-      </ul>
-    </nav>
+    <header className="glass-header">
+      <nav className="nav-container">
+        <div className="logo-section">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="logo-icon"
+          >
+            <path d="m5 3 2.5 4L10 3" />
+            <path d="M14 3s2.5 4 2.5 4L19 3" />
+            <path d="M12 22v-8" />
+            <path d="M8.5 11l-3-3" />
+            <path d="M15.5 11l3-3" />
+          </svg>
+          <span className="logo-text">Thoughtify</span>
+        </div>
+
+        <div className="nav-links">
+          <Link to="/" className="nav-link active">
+            Home
+          </Link>
+          <Link to="/ai-tools" className="nav-link">
+            Tools
+          </Link>
+          <Link to="#" className="nav-link">
+            Projects
+          </Link>
+          <Link to="/settings" className="nav-link">
+            Settings
+          </Link>
+        </div>
+
+        <div className="user-actions">
+          <button className="notification-btn" type="button">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+            <span className="indicator" />
+          </button>
+          <img
+            src="https://placehold.co/40x40/764ba2/FFFFFF?text=ID"
+            alt="User Avatar"
+            className="user-avatar"
+          />
+        </div>
+      </nav>
+    </header>
   );
 };
 
-NavBar.propTypes = {
-  user: PropTypes.object,
-};
-
 export default NavBar;
-
