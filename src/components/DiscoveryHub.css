@@ -1,0 +1,57 @@
+.discovery-hub .columns {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.discovery-hub .column {
+  flex: 1;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.question-card {
+  margin-bottom: 1rem;
+}
+
+.question-card.answered {
+  background: rgba(0, 128, 0, 0.1);
+}
+
+.question-card .answer {
+  white-space: pre-wrap;
+}
+
+.question-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.contact-tag {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #000;
+}
+
+.contact-select {
+  flex: 1;
+}
+
+.ask-selected {
+  margin-bottom: 0.5rem;
+}
+
