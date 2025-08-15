@@ -445,7 +445,7 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
   }
 );
 
-export const generateProjectBrief = onCall(
+export const generateClarifyingQuestions = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
   async (request) => {
     const {
@@ -470,13 +470,29 @@ export const generateProjectBrief = onCall(
       model: gemini("gemini-1.5-pro"),
     });
 
-    const contactsInfo = Array.isArray(keyContacts) && keyContacts.length
-      ? `\nKey Contacts: ${keyContacts.map((c) => `${c.name} (${c.role})`).join("; ")}`
-      : "";
-    const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief written in a clear, narrative style like a blog post, using distinct paragraphs for readability. Also list any questions that require clarification before moving forward.
+    const contactsInfo =
+      Array.isArray(keyContacts) && keyContacts.length
+        ? `\nKey Contacts: ${keyContacts
+            .map((c) => `${c.name} (${c.role})`)
+            .join("; ")}`
+        : "";
+    const promptTemplate =
+      `You are an expert Instructional Designer and Performance Consultant. Your primary goal is to generate deeply contextual clarifying questions based on the provided project information and documents.
+
+Follow these steps in order:
+
+Analyze Document Themes: First, meticulously scan the body of any provided documents. Identify and extract specific, recurring keywords, themes, patterns, and data points (e.g., 'narrow aisles', 'micromanagement', '15% drop'). This is your most important task.
+
+Generate Theme-Based Questions: Based only on your analysis in Step 1, generate 2-3 high-priority questions that directly reference or quote the key themes and data points you found. These questions should dig into the "why" behind those specific details.
+
+Generate Broader Strategic Questions: After you have created the theme-based questions, generate additional clarifying questions about the overall project goals, current state, and constraints that may not have been in the documents.
+
+Format the Final Output: For every question you've generated, suggest the primary stakeholder roles that should be consulted and assign the question to one of these phases: "The Core Problem & Vision", "The Current State", or "The Project Constraints".
+
 Return a valid JSON object with the structure:{
-  "projectBrief": "text of the brief",
-  "clarifyingQuestions": ["question1", "question2"]
+  "clarifyingQuestions": [
+    {"question":"text","stakeholders":["role1","role2"],"phase":"The Core Problem & Vision"}
+  ]
 }
 Do not include any code fences or additional formatting.
 
@@ -496,13 +512,99 @@ Source Material: ${sourceMaterial}${contactsInfo}`;
         throw new HttpsError("internal", "Invalid AI response format.");
       }
 
+      if (!Array.isArray(json.clarifyingQuestions)) {
+        console.error(
+          "AI response missing clarifyingQuestions field:",
+          json
+        );
+        throw new HttpsError(
+          "internal",
+          "AI response missing clarifying questions."
+        );
+      }
+
+      // Must return a plain object for callables
+      return json;
+    } catch (error) {
+      console.error("Error generating clarifying questions:", error);
+      throw new HttpsError(
+        "internal",
+        "Failed to generate clarifying questions."
+      );
+    }
+  }
+);
+
+export const generateProjectBrief = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
+  async (request) => {
+    const {
+      businessGoal,
+      audienceProfile,
+      sourceMaterial,
+      projectConstraints,
+      keyContacts = [],
+      clarifyingQuestions = [],
+      clarifyingAnswers = [],
+    } = request.data || {};
+
+    if (!businessGoal) {
+      throw new HttpsError("invalid-argument", "A business goal is required.");
+    }
+
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) {
+      throw new HttpsError("internal", "No API key available.");
+    }
+
+    const ai = genkit({
+      plugins: [googleAI({ apiKey: key })],
+      model: gemini("gemini-1.5-pro"),
+    });
+
+    const contactsInfo =
+      Array.isArray(keyContacts) && keyContacts.length
+        ? `\nKey Contacts: ${keyContacts
+            .map((c) => `${c.name} (${c.role})`)
+            .join("; ")}`
+        : "";
+    const clarificationsBlock = (() => {
+      const pairs = clarifyingQuestions.map(
+        (q, i) => `Q: ${q?.question || q}\nA: ${clarifyingAnswers[i] || ""}`
+      );
+      return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
+    })();
+
+    const promptTemplate =
+      `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief written in a clear, narrative style like a blog post, using distinct paragraphs for readability.
+Return a valid JSON object with the structure:{
+  "projectBrief": "text of the brief"
+}
+Do not include any code fences or additional formatting.
+
+Business Goal: ${businessGoal}
+Audience Profile: ${audienceProfile}
+Project Constraints: ${projectConstraints}
+Source Material: ${sourceMaterial}${contactsInfo}${clarificationsBlock}`;
+
+    try {
+      const { text } = await ai.generate(promptTemplate);
+
+      let json;
+      try {
+        json = parseJsonFromText(text);
+      } catch (err) {
+        console.error("Failed to parse AI response:", err, text);
+        throw new HttpsError("internal", "Invalid AI response format.");
+      }
+
       if (!json.projectBrief) {
         console.error("AI response missing projectBrief field:", json);
         throw new HttpsError("internal", "AI response missing project brief.");
       }
 
       // Must return a plain object for callables
-      return json; 
+      return json;
     } catch (error) {
       console.error("Error generating project brief:", error);
       throw new HttpsError("internal", "Failed to generate project brief.");
@@ -566,7 +668,9 @@ export const generateLearningStrategy = onCall(
 }`;
 
     const clarificationsBlock = (() => {
-      const pairs = clarifyingQuestions.map((q, i) => `Q: ${q}\nA: ${clarifyingAnswers[i] || ""}`);
+      const pairs = clarifyingQuestions.map(
+        (q, i) => `Q: ${q?.question || q}\nA: ${clarifyingAnswers[i] || ""}`
+      );
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
     })();
 

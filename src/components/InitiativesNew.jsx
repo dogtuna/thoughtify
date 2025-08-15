@@ -305,11 +305,16 @@ const InitiativesNew = () => {
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
   const [clarifyingAnswers, setClarifyingAnswers] = useState([]);
   const [questionPage, setQuestionPage] = useState(0);
-  const QUESTIONS_PER_PAGE = 3;
-  const totalQuestionPages = Math.max(
-    1,
-    Math.ceil(clarifyingQuestions.length / QUESTIONS_PER_PAGE)
+  const DEFAULT_PHASES = [
+    "The Core Problem & Vision",
+    "The Current State",
+    "The Project Constraints",
+  ];
+  const phases = DEFAULT_PHASES.filter((phase) =>
+    clarifyingQuestions.some((q) => q.phase === phase)
   );
+  const currentPhase = phases[questionPage];
+  const totalQuestionPages = Math.max(1, phases.length);
   const isFirstQuestionPage = questionPage === 0;
   const isLastQuestionPage = questionPage >= totalQuestionPages - 1;
 
@@ -612,7 +617,12 @@ const InitiativesNew = () => {
           );
           setProjectConstraints(data.projectConstraints || "");
           setProjectBrief(data.projectBrief || "");
-          const qs = (data.clarifyingQuestions || []).slice(0, 9);
+          const qsRaw = (data.clarifyingQuestions || []).slice(0, 9);
+          const qs = qsRaw.map((q) =>
+            typeof q === "string"
+              ? { question: q, stakeholders: [], phase: "General" }
+              : q
+          );
           const ans = (data.clarifyingAnswers || []).slice(0, 9);
           setClarifyingQuestions(qs);
           setClarifyingAnswers(qs.map((_, i) => ans[i] || ""));
@@ -703,9 +713,22 @@ const InitiativesNew = () => {
   // Use the same region you deploy to
   const functions = getFunctions(app, "us-central1");
 
-  const generateProjectBrief = httpsCallable(functions, "generateProjectBrief");
-  const generateLearningStrategy = httpsCallable(functions, "generateLearningStrategy");
-  const generateLearnerPersona = httpsCallable(functions, "generateLearnerPersona");
+  const generateClarifyingQuestions = httpsCallable(
+    functions,
+    "generateClarifyingQuestions"
+  );
+  const generateProjectBrief = httpsCallable(
+    functions,
+    "generateProjectBrief"
+  );
+  const generateLearningStrategy = httpsCallable(
+    functions,
+    "generateLearningStrategy"
+  );
+  const generateLearnerPersona = httpsCallable(
+    functions,
+    "generateLearnerPersona"
+  );
   const generateAvatar = httpsCallable(functions, "generateAvatar");
 
   const extractTextFromPdf = async (buffer) => {
@@ -855,7 +878,7 @@ const InitiativesNew = () => {
         setPersonaCount(0);
 
     try {
-      const { data } = await generateProjectBrief({
+      const { data } = await generateClarifyingQuestions({
         businessGoal,
         audienceProfile,
         sourceMaterial: getCombinedSource(),
@@ -863,7 +886,12 @@ const InitiativesNew = () => {
         keyContacts,
       });
 
-      const qs = (data.clarifyingQuestions || []).slice(0, 9);
+      const qsRaw = (data.clarifyingQuestions || []).slice(0, 9);
+      const qs = qsRaw.map((q) =>
+        typeof q === "string"
+          ? { question: q, stakeholders: [], phase: "General" }
+          : q
+      );
       setClarifyingQuestions(qs);
       setClarifyingAnswers(qs.map(() => ""));
       setQuestionPage(0);
@@ -1493,27 +1521,26 @@ const InitiativesNew = () => {
           <p className="page-indicator">
             Page {questionPage + 1} of {totalQuestionPages}
           </p>
+          <h4>{currentPhase}</h4>
           {clarifyingQuestions
-            .slice(
-              questionPage * QUESTIONS_PER_PAGE,
-              questionPage * QUESTIONS_PER_PAGE + QUESTIONS_PER_PAGE
-            )
-            .map((q, idx) => {
-              const overallIdx = questionPage * QUESTIONS_PER_PAGE + idx;
-              return (
-                <div key={overallIdx}>
-                  <p>{q}</p>
-                  <textarea
-                    className="generator-input clarify-textarea"
-                    value={clarifyingAnswers[overallIdx] || ""}
-                    onChange={(e) =>
-                      handleAnswerChange(overallIdx, e.target.value)
-                    }
-                    rows={3}
-                  />
-                </div>
-              );
-            })}
+            .map((q, idx) => ({ q, idx }))
+            .filter(({ q }) => q.phase === currentPhase)
+            .map(({ q, idx }) => (
+              <div key={idx}>
+                <p>{q.question}</p>
+                {q.stakeholders && q.stakeholders.length > 0 && (
+                  <p className="suggested-audience">
+                    Suggested Audience: {q.stakeholders.join(", ")}
+                  </p>
+                )}
+                <textarea
+                  className="generator-input clarify-textarea"
+                  value={clarifyingAnswers[idx] || ""}
+                  onChange={(e) => handleAnswerChange(idx, e.target.value)}
+                  rows={3}
+                />
+              </div>
+            ))}
           <p className="page-indicator">
             Page {questionPage + 1} of {totalQuestionPages}
           </p>
