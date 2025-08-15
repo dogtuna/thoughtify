@@ -1,7 +1,7 @@
 // src/CustomDashboard.jsx
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   getFirestore,
   collection,
@@ -12,18 +12,21 @@ import {
   getDoc,
   setDoc,
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { app, auth } from "../firebase";
 import AccountCreation from "./AccountCreation";
+import { loadInitiatives } from "../utils/initiatives";
+import "./AIToolsGenerators.css";
 import "./CustomDashboard.css";
 
 const CustomDashboard = () => {
   const [searchParams] = useSearchParams();
   const invitationCode = searchParams.get("invite");
-  const [displayName, setDisplayName] = useState("");
+  const [, setDisplayName] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [error, setError] = useState("");
   const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const [initiatives, setInitiatives] = useState([]);
   const navigate = useNavigate();
   const db = getFirestore(app);
 
@@ -98,20 +101,18 @@ const CustomDashboard = () => {
           console.error("Error fetching invitation or profile data:", err);
           setError("Error fetching invitation or profile data.");
         }
+        const uid = user.uid;
+        try {
+          const data = await loadInitiatives(uid);
+          setInitiatives(data);
+        } catch (loadErr) {
+          console.error("Error loading initiatives:", loadErr);
+        }
         setDataLoaded(true);
       }
     });
     return () => unsubscribe();
   }, [invitationCode, db]);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate("/login");
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
 
   if (!dataLoaded) {
     return (
@@ -134,29 +135,30 @@ const CustomDashboard = () => {
     return <AccountCreation />;
   }
 
+  const handleNewProject = () => {
+    const newId = crypto.randomUUID();
+    navigate(`/ai-tools/initiatives?initiativeId=${newId}`);
+  };
+
   return (
     <div className="dashboard-container">
-      <header className="dashboard-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Welcome, {displayName}</h1>
-        <button onClick={handleLogout} className="logout-button">
-          Logout
-        </button>
-      </header>
-      <div className="todo-list">
-        <h3>To-Do List</h3>
-        <ul>
-          <li onClick={() => navigate("/leadership-assessment")}>
-            Complete Training Needs Assessment
-          </li>
-          {/* Additional to-do items can be added here */}
-        </ul>
-      </div>
-      <div className="ai-tools-access">
-        <button
-          onClick={() => navigate("/ai-tools")}
-          className="ai-tools-button"
-        >
-          Go to AI Tools
+      <div className="initiative-card projects-card">
+        <h2>Projects</h2>
+        {initiatives.length > 0 ? (
+          <ul className="project-list">
+            {initiatives.map((init) => (
+              <li key={init.id}>
+                <Link to={`/ai-tools/initiatives?initiativeId=${init.id}`}>
+                  {init.businessGoal || init.id}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="no-projects">No projects yet.</p>
+        )}
+        <button onClick={handleNewProject} className="new-project-button">
+          Start New Project
         </button>
       </div>
     </div>
