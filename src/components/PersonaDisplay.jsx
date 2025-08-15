@@ -98,6 +98,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
           labelClass="bottom-label"
           valueClass="bottom-value"
           divider
+          autoSave
         />
         <EditableField
           label={`Motivation${
@@ -112,6 +113,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
           labelClass="bottom-label"
           valueClass="bottom-value"
           divider
+          autoSave
         />
         <EditableField
           label={`Challenge${
@@ -126,6 +128,7 @@ function PersonaDisplay({ persona, personaQualities, onUpdate, onRegenerate }) {
           labelClass="bottom-label"
           valueClass="bottom-value"
           divider
+          autoSave
         />
       </div>
     </div>

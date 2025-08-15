@@ -41,6 +41,7 @@ export async function loadPersonas(uid, initiativeId) {
     challenges: null,
     challengeOptions: [],
     avatar: null,
+    selectedTraits: [],
     ...d.data(),
   }));
 }
@@ -84,6 +85,7 @@ export async function savePersona(uid, initiativeId, persona) {
     challenges: null,
     challengeOptions: [],
     avatar: null,
+    selectedTraits: [],
   };
   await callable({ initiativeId, personaId, persona: { ...defaults, ...persona } });
   return personaId;

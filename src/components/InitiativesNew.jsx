@@ -257,6 +257,7 @@ const normalizePersona = (p = {}) => {
     supportLevel: p.supportLevel || "",
     accessibility: p.accessibility || [],
     summary: p.summary || getRandomItem(SUMMARY_OPTIONS),
+    selectedTraits: p.selectedTraits || [],
     ageRange: p.ageRange || "",
     ageRangeOptions: p.ageRangeOptions || [],
     educationLevel: p.educationLevel || "",
@@ -664,6 +665,14 @@ const InitiativesNew = () => {
         });
         setPersonas(normalized);
         setActivePersonaIndex(0);
+        const loadedTraits = Array.from(
+          new Set(
+            normalized.flatMap((p) => p.selectedTraits || [])
+          )
+        );
+        if (loadedTraits.length > 0) {
+          setPersonaQualities(loadedTraits);
+        }
       })
       .catch((err) => console.error("Error loading personas:", err));
   }, [
@@ -1069,6 +1078,7 @@ const InitiativesNew = () => {
           challenges: challengesList[0] || null,
           challengeOptions,
           avatar: avatarRes?.data?.avatar || null,
+          selectedTraits: personaQualities,
         };
         addUsedMotivation([
           ...motivations.map((o) => o.keyword),
@@ -1185,16 +1195,17 @@ const InitiativesNew = () => {
           void selected;
           return o;
         });
-      const personaToSave = {
-        ...rest,
-        motivations,
-        motivation: motivations[0] || null,
-        motivationOptions,
-        challengesList,
-        challenges: challengesList[0] || null,
-        challengeOptions,
-        avatar: avatarRes?.data?.avatar || null,
-      };
+        const personaToSave = {
+          ...rest,
+          motivations,
+          motivation: motivations[0] || null,
+          motivationOptions,
+          challengesList,
+          challenges: challengesList[0] || null,
+          challengeOptions,
+          avatar: avatarRes?.data?.avatar || null,
+          selectedTraits: personaQualities,
+        };
       // record used keywords
       addUsedMotivation([
         ...motivations.map((o) => o.keyword),
