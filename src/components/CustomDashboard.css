@@ -1,7 +1,7 @@
 .dashboard-container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 100px 20px 20px;
 }
 
 .projects-card h2 {
@@ -26,17 +26,20 @@
 
 .new-project-button {
   margin-top: 1rem;
-  background: #8c259e;
+  background: rgba(140, 37, 158, 0.2);
+  border: 1px solid rgba(140, 37, 158, 0.5);
   color: #fff;
   padding: 10px 20px;
-  border: none;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 0.3s ease;
 }
 
 .new-project-button:hover {
-  background: #a742b2;
+  background: rgba(140, 37, 158, 0.35);
 }
 
 .no-projects {

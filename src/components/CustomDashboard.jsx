@@ -16,7 +16,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { app, auth } from "../firebase";
 import AccountCreation from "./AccountCreation";
 import { loadInitiatives } from "../utils/initiatives";
-import "./ui/card.css";
+import "./AIToolsGenerators.css";
 import "./CustomDashboard.css";
 
 const CustomDashboard = () => {
@@ -142,7 +142,7 @@ const CustomDashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <div className="glass-card projects-card">
+      <div className="initiative-card projects-card">
         <h2>Projects</h2>
         {initiatives.length > 0 ? (
           <ul className="project-list">
