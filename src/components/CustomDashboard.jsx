@@ -137,7 +137,7 @@ const CustomDashboard = () => {
 
   const handleNewProject = () => {
     const newId = crypto.randomUUID();
-    navigate(`/ai-tools/initiatives?initiativeId=${newId}`);
+    navigate(`/project-setup?initiativeId=${newId}`);
   };
 
   return (
@@ -148,8 +148,8 @@ const CustomDashboard = () => {
           <ul className="project-list">
             {initiatives.map((init) => (
               <li key={init.id}>
-                <Link to={`/ai-tools/initiatives?initiativeId=${init.id}`}>
-                  {init.businessGoal || init.id}
+                <Link to={`/discovery?initiativeId=${init.id}`}>
+                  {init.projectName || init.businessGoal || init.id}
                 </Link>
               </li>
             ))}
