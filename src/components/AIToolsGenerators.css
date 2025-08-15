@@ -105,7 +105,7 @@
     text-align: left;
   }
 
-  .clarify-textarea {
+.clarify-textarea {
     width: calc(100% - 20px);
     max-width: none;
     margin: 0 10px 10px;
@@ -277,6 +277,25 @@
     overflow-y: auto;
     text-align: left;
     position: relative;
+}
+
+.contacts-section p {
+  margin: 10px 0 0;
+}
+
+.contact-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.contact-row .generator-input {
+  flex: 1;
+  margin: 10px 0;
+}
+
+.add-contact-button {
+  margin-top: 10px;
 }
   
   .generator-result h3 {

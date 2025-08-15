@@ -29,6 +29,7 @@ const LearningObjectivesGenerator = ({
   businessGoal,
   audienceProfile,
   projectConstraints,
+  keyContacts,
   selectedModality,
   blendModalities = [],
   sourceMaterials,
@@ -64,6 +65,7 @@ const LearningObjectivesGenerator = ({
         businessGoal,
         audienceProfile,
         projectConstraints,
+        keyContacts,
         selectedModality,
         blendModalities,
         sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
@@ -108,16 +110,17 @@ const LearningObjectivesGenerator = ({
     setLoading(true);
     setError("");
     try {
-      const { data } = await callGenerate({
-        projectBrief,
-        businessGoal,
-        audienceProfile,
-        projectConstraints,
-        selectedModality,
-        blendModalities,
-        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
-        approach: learningObjectives.approach,
-        bloomLevel: learningObjectives.bloomLevel,
+        const { data } = await callGenerate({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          keyContacts,
+          selectedModality,
+          blendModalities,
+          sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
+          approach: learningObjectives.approach,
+          bloomLevel: learningObjectives.bloomLevel,
         ...(learningObjectives.category
           ? { category: learningObjectives.category }
           : {}),
@@ -342,6 +345,9 @@ LearningObjectivesGenerator.propTypes = {
   businessGoal: PropTypes.string.isRequired,
   audienceProfile: PropTypes.string.isRequired,
   projectConstraints: PropTypes.string.isRequired,
+  keyContacts: PropTypes.arrayOf(
+    PropTypes.shape({ name: PropTypes.string, role: PropTypes.string })
+  ).isRequired,
   selectedModality: PropTypes.string.isRequired,
   blendModalities: PropTypes.array,
   sourceMaterials: PropTypes.array.isRequired,
