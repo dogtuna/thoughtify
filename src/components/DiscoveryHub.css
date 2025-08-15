@@ -1,0 +1,22 @@
+.discovery-hub .columns {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.discovery-hub .column {
+  flex: 1;
+}
+
+.question-card {
+  margin-bottom: 1rem;
+}
+
+.question-card.answered {
+  background: rgba(0, 128, 0, 0.1);
+}
+
+.question-card .answer {
+  white-space: pre-wrap;
+}
+

@@ -1,9 +1,21 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../firebase";
 
 // src/components/NavBar.jsx
 // Updated header component using glass effect and profile actions
 
 const NavBar = () => {
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setLoggedIn(!!user);
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
     <header className="glass-header">
       <nav className="nav-container">
@@ -30,7 +42,7 @@ const NavBar = () => {
         </div>
 
         <div className="nav-links">
-          <Link to="/" className="nav-link active">
+          <Link to={loggedIn ? "/dashboard" : "/"} className="nav-link active">
             Home
           </Link>
           <Link to="/ai-tools" className="nav-link">
