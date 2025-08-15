@@ -551,71 +551,97 @@ body.pulsing::before {
   text-decoration: underline;
 }
 
-/* Navigation bar */
-.navbar {
+/* Header */
+.glass-header {
   width: 100%;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 10px 20px;
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 50;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-}
-
-.nav-list {
-  list-style: none;
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-item {
-  position: relative;
-}
-
-.nav-link {
-  color: #000;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.nav-link:hover {
-  color: #FB852A;
-}
-
-.dropdown-menu {
-  display: none;
-  position: absolute;
-  top: 100%;
   left: 0;
-  list-style: none;
-  margin: 0;
-  padding: 10px 0;
-  background: rgba(255, 255, 255, 0.8);
+  right: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  min-width: 200px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.dropdown-link {
-  display: block;
-  padding: 5px 15px;
-  color: #000;
+.glass-header .nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+}
+
+.glass-header .logo-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.glass-header .logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.glass-header .logo-icon {
+  color: #fb923c;
+}
+
+.glass-header .nav-links {
+  display: flex;
+  gap: 2rem;
+}
+
+.glass-header .user-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.glass-header .nav-link {
+  color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
 }
 
-.dropdown-link:hover {
-  background: rgba(0, 0, 0, 0.05);
+.glass-header .nav-link:hover,
+.glass-header .nav-link.active {
+  color: #fff;
 }
 
-.nav-item.dropdown:hover .dropdown-menu {
-  display: block;
+.glass-header .notification-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  transition: color 0.3s ease;
+}
+
+.glass-header .notification-btn:hover {
+  color: #fff;
+}
+
+.glass-header .indicator {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  background: #ec4899;
+  border-radius: 50%;
+}
+
+.glass-header .user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
 }
 
 /* Footer */
