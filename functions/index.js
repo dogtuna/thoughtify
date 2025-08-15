@@ -470,13 +470,19 @@ export const generateProjectBrief = onCall(
       model: gemini("gemini-1.5-pro"),
     });
 
-    const contactsInfo = Array.isArray(keyContacts) && keyContacts.length
-      ? `\nKey Contacts: ${keyContacts.map((c) => `${c.name} (${c.role})`).join("; ")}`
-      : "";
-    const promptTemplate = `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief written in a clear, narrative style like a blog post, using distinct paragraphs for readability. Also list any questions that require clarification before moving forward.
+    const contactsInfo =
+      Array.isArray(keyContacts) && keyContacts.length
+        ? `\nKey Contacts: ${keyContacts
+            .map((c) => `${c.name} (${c.role})`)
+            .join("; ")}`
+        : "";
+    const promptTemplate =
+      `You are an expert Performance Consultant and Business Analyst. Using the information provided, create a project brief written in a clear, narrative style like a blog post, using distinct paragraphs for readability. Also list any questions that require clarification before moving forward. For each question, suggest the primary stakeholder roles that should be consulted and assign the question to one of these phases: "The Core Problem & Vision", "The Current State", or "The Project Constraints".
 Return a valid JSON object with the structure:{
   "projectBrief": "text of the brief",
-  "clarifyingQuestions": ["question1", "question2"]
+  "clarifyingQuestions": [
+    {"question":"text","stakeholders":["role1","role2"],"phase":"The Core Problem & Vision"}
+  ]
 }
 Do not include any code fences or additional formatting.
 
@@ -566,7 +572,9 @@ export const generateLearningStrategy = onCall(
 }`;
 
     const clarificationsBlock = (() => {
-      const pairs = clarifyingQuestions.map((q, i) => `Q: ${q}\nA: ${clarifyingAnswers[i] || ""}`);
+      const pairs = clarifyingQuestions.map(
+        (q, i) => `Q: ${q?.question || q}\nA: ${clarifyingAnswers[i] || ""}`
+      );
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
     })();
 
