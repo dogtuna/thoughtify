@@ -1,9 +1,19 @@
-import functions from "firebase-functions";
+
+import process from "process"; 
+import { Buffer } from "buffer";
+import { onRequest, onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import admin from "firebase-admin";
 import { google } from "googleapis";
 import crypto from "crypto";
-import process from "process"; import { Buffer } from "buffer";
+
+// ------------------------------
+// FIREBASE INIT
+// ------------------------------
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+const db = admin.firestore();
 
 // ------------------------------
 // SECRETS
@@ -12,19 +22,12 @@ const TOKEN_ENCRYPTION_KEY = defineSecret("TOKEN_ENCRYPTION_KEY");
 const GMAIL_CLIENT_ID = defineSecret("GMAIL_CLIENT_ID");
 const GMAIL_CLIENT_SECRET = defineSecret("GMAIL_CLIENT_SECRET");
 const GMAIL_REDIRECT_URI = defineSecret("GMAIL_REDIRECT_URI");
-// Outlook secrets commented out while disabled
+
+// If/when Outlook is re-enabled:
 // const OUTLOOK_CLIENT_ID = defineSecret("OUTLOOK_CLIENT_ID");
 // const OUTLOOK_TENANT_ID = defineSecret("OUTLOOK_TENANT_ID");
 // const OUTLOOK_CLIENT_SECRET = defineSecret("OUTLOOK_CLIENT_SECRET");
 // const OUTLOOK_REDIRECT_URI = defineSecret("OUTLOOK_REDIRECT_URI");
-
-// ------------------------------
-// INIT FIREBASE
-// ------------------------------
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-const db = admin.firestore();
 
 // ------------------------------
 // ENCRYPTION HELPERS
@@ -62,15 +65,15 @@ const gmailClient = new google.auth.OAuth2(
 // ------------------------------
 // 1. Generate provider auth URL
 // ------------------------------
-export const getEmailAuthUrl = functions
-  .runWith({ secrets: [TOKEN_ENCRYPTION_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI] })
-  .https.onRequest(async (req, res) => {
+export const getEmailAuthUrl = onRequest(
+  { secrets: [TOKEN_ENCRYPTION_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI] },
+  async (req, res) => {
     const { provider, state = "" } = req.query;
     try {
       if (provider === "gmail") {
         const url = gmailClient.generateAuthUrl({
           access_type: "offline",
-          prompt: "consent", // ensure refresh_token is always issued
+          prompt: "consent", // ensures refresh_token every time
           scope: ["https://www.googleapis.com/auth/gmail.send"],
           state,
         });
@@ -82,14 +85,15 @@ export const getEmailAuthUrl = functions
       console.error("getEmailAuthUrl error", err);
       res.status(500).send("OAuth error");
     }
-  });
+  }
+);
 
 // ------------------------------
 // 2. OAuth callback
 // ------------------------------
-export const emailOAuthCallback = functions
-  .runWith({ secrets: [TOKEN_ENCRYPTION_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI] })
-  .https.onRequest(async (req, res) => {
+export const emailOAuthCallback = onRequest(
+  { secrets: [TOKEN_ENCRYPTION_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI] },
+  async (req, res) => {
     const { code, state, provider } = { ...req.query, ...req.body };
     const uid = state;
     if (!uid) return res.status(400).send("Missing user state");
@@ -107,7 +111,8 @@ export const emailOAuthCallback = functions
       console.error("emailOAuthCallback error", err);
       res.status(500).send("OAuth error");
     }
-  });
+  }
+);
 
 // ------------------------------
 // Helper to read stored token
@@ -121,15 +126,15 @@ async function getToken(uid, provider) {
 // ------------------------------
 // 3. Send or draft email
 // ------------------------------
-export const sendQuestionEmail = functions
-  .runWith({ secrets: [TOKEN_ENCRYPTION_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI] })
-  .https.onCall(async (data, context) => {
+export const sendQuestionEmail = onCall(
+  { secrets: [TOKEN_ENCRYPTION_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI] },
+  async (data, context) => {
     const uid = context.auth?.uid;
-    if (!uid) throw new functions.https.HttpsError("unauthenticated", "Auth required");
+    if (!uid) throw new HttpsError("unauthenticated", "Auth required");
 
     const { provider, recipientEmail, subject, message, questionId, draft = false } = data;
     if (!provider || !recipientEmail || !subject || !message || !questionId) {
-      throw new functions.https.HttpsError("invalid-argument", "Missing fields");
+      throw new HttpsError("invalid-argument", "Missing fields");
     }
 
     try {
@@ -160,6 +165,7 @@ export const sendQuestionEmail = functions
       return { messageId };
     } catch (err) {
       console.error("sendQuestionEmail error", err);
-      throw new functions.https.HttpsError("internal", err.message);
+      throw new HttpsError("internal", err.message);
     }
-  });
+  }
+);
