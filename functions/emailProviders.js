@@ -6,6 +6,10 @@ import { google } from "googleapis";
 // import { ConfidentialClientApplication } from "@azure/msal-node"; // Outlook integration disabled
 import crypto from "crypto";
 
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
 // Encryption helpers for storing tokens securely
 const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY || ""; // must be 32 bytes hex
 function encrypt(text) {
@@ -163,17 +167,34 @@ async function getToken(uid, provider) {
 // 3. Send or draft email and record provider message ID
 export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
   let uid = context.auth?.uid;
-  // If the callable request didn't include auth context, fall back to an idToken
-  if (!uid && data.idToken) {
-    try {
-      const decoded = await admin.auth().verifyIdToken(data.idToken);
-      uid = decoded.uid;
-    } catch (err) {
-      console.error("verifyIdToken error", err);
+
+  if (!uid) {
+    let token = data.idToken;
+
+    if (!token) {
+      const authHeader = context.rawRequest?.headers?.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      }
+    }
+
+    if (token) {
+      try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        uid = decoded.uid;
+      } catch (err) {
+        console.error("verifyIdToken error", err);
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Invalid ID token"
+        );
+      }
     }
   }
-  if (!uid)
+
+  if (!uid) {
     throw new functions.https.HttpsError("unauthenticated", "Auth required");
+  }
   const {
     provider,
     recipientEmail,
