@@ -25,12 +25,16 @@ const DiscoveryHub = () => {
   const initiativeId = searchParams.get("initiativeId");
   const [questions, setQuestions] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [contactFilter, setContactFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
   const [selected, setSelected] = useState([]);
   const [uid, setUid] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [active, setActive] = useState("questions");
+  const [summary, setSummary] = useState("");
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -55,6 +59,7 @@ const DiscoveryHub = () => {
             };
           });
           setQuestions(qs);
+          setDocuments(init?.sourceMaterials || []);
         }
         setLoaded(true);
       } else {
@@ -175,6 +180,59 @@ const DiscoveryHub = () => {
     });
   };
 
+  const handleDocFiles = async (files) => {
+    const newDocs = [];
+    for (const file of Array.from(files)) {
+      const content = await file.text();
+      newDocs.push({ name: file.name, content });
+    }
+    setDocuments((prev) => {
+      const updated = [...prev, ...newDocs];
+      if (uid) {
+        saveInitiative(uid, initiativeId, { sourceMaterials: updated });
+      }
+      return updated;
+    });
+  };
+
+  const handleDocInput = (e) => {
+    if (e.target.files) handleDocFiles(e.target.files);
+  };
+
+  const handleDocDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files) handleDocFiles(e.dataTransfer.files);
+  };
+
+  const handleDocDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const removeDocument = (idx) => {
+    setDocuments((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+      if (uid) {
+        saveInitiative(uid, initiativeId, { sourceMaterials: updated });
+      }
+      return updated;
+    });
+  };
+
+  const summarizeText = (text) => {
+    const words = text.trim().split(/\s+/);
+    return words.slice(0, 50).join(" ") + (words.length > 50 ? "..." : "");
+  };
+
+  const handleSummarize = (text) => {
+    setSummary(summarizeText(text));
+    setShowSummary(true);
+  };
+
+  const handleSummarizeAll = () => {
+    const combined = documents.map((d) => d.content).join(" ");
+    handleSummarize(combined);
+  };
+
   const toggleSelect = (idx) => {
     setSelected((prev) =>
       prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
@@ -237,160 +295,224 @@ const DiscoveryHub = () => {
       <aside className="sidebar">
         <h2>Discovery Hub</h2>
         <ul>
-          <li>
-            <span className="questions" onClick={() => setStatusFilter("")}>
+          <li
+            className={active === "documents" ? "active" : ""}
+            onClick={() => setActive("documents")}
+          >
+            Documents
+          </li>
+          <li className={active === "questions" ? "active" : ""}>
+            <span
+              className="questions"
+              onClick={() => {
+                setActive("questions");
+                setStatusFilter("");
+              }}
+            >
               Questions
             </span>
-            <ul className="sub-menu">
-              <li
-                className={statusFilter === "toask" ? "active" : ""}
-                onClick={() => setStatusFilter("toask")}
-              >
-                Ask
-              </li>
-              <li
-                className={statusFilter === "asked" ? "active" : ""}
-                onClick={() => setStatusFilter("asked")}
-              >
-                Asked
-              </li>
-              <li
-                className={statusFilter === "answered" ? "active" : ""}
-                onClick={() => setStatusFilter("answered")}
-              >
-                Answered
-              </li>
-            </ul>
+            {active === "questions" && (
+              <ul className="sub-menu">
+                <li
+                  className={statusFilter === "toask" ? "active" : ""}
+                  onClick={() => setStatusFilter("toask")}
+                >
+                  Ask
+                </li>
+                <li
+                  className={statusFilter === "asked" ? "active" : ""}
+                  onClick={() => setStatusFilter("asked")}
+                >
+                  Asked
+                </li>
+                <li
+                  className={statusFilter === "answered" ? "active" : ""}
+                  onClick={() => setStatusFilter("answered")}
+                >
+                  Answered
+                </li>
+              </ul>
+            )}
           </li>
         </ul>
       </aside>
       <div className="main-content">
-        <div className="filter-bar">
-          <label>
-            Contact:
-            <select
-              value={contactFilter}
-              onChange={(e) => setContactFilter(e.target.value)}
-            >
-              <option value="">All</option>
-              {contacts.map((c) => (
-                <option key={c.role} value={c.role}>
-                  {c.role}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Status:
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All</option>
-              <option value="toask">To Ask</option>
-              <option value="asked">Asked</option>
-              <option value="answered">Answered</option>
-            </select>
-          </label>
-          <label>
-            Group by:
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-              <option value="">None</option>
-              <option value="contact">Contact</option>
-              <option value="status">Status</option>
-            </select>
-          </label>
-          <button className="generator-button" onClick={addContact}>
-            Add Contact
-          </button>
-          {selected.length > 0 && (
-            <button
-              className="generator-button ask-selected"
-              onClick={askSelected}
-            >
-              Ask Selected
-            </button>
-          )}
-        </div>
-        {Object.entries(grouped).map(([grp, items]) => (
-          <div key={grp} className="group-section">
-            {groupBy && <h3>{grp}</h3>}
-            {items.map((q) => (
-              <div
-                key={q.idx}
-                className={`initiative-card question-card ${q.status}`}
+        {active === "documents" ? (
+          <div className="document-section">
+            {documents.length > 0 && (
+              <button
+                className="generator-button summarize-all"
+                onClick={handleSummarizeAll}
               >
-                <div className="question-header">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(q.idx)}
-                    onChange={() => toggleSelect(q.idx)}
-                  />
-                  <p>{q.question}</p>
-                  <span className="status-tag">{statusLabel(q.status)}</span>
-                </div>
-                <div className="contact-row">
-                  {q.contacts.map((r) => (
-                    <span
-                      key={r}
-                      className="contact-tag"
-                      style={{ backgroundColor: getColor(r) }}
-                    >
-                      {r}
-                      <button onClick={() => removeContactFromQuestion(q.idx, r)}>
-                        ×
-                      </button>
-                    </span>
+                Summarize All Files
+              </button>
+            )}
+            <ul className="document-list">
+              {documents.map((doc, idx) => (
+                <li key={idx} className="document-item">
+                  {doc.name}
+                  <span className="doc-actions">
+                    <button onClick={() => handleSummarize(doc.content)}>
+                      Summarize
+                    </button>
+                    <button onClick={() => removeDocument(idx)}>Remove</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div
+              className="drop-zone"
+              onDrop={handleDocDrop}
+              onDragOver={handleDocDragOver}
+            >
+              Drag & Drop Documents Here
+              <input type="file" multiple onChange={handleDocInput} />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="filter-bar">
+              <label>
+                Contact:
+                <select
+                  value={contactFilter}
+                  onChange={(e) => setContactFilter(e.target.value)}
+                >
+                  <option value="">All</option>
+                  {contacts.map((c) => (
+                    <option key={c.role} value={c.role}>
+                      {c.role}
+                    </option>
                   ))}
-                  <select
-                    className="contact-select"
-                    value=""
-                    onChange={(e) => handleContactSelect(q.idx, e.target.value)}
+                </select>
+              </label>
+              <label>
+                Status:
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="toask">To Ask</option>
+                  <option value="asked">Asked</option>
+                  <option value="answered">Answered</option>
+                </select>
+              </label>
+              <label>
+                Group by:
+                <select
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value)}
+                >
+                  <option value="">None</option>
+                  <option value="contact">Contact</option>
+                  <option value="status">Status</option>
+                </select>
+              </label>
+              <button className="generator-button" onClick={addContact}>
+                Add Contact
+              </button>
+              {selected.length > 0 && (
+                <button
+                  className="generator-button ask-selected"
+                  onClick={askSelected}
+                >
+                  Ask Selected
+                </button>
+              )}
+            </div>
+            {Object.entries(grouped).map(([grp, items]) => (
+              <div key={grp} className="group-section">
+                {groupBy && <h3>{grp}</h3>}
+                {items.map((q) => (
+                  <div
+                    key={q.idx}
+                    className={`initiative-card question-card ${q.status}`}
                   >
-                    <option value="">Add Contact</option>
-                    {contacts
-                      .filter((c) => !q.contacts.includes(c.role))
-                      .map((c) => (
-                        <option key={c.role} value={c.role}>
-                          {c.role}
-                        </option>
-                      ))}
-                    <option value="__add__">Add New Contact</option>
-                  </select>
-                </div>
-                {q.status !== "toask" &&
-                  q.contacts.map((r) => (
-                    <div key={r} className="answer-block">
-                      <strong>{r}:</strong>
-                      <textarea
-                        className="generator-input"
-                        placeholder="Paste Answer/Notes Here"
-                        value={q.answers[r] || ""}
-                        onChange={(e) => updateAnswer(q.idx, r, e.target.value)}
-                        rows={3}
+                    <div className="question-header">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(q.idx)}
+                        onChange={() => toggleSelect(q.idx)}
                       />
+                      <p>{q.question}</p>
+                      <span className="status-tag">{statusLabel(q.status)}</span>
                     </div>
-                  ))}
-                {q.status === "toask" ? (
-                  <button
-                    className="generator-button"
-                    onClick={() => markAsked(q.idx)}
-                  >
-                    Ask
-                  </button>
-                ) : (
-                  <button
-                    className="generator-button secondary"
-                    onClick={() => moveToToAsk(q.idx)}
-                  >
-                    Move to To Ask
-                  </button>
-                )}
+                    <div className="contact-row">
+                      {q.contacts.map((r) => (
+                        <span
+                          key={r}
+                          className="contact-tag"
+                          style={{ backgroundColor: getColor(r) }}
+                        >
+                          {r}
+                          <button onClick={() => removeContactFromQuestion(q.idx, r)}>
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <select
+                        className="contact-select"
+                        value=""
+                        onChange={(e) => handleContactSelect(q.idx, e.target.value)}
+                      >
+                        <option value="">Add Contact</option>
+                        {contacts
+                          .filter((c) => !q.contacts.includes(c.role))
+                          .map((c) => (
+                            <option key={c.role} value={c.role}>
+                              {c.role}
+                            </option>
+                          ))}
+                        <option value="__add__">Add New Contact</option>
+                      </select>
+                    </div>
+                    {q.status !== "toask" &&
+                      q.contacts.map((r) => (
+                        <div key={r} className="answer-block">
+                          <strong>{r}:</strong>
+                          <textarea
+                            className="generator-input"
+                            placeholder="Paste Answer/Notes Here"
+                            value={q.answers[r] || ""}
+                            onChange={(e) => updateAnswer(q.idx, r, e.target.value)}
+                            rows={3}
+                          />
+                        </div>
+                      ))}
+                    {q.status === "toask" ? (
+                      <button
+                        className="generator-button"
+                        onClick={() => markAsked(q.idx)}
+                      >
+                        Ask
+                      </button>
+                    ) : (
+                      <button
+                        className="generator-button secondary"
+                        onClick={() => moveToToAsk(q.idx)}
+                      >
+                        Move to To Ask
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
-          </div>
-        ))}
+          </>
+        )}
       </div>
+      {showSummary && (
+        <div className="modal-overlay" onClick={() => setShowSummary(false)}>
+          <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Summary</h3>
+            <p>{summary}</p>
+            <button className="generator-button" onClick={() => setShowSummary(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -25,6 +25,24 @@
   font-weight: 500;
 }
 
+.project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-actions button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.project-actions button:hover {
+  text-decoration: underline;
+}
+
 .new-project-button {
   margin-top: 1rem;
   background: rgba(140, 37, 158, 0.2);

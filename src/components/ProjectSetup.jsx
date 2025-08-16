@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { onAuthStateChanged } from "firebase/auth";
 import { app, auth } from "../firebase";
-import { saveInitiative } from "../utils/initiatives";
+import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 
 const ProjectSetup = () => {
@@ -25,6 +26,23 @@ const ProjectSetup = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user && initiativeId) {
+        const init = await loadInitiative(user.uid, initiativeId);
+        if (init) {
+          setProjectName(init.projectName || "");
+          setBusinessGoal(init.businessGoal || "");
+          setAudienceProfile(init.audienceProfile || "");
+          setProjectConstraints(init.projectConstraints || "");
+          setKeyContacts(init.keyContacts || [{ name: "", role: "" }]);
+          setSourceMaterials(init.sourceMaterials || []);
+        }
+      }
+    });
+    return () => unsub();
+  }, [initiativeId]);
 
   const getCombinedSource = () =>
     sourceMaterials.map((f) => f.content).join("\n");

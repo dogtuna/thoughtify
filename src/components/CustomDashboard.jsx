@@ -15,7 +15,10 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { app, auth } from "../firebase";
 import AccountCreation from "./AccountCreation";
-import { loadInitiatives } from "../utils/initiatives";
+import {
+  loadInitiatives,
+  deleteInitiative,
+} from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 import "./CustomDashboard.css";
 
@@ -27,6 +30,7 @@ const CustomDashboard = () => {
   const [error, setError] = useState("");
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const [initiatives, setInitiatives] = useState([]);
+  const [uid, setUid] = useState(null);
   const navigate = useNavigate();
   const db = getFirestore(app);
 
@@ -54,6 +58,7 @@ const CustomDashboard = () => {
         setDataLoaded(true);
       } else {
         setUserLoggedIn(true);
+        setUid(user.uid);
         try {
           if (invitationCode) {
             // Try to fetch the invitation document by invitationCode.
@@ -101,9 +106,9 @@ const CustomDashboard = () => {
           console.error("Error fetching invitation or profile data:", err);
           setError("Error fetching invitation or profile data.");
         }
-        const uid = user.uid;
+        const userId = user.uid;
         try {
-          const data = await loadInitiatives(uid);
+          const data = await loadInitiatives(userId);
           setInitiatives(data);
         } catch (loadErr) {
           console.error("Error loading initiatives:", loadErr);
@@ -140,6 +145,21 @@ const CustomDashboard = () => {
     navigate(`/project-setup?initiativeId=${newId}`);
   };
 
+  const handleEdit = (id) => {
+    navigate(`/project-setup?initiativeId=${id}`);
+  };
+
+  const handleDelete = async (id) => {
+    if (!uid) return;
+    if (!window.confirm("Delete this project?")) return;
+    try {
+      await deleteInitiative(uid, id);
+      setInitiatives((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error("Failed to delete initiative", err);
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <div className="initiative-card projects-card">
@@ -147,10 +167,14 @@ const CustomDashboard = () => {
         {initiatives.length > 0 ? (
           <ul className="project-list">
             {initiatives.map((init) => (
-              <li key={init.id}>
+              <li key={init.id} className="project-item">
                 <Link to={`/discovery?initiativeId=${init.id}`}>
                   {init.projectName || init.businessGoal || init.id}
                 </Link>
+                <span className="project-actions">
+                  <button onClick={() => handleEdit(init.id)}>Edit</button>
+                  <button onClick={() => handleDelete(init.id)}>Delete</button>
+                </span>
               </li>
             ))}
           </ul>
