@@ -65,7 +65,7 @@ const DiscoveryHub = () => {
         recipientEmail: auth.currentUser.email || "",
         subject: q.question,
         message: q.question,
-        questionId: q.id ?? q.idx,
+        questionId: q.id,
         draft: true,
       });
       alert("Draft created in Gmail");
