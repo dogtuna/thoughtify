@@ -1,0 +1,107 @@
+.discovery-hub {
+  display: flex;
+  min-height: 100%;
+}
+
+.sidebar {
+  width: 200px;
+  padding: 1rem;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  cursor: pointer;
+  margin: 0.5rem 0;
+}
+
+.sidebar .sub-menu {
+  margin-left: 1rem;
+}
+
+.sidebar li.active {
+  font-weight: bold;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1rem;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.question-card {
+  margin-bottom: 1rem;
+}
+
+.question-card.answered {
+  background: rgba(0, 128, 0, 0.1);
+}
+
+.question-card .answer {
+  white-space: pre-wrap;
+}
+
+.question-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-tag {
+  margin-left: auto;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.contact-tag {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.contact-select {
+  flex: 1;
+}
+
+.ask-selected {
+  margin-left: auto;
+}
+
+.group-section {
+  margin-bottom: 1rem;
+}
+
+.answer-block {
+  margin-top: 0.5rem;
+}
+
+.contact-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
