@@ -193,6 +193,10 @@ const ProjectSetup = () => {
             return [idx, names];
           })
         );
+        const clarifyingAsked = qs.map((_, idx) => {
+          const names = contactsMap[idx] || [];
+          return Object.fromEntries(names.map((n) => [n, false]));
+        });
         await saveInitiative(uid, initiativeId, {
           projectName,
           businessGoal,
@@ -203,7 +207,7 @@ const ProjectSetup = () => {
           clarifyingQuestions: qs,
           clarifyingContacts: contactsMap,
           clarifyingAnswers: qs.map(() => ({})),
-          clarifyingAsked: qs.map(() => false),
+          clarifyingAsked,
         });
       }
       navigate(`/discovery?initiativeId=${initiativeId}`);

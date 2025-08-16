@@ -61,11 +61,20 @@ const DiscoveryHub = () => {
               );
               return match?.name || c;
             });
+            const askedData = init?.clarifyingAsked?.[idx] || {};
+            const asked = {};
+            names.forEach((n) => {
+              if (typeof askedData === "object") {
+                asked[n] = !!askedData[n];
+              } else {
+                asked[n] = !!askedData;
+              }
+            });
             return {
               question: typeof q === "string" ? q : q.question,
               contacts: names,
               answers: init?.clarifyingAnswers?.[idx] || {},
-              asked: init?.clarifyingAsked?.[idx] || false,
+              asked,
               id: idx,
             };
           });
@@ -85,9 +94,13 @@ const DiscoveryHub = () => {
       const updated = [...prev];
       const q = updated[idx];
       q.answers = { ...q.answers, [name]: value };
+      if (value && !q.asked[name]) {
+        q.asked[name] = true;
+      }
       if (uid) {
         saveInitiative(uid, initiativeId, {
           clarifyingAnswers: updated.map((qq) => qq.answers),
+          clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
       return updated;
@@ -116,12 +129,14 @@ const DiscoveryHub = () => {
       const q = updated[idx];
       if (!q.contacts.includes(name)) {
         q.contacts = [...q.contacts, name];
+        q.asked = { ...q.asked, [name]: false };
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
           clarifyingContacts: Object.fromEntries(
             updated.map((qq, i) => [i, qq.contacts])
           ),
+          clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
       return updated;
@@ -136,12 +151,16 @@ const DiscoveryHub = () => {
       if (q.answers[name]) {
         delete q.answers[name];
       }
+      if (q.asked[name] !== undefined) {
+        delete q.asked[name];
+      }
       if (uid) {
         saveInitiative(uid, initiativeId, {
           clarifyingContacts: Object.fromEntries(
             updated.map((qq, i) => [i, qq.contacts])
           ),
           clarifyingAnswers: updated.map((qq) => qq.answers),
+          clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
       return updated;
@@ -157,14 +176,14 @@ const DiscoveryHub = () => {
     }
   };
 
-  const markAsked = (idxs) => {
-    const indices = Array.isArray(idxs) ? idxs : [idxs];
-    const texts = [];
+  const markAsked = (idx, names = []) => {
+    const text = questions[idx]?.question || "";
     setQuestions((prev) => {
       const updated = [...prev];
-      indices.forEach((i) => {
-        updated[i].asked = true;
-        texts.push(updated[i].question);
+      const q = updated[idx];
+      const targets = names.length ? names : q.contacts;
+      targets.forEach((n) => {
+        q.asked[n] = true;
       });
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -173,10 +192,7 @@ const DiscoveryHub = () => {
       }
       return updated;
     });
-    if (navigator.clipboard && texts.length) {
-      navigator.clipboard.writeText(texts.join("\n\n"));
-    }
-    setSelected((prev) => prev.filter((i) => !indices.includes(i)));
+    return text;
   };
 
   const handleDocFiles = async (files) => {
@@ -232,16 +248,26 @@ const DiscoveryHub = () => {
     handleSummarize(combined);
   };
 
-  const toggleSelect = (idx) => {
+  const toggleSelect = (key) => {
     setSelected((prev) =>
-      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+      prev.includes(key) ? prev.filter((i) => i !== key) : [...prev, key]
     );
   };
 
   const askSelected = () => {
-    if (selected.length) {
-      markAsked(selected);
+    if (!selected.length) return;
+    const selections = selected.map((k) => {
+      const parts = k.split("|");
+      return {
+        idx: parseInt(parts[0], 10),
+        names: parts[2] ? parts[2].split(",") : [],
+      };
+    });
+    const texts = selections.map((s) => markAsked(s.idx, s.names));
+    if (navigator.clipboard && texts.length) {
+      navigator.clipboard.writeText(texts.join("\n\n"));
     }
+    setSelected([]);
   };
 
   const sortUnassignedFirst = (arr) =>
@@ -288,7 +314,11 @@ const DiscoveryHub = () => {
       Object.entries(q.answers).forEach(([n, v]) => {
         newAnswers[n === original ? name : n] = v;
       });
-      return { ...q, contacts: newContacts, answers: newAnswers };
+      const newAsked = {};
+      Object.entries(q.asked).forEach(([n, v]) => {
+        newAsked[n === original ? name : n] = v;
+      });
+      return { ...q, contacts: newContacts, answers: newAnswers, asked: newAsked };
     });
     setContacts(updatedContacts);
     setQuestions(updatedQuestions);
@@ -299,6 +329,7 @@ const DiscoveryHub = () => {
           updatedQuestions.map((qq, i) => [i, qq.contacts])
         ),
         clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
+        clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
       });
     }
     setEditData(null);
@@ -314,13 +345,23 @@ const DiscoveryHub = () => {
   const statusLabel = (s) =>
     s === "toask" ? "To Ask" : s === "asked" ? "Asked" : "Answered";
 
-  const items = questions.map((q, idx) => {
-    const allAnswered =
-      q.contacts.length && q.contacts.every((n) => (q.answers[n] || "").trim());
-    const status = !q.asked ? "toask" : allAnswered ? "answered" : "asked";
-    return { ...q, idx, status };
+  const items = [];
+  questions.forEach((q, idx) => {
+    const toAskNames = q.contacts.filter((n) => !q.asked[n]);
+    if (toAskNames.length || q.contacts.length === 0) {
+      items.push({ ...q, idx, contacts: toAskNames, status: "toask" });
+    }
+    const askedNames = q.contacts.filter(
+      (n) => q.asked[n] && !(q.answers[n] || "").trim()
+    );
+    if (askedNames.length) {
+      items.push({ ...q, idx, contacts: askedNames, status: "asked" });
+    }
+    const answeredNames = q.contacts.filter((n) => (q.answers[n] || "").trim());
+    if (answeredNames.length) {
+      items.push({ ...q, idx, contacts: answeredNames, status: "answered" });
+    }
   });
-  sortUnassignedFirst(items);
 
   let filtered = items.filter(
     (q) =>
@@ -335,8 +376,9 @@ const DiscoveryHub = () => {
     filtered.forEach((q) => {
       const names = q.contacts.length ? q.contacts : ["Unassigned"];
       names.forEach((n) => {
+        const qCopy = { ...q, contacts: [n] };
         grouped[n] = grouped[n] || [];
-        grouped[n].push(q);
+        grouped[n].push(qCopy);
       });
     });
     const ordered = {};
@@ -358,10 +400,15 @@ const DiscoveryHub = () => {
             (n) => contacts.find((c) => c.name === n)?.role || "No Role"
           )
         : ["Unassigned"];
-      roles.forEach((r) => {
+      const uniqueRoles = Array.from(new Set(roles));
+      uniqueRoles.forEach((r) => {
         const label = r && r !== "" ? r : "No Role";
+        const namesForRole = q.contacts.filter(
+          (n) => (contacts.find((c) => c.name === n)?.role || "No Role") === r
+        );
+        const qCopy = { ...q, contacts: namesForRole };
         grouped[label] = grouped[label] || [];
-        grouped[label].push(q);
+        grouped[label].push(qCopy);
       });
     });
     const ordered = {};
@@ -535,9 +582,11 @@ const DiscoveryHub = () => {
             {Object.entries(grouped).map(([grp, items]) => (
               <div key={grp} className="group-section">
                 {groupBy && <h3>{grp}</h3>}
-                {items.map((q) => (
+                {items.map((q) => {
+                  const selKey = `${q.idx}|${q.status}|${q.contacts.join(',')}`;
+                  return (
                   <div
-                    key={q.idx}
+                    key={selKey}
                     className={`initiative-card question-card ${q.status}`}
                   >
                     <div className="contact-row">
@@ -592,8 +641,8 @@ const DiscoveryHub = () => {
                       {selectMode && (
                         <input
                           type="checkbox"
-                          checked={selected.includes(q.idx)}
-                          onChange={() => toggleSelect(q.idx)}
+                          checked={selected.includes(selKey)}
+                          onChange={() => toggleSelect(selKey)}
                         />
                       )}
                       <p>{q.question}</p>
@@ -613,7 +662,8 @@ const DiscoveryHub = () => {
                         </div>
                       ))}
                   </div>
-                ))}
+                );
+                })}
               </div>
             ))}
           </>
@@ -635,7 +685,10 @@ const DiscoveryHub = () => {
           </li>
           <li
             onClick={() => {
-              markAsked(menu.idx);
+              const text = markAsked(menu.idx, [menu.name]);
+              if (navigator.clipboard && text) {
+                navigator.clipboard.writeText(text);
+              }
               setMenu(null);
             }}
           >
