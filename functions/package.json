@@ -14,6 +14,7 @@
   },
   "main": "index.js",
   "dependencies": {
+    "@azure/msal-node": "^2.16.3",
     "@dicebear/collection": "^9.2.3",
     "@dicebear/core": "^9.2.3",
     "@genkit-ai/googleai": "^1.0.4",
