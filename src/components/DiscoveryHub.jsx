@@ -57,7 +57,7 @@ const DiscoveryHub = () => {
       return;
     }
     try {
-      await auth.currentUser.getIdToken();
+      const idToken = await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
@@ -66,6 +66,7 @@ const DiscoveryHub = () => {
         message: q.question,
         questionId: q.id ?? q.idx,
         draft: true,
+        idToken,
       });
       alert("Draft created in Gmail");
     } catch (err) {
