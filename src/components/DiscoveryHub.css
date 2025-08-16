@@ -1,18 +1,42 @@
-.discovery-hub .columns {
+.discovery-hub {
   display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
+  min-height: 100%;
 }
 
-.discovery-hub .column {
+.sidebar {
+  width: 200px;
+  padding: 1rem;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  cursor: pointer;
+  margin: 0.5rem 0;
+}
+
+.sidebar .sub-menu {
+  margin-left: 1rem;
+}
+
+.sidebar li.active {
+  font-weight: bold;
+}
+
+.main-content {
   flex: 1;
+  padding: 1rem;
 }
 
 .filter-bar {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 .question-card {
@@ -31,6 +55,14 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.status-tag {
+  margin-left: auto;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .contact-row {
@@ -55,11 +87,15 @@
 }
 
 .ask-selected {
-  margin-bottom: 0.5rem;
+  margin-left: auto;
 }
 
-.role-group {
+.group-section {
   margin-bottom: 1rem;
+}
+
+.answer-block {
+  margin-top: 0.5rem;
 }
 
 .contact-tag button {

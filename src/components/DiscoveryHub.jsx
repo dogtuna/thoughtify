@@ -25,7 +25,9 @@ const DiscoveryHub = () => {
   const initiativeId = searchParams.get("initiativeId");
   const [questions, setQuestions] = useState([]);
   const [contacts, setContacts] = useState([]);
-  const [filterRole, setFilterRole] = useState("");
+  const [contactFilter, setContactFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [groupBy, setGroupBy] = useState("");
   const [selected, setSelected] = useState([]);
   const [uid, setUid] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -195,201 +197,199 @@ const DiscoveryHub = () => {
       </div>
     );
   }
+  const statusLabel = (s) =>
+    s === "toask" ? "To Ask" : s === "asked" ? "Asked" : "Answered";
 
-  const tasks = [];
-  questions.forEach((q, idx) => {
-    const roles = q.contacts.length ? q.contacts : ["Unassigned"];
-    roles.forEach((role) => {
-      const allAnswered =
-        q.contacts.length && q.contacts.every((r) => (q.answers[r] || "").trim());
-      const status = !q.asked
-        ? "toask"
-        : allAnswered
-        ? "answered"
-        : "asked";
-      tasks.push({ ...q, idx, role, contactAnswer: q.answers[role] || "", status });
+  const items = questions.map((q, idx) => {
+    const allAnswered =
+      q.contacts.length && q.contacts.every((r) => (q.answers[r] || "").trim());
+    const status = !q.asked ? "toask" : allAnswered ? "answered" : "asked";
+    return { ...q, idx, status };
     });
-  });
 
-  const toAsk = tasks.filter(
-    (t) => t.status === "toask" && (!filterRole || t.role === filterRole)
-  );
-  const asked = tasks.filter(
-    (t) => t.status === "asked" && (!filterRole || t.role === filterRole)
-  );
-  const answered = tasks.filter(
-    (t) => t.status === "answered" && (!filterRole || t.role === filterRole)
+  let filtered = items.filter(
+    (q) =>
+      (!contactFilter || q.contacts.includes(contactFilter)) &&
+      (!statusFilter || q.status === statusFilter)
   );
 
-  const groupByRole = (arr) => {
-    const groups = {};
-    arr.forEach((t) => {
-      groups[t.role] = groups[t.role] || [];
-      groups[t.role].push(t);
+  let grouped = { All: filtered };
+  if (groupBy === "contact") {
+    grouped = {};
+    filtered.forEach((q) => {
+      const roles = q.contacts.length ? q.contacts : ["Unassigned"];
+      roles.forEach((r) => {
+        grouped[r] = grouped[r] || [];
+        grouped[r].push(q);
+      });
     });
-    return groups;
-  };
-
-  const groupedToAsk = groupByRole(toAsk);
-  const groupedAsked = groupByRole(asked);
-  const groupedAnswered = groupByRole(answered);
+  } else if (groupBy === "status") {
+    grouped = {};
+    filtered.forEach((q) => {
+      const label = statusLabel(q.status);
+      grouped[label] = grouped[label] || [];
+      grouped[label].push(q);
+    });
+  }
 
   return (
     <div className="dashboard-container discovery-hub">
-      <h2>Discovery Hub</h2>
-      <div className="filter-bar">
-        <label>
-          Filter by role:
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-          >
-            <option value="">All</option>
-            {contacts.map((c) => (
-              <option key={c.role} value={c.role}>
-                {c.role}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="generator-button" onClick={addContact}>
-          Add Contact
-        </button>
-      </div>
-      <div className="columns">
-        <div className="column">
-          <h3>To Ask</h3>
+      <aside className="sidebar">
+        <h2>Discovery Hub</h2>
+        <ul>
+          <li>
+            <span className="questions" onClick={() => setStatusFilter("")}>
+              Questions
+            </span>
+            <ul className="sub-menu">
+              <li
+                className={statusFilter === "toask" ? "active" : ""}
+                onClick={() => setStatusFilter("toask")}
+              >
+                Ask
+              </li>
+              <li
+                className={statusFilter === "asked" ? "active" : ""}
+                onClick={() => setStatusFilter("asked")}
+              >
+                Asked
+              </li>
+              <li
+                className={statusFilter === "answered" ? "active" : ""}
+                onClick={() => setStatusFilter("answered")}
+              >
+                Answered
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </aside>
+      <div className="main-content">
+        <div className="filter-bar">
+          <label>
+            Contact:
+            <select
+              value={contactFilter}
+              onChange={(e) => setContactFilter(e.target.value)}
+            >
+              <option value="">All</option>
+              {contacts.map((c) => (
+                <option key={c.role} value={c.role}>
+                  {c.role}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Status:
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All</option>
+              <option value="toask">To Ask</option>
+              <option value="asked">Asked</option>
+              <option value="answered">Answered</option>
+            </select>
+          </label>
+          <label>
+            Group by:
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+              <option value="">None</option>
+              <option value="contact">Contact</option>
+              <option value="status">Status</option>
+            </select>
+          </label>
+          <button className="generator-button" onClick={addContact}>
+            Add Contact
+          </button>
           {selected.length > 0 && (
-            <button className="generator-button ask-selected" onClick={askSelected}>
+            <button
+              className="generator-button ask-selected"
+              onClick={askSelected}
+            >
               Ask Selected
             </button>
           )}
-          {Object.entries(groupedToAsk).map(([role, items]) => (
-            <div key={role} className="role-group">
-              <h4>{role}</h4>
-              {items.map((q) => (
-                <div
-                  key={`${q.idx}-${role}`}
-                  className="initiative-card question-card"
-                >
-                  <div className="question-header">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(q.idx)}
-                      onChange={() => toggleSelect(q.idx)}
-                    />
-                    <p>{q.question}</p>
-                  </div>
-                  <div className="contact-row">
-                    {q.contacts.map((r) => (
-                      <span
-                        key={r}
-                        className="contact-tag"
-                        style={{ backgroundColor: getColor(r) }}
-                      >
-                        {r}
-                        <button
-                          onClick={() => removeContactFromQuestion(q.idx, r)}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                    <select
-                      className="contact-select"
-                      value=""
-                      onChange={(e) => handleContactSelect(q.idx, e.target.value)}
+        </div>
+        {Object.entries(grouped).map(([grp, items]) => (
+          <div key={grp} className="group-section">
+            {groupBy && <h3>{grp}</h3>}
+            {items.map((q) => (
+              <div
+                key={q.idx}
+                className={`initiative-card question-card ${q.status}`}
+              >
+                <div className="question-header">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(q.idx)}
+                    onChange={() => toggleSelect(q.idx)}
+                  />
+                  <p>{q.question}</p>
+                  <span className="status-tag">{statusLabel(q.status)}</span>
+                </div>
+                <div className="contact-row">
+                  {q.contacts.map((r) => (
+                    <span
+                      key={r}
+                      className="contact-tag"
+                      style={{ backgroundColor: getColor(r) }}
                     >
-                      <option value="">Add Contact</option>
-                      {contacts
-                        .filter((c) => !q.contacts.includes(c.role))
-                        .map((c) => (
-                          <option key={c.role} value={c.role}>
-                            {c.role}
-                          </option>
-                        ))}
-                      <option value="__add__">Add New Contact</option>
-                    </select>
-                  </div>
+                      {r}
+                      <button onClick={() => removeContactFromQuestion(q.idx, r)}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <select
+                    className="contact-select"
+                    value=""
+                    onChange={(e) => handleContactSelect(q.idx, e.target.value)}
+                  >
+                    <option value="">Add Contact</option>
+                    {contacts
+                      .filter((c) => !q.contacts.includes(c.role))
+                      .map((c) => (
+                        <option key={c.role} value={c.role}>
+                          {c.role}
+                        </option>
+                      ))}
+                    <option value="__add__">Add New Contact</option>
+                  </select>
+                </div>
+                {q.status !== "toask" &&
+                  q.contacts.map((r) => (
+                    <div key={r} className="answer-block">
+                      <strong>{r}:</strong>
+                      <textarea
+                        className="generator-input"
+                        placeholder="Paste Answer/Notes Here"
+                        value={q.answers[r] || ""}
+                        onChange={(e) => updateAnswer(q.idx, r, e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  ))}
+                {q.status === "toask" ? (
                   <button
                     className="generator-button"
                     onClick={() => markAsked(q.idx)}
                   >
                     Ask
                   </button>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="column">
-          <h3>Asked</h3>
-          {Object.entries(groupedAsked).map(([role, items]) => (
-            <div key={role} className="role-group">
-              <h4>{role}</h4>
-              {items.map((q) => (
-                <div
-                  key={`${q.idx}-${role}`}
-                  className="initiative-card question-card"
-                >
-                  <p>{q.question}</p>
-                  <div className="contact-row">
-                    <span
-                      className="contact-tag"
-                      style={{ backgroundColor: getColor(role) }}
-                    >
-                      {role}
-                    </span>
-                  </div>
-                  <textarea
-                    className="generator-input"
-                    placeholder="Paste Answer/Notes Here"
-                    value={q.contactAnswer}
-                    onChange={(e) => updateAnswer(q.idx, role, e.target.value)}
-                    rows={3}
-                  />
+                ) : (
                   <button
                     className="generator-button secondary"
                     onClick={() => moveToToAsk(q.idx)}
                   >
                     Move to To Ask
                   </button>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="column">
-          <h3>Answered</h3>
-          {Object.entries(groupedAnswered).map(([role, items]) => (
-            <div key={role} className="role-group">
-              <h4>{role}</h4>
-              {items.map((q) => (
-                <div
-                  key={`${q.idx}-${role}`}
-                  className="initiative-card question-card answered"
-                >
-                  <p>{q.question}</p>
-                  <div className="contact-row">
-                    <span
-                      className="contact-tag"
-                      style={{ backgroundColor: getColor(role) }}
-                    >
-                      {role}
-                    </span>
-                  </div>
-                  <p className="answer">{q.contactAnswer}</p>
-                  <button
-                    className="generator-button secondary"
-                    onClick={() => moveToToAsk(q.idx)}
-                  >
-                    Move to To Ask
-                  </button>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
