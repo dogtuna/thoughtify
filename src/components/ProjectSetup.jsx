@@ -184,6 +184,9 @@ const ProjectSetup = () => {
       );
       const uid = auth.currentUser?.uid;
       if (uid) {
+        const contactsMap = Object.fromEntries(
+          qs.map((q, idx) => [idx, q.stakeholders || []])
+        );
         await saveInitiative(uid, initiativeId, {
           projectName,
           businessGoal,
@@ -192,7 +195,7 @@ const ProjectSetup = () => {
           projectConstraints,
           keyContacts,
           clarifyingQuestions: qs,
-          clarifyingContacts: qs.map((q) => q.stakeholders || []),
+          clarifyingContacts: contactsMap,
           clarifyingAnswers: qs.map(() => ({})),
           clarifyingAsked: qs.map(() => false),
         });

@@ -108,7 +108,9 @@ const DiscoveryHub = () => {
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
-          clarifyingContacts: updated.map((qq) => qq.contacts),
+          clarifyingContacts: Object.fromEntries(
+            updated.map((qq, i) => [i, qq.contacts])
+          ),
         });
       }
       return updated;
@@ -125,7 +127,9 @@ const DiscoveryHub = () => {
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
-          clarifyingContacts: updated.map((qq) => qq.contacts),
+          clarifyingContacts: Object.fromEntries(
+            updated.map((qq, i) => [i, qq.contacts])
+          ),
           clarifyingAnswers: updated.map((qq) => qq.answers),
         });
       }
