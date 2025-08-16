@@ -258,6 +258,7 @@ const DiscoveryHub = () => {
 
   const openContextMenu = (e, name, idx) => {
     e.preventDefault();
+    e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, name, idx });
   };
 
