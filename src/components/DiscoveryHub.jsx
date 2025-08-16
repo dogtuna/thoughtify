@@ -15,6 +15,11 @@ const colorPalette = [
   "#e2ccff",
 ];
 
+const normalizeContacts = (value) => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
 const DiscoveryHub = () => {
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
@@ -36,13 +41,17 @@ const DiscoveryHub = () => {
             color: colorPalette[i % colorPalette.length],
           }));
           setContacts(contactsInit);
-          const qs = (init?.clarifyingQuestions || []).map((q, idx) => ({
-            question: typeof q === "string" ? q : q.question,
-            contacts: init?.clarifyingContacts?.[idx] || q.stakeholders || [],
-            answers: init?.clarifyingAnswers?.[idx] || {},
-            asked: init?.clarifyingAsked?.[idx] || false,
-            id: idx,
-          }));
+          const qs = (init?.clarifyingQuestions || []).map((q, idx) => {
+            const contactValue =
+              init?.clarifyingContacts?.[idx] ?? q.stakeholders ?? [];
+            return {
+              question: typeof q === "string" ? q : q.question,
+              contacts: normalizeContacts(contactValue),
+              answers: init?.clarifyingAnswers?.[idx] || {},
+              asked: init?.clarifyingAsked?.[idx] || false,
+              id: idx,
+            };
+          });
           setQuestions(qs);
         }
         setLoaded(true);
