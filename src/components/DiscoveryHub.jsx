@@ -58,6 +58,7 @@ const DiscoveryHub = () => {
     }
     try {
       const callable = httpsCallable(functions, "sendQuestionEmail");
+      const idToken = await auth.currentUser.getIdToken();
       await callable({
         provider: "gmail",
         recipientEmail: auth.currentUser.email || "",

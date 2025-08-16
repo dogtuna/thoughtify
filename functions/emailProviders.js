@@ -166,11 +166,21 @@ async function getToken(uid, provider) {
 
 // 3. Send or draft email and record provider message ID
 export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
-  const uid = context.auth?.uid;
+  let uid = context.auth?.uid;
+
+  if (!uid && data.idToken) {
+    try {
+      const decoded = await admin.auth().verifyIdToken(data.idToken);
+      uid = decoded.uid;
+    } catch {
+      // fall through to unauthenticated error below
+    }
+  }
 
   if (!uid) {
     throw new functions.https.HttpsError("unauthenticated", "Auth required");
   }
+
   const {
     provider,
     recipientEmail,
