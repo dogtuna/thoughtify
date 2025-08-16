@@ -206,7 +206,13 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
     questionId,
     draft = false,
   } = data;
-  if (!provider || !recipientEmail || !subject || !message || !questionId) {
+  if (
+    !provider ||
+    !recipientEmail ||
+    !subject ||
+    !message ||
+    questionId == null
+  ) {
     throw new functions.https.HttpsError("invalid-argument", "Missing fields");
   }
   try {
