@@ -176,8 +176,6 @@ async function getToken(uid, provider) {
 
 // 3. Send or draft email and record provider message ID
 export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
-  let uid = context.auth?.uid;
-
   if (!ENCRYPTION_KEY) {
     const msg =
       "Server misconfigured: TOKEN_ENCRYPTION_KEY is not set";
@@ -185,17 +183,11 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError("failed-precondition", msg);
   }
 
-  if (!uid && data.idToken) {
-    try {
-      const decoded = await admin.auth().verifyIdToken(data.idToken);
-      uid = decoded.uid;
-    } catch {
-      // fall through to unauthenticated error below
-    }
-  }
-
+  const uid = context.auth?.uid;
   if (!uid) {
-    throw new functions.https.HttpsError("unauthenticated", "Auth required");
+    const msg = "Authentication required: missing context.auth";
+    console.error("sendQuestionEmail unauthenticated", msg);
+    throw new functions.https.HttpsError("unauthenticated", msg);
   }
 
   const {
