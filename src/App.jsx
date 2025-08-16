@@ -17,6 +17,8 @@ import InitiativesNew from "./components/InitiativesNew";
 import InitiativesList from "./components/InitiativesList";
 import LeadershipAssessmentWizard from "./components/LeadershipAssessmentWizard";
 import CustomDashboard from "./components/CustomDashboard";
+import ProjectSetup from "./components/ProjectSetup";
+import DiscoveryHub from "./components/DiscoveryHub";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import Login from "./components/Login";
 import NavBar from "./components/NavBar";
@@ -82,6 +84,14 @@ export default function App() {
           }
         />
         <Route path="/dashboard" element={<CustomDashboard />} />
+        <Route
+          path="/project-setup"
+          element={user ? <ProjectSetup /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/discovery"
+          element={user ? <DiscoveryHub /> : <Navigate to="/login" />}
+        />
         <Route path="/settings" element={<Settings />} />
         <Route
           path="/leadership-assessment"
