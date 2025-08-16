@@ -1572,3 +1572,5 @@ export const savePersona = onCall(async (request) => {
     .set(persona, { merge: true });
   return { id: personaId };
 });
+
+export { getEmailAuthUrl, emailOAuthCallback, sendQuestionEmail } from "./emailProviders.js";
