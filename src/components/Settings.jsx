@@ -26,7 +26,11 @@ const Settings = () => {
 
   const connectGmail = () => {
     if (!uid) return;
-    window.location.href = `${functionsBaseUrl}/getEmailAuthUrl?provider=gmail&state=${uid}`;
+    window.open(
+      `${functionsBaseUrl}/getEmailAuthUrl?provider=gmail&state=${uid}`,
+      "_blank",
+      "width=500,height=600"
+    );
   };
 
   const disconnectGmail = async () => {

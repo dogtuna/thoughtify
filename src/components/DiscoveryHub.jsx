@@ -52,11 +52,16 @@ const DiscoveryHub = () => {
       }
       return;
     }
+    if (!auth.currentUser) {
+      alert("Please log in to draft emails.");
+      return;
+    }
     try {
+      await auth.currentUser.getIdToken();
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
-        recipientEmail: auth.currentUser?.email || "",
+        recipientEmail: auth.currentUser.email || "",
         subject: q.question,
         message: q.question,
         questionId: q.id ?? q.idx,
