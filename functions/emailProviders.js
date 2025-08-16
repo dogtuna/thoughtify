@@ -6,6 +6,10 @@ import { google } from "googleapis";
 // import { ConfidentialClientApplication } from "@azure/msal-node"; // Outlook integration disabled
 import crypto from "crypto";
 
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
 // Encryption helpers for storing tokens securely
 const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY || ""; // must be 32 bytes hex
 function encrypt(text) {
@@ -164,15 +168,13 @@ async function getToken(uid, provider) {
 export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
   let uid = context.auth?.uid;
 
-  // If the callable request didn't include auth context, attempt to verify a token
   if (!uid) {
     let token = data.idToken;
 
-    // Fallback to Authorization header if present
     if (!token) {
-      const authHeader = context.rawRequest.headers.authorization;
+      const authHeader = context.rawRequest?.headers?.authorization;
       if (authHeader?.startsWith("Bearer ")) {
-        token = authHeader.split("Bearer ")[1];
+        token = authHeader.split(" ")[1];
       }
     }
 
@@ -182,6 +184,10 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
         uid = decoded.uid;
       } catch (err) {
         console.error("verifyIdToken error", err);
+        throw new functions.https.HttpsError(
+          "unauthenticated",
+          "Invalid ID token"
+        );
       }
     }
   }
