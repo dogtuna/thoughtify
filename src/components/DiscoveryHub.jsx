@@ -52,15 +52,21 @@ const DiscoveryHub = () => {
       }
       return;
     }
+    if (!auth.currentUser) {
+      alert("Please log in to draft emails.");
+      return;
+    }
     try {
+      const idToken = await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
-        recipientEmail: auth.currentUser?.email || "",
+        recipientEmail: auth.currentUser.email || "",
         subject: q.question,
         message: q.question,
         questionId: q.id ?? q.idx,
         draft: true,
+        idToken,
       });
       alert("Draft created in Gmail");
     } catch (err) {

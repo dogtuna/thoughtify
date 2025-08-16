@@ -128,9 +128,17 @@ export const emailOAuthCallback = functions.https.onRequest(async (req, res) => 
     } else {
       return res.status(400).send("Unknown provider");
     }
-    res.status(200).send(
-      "<p>Gmail account connected. You can close this window.</p>"
-    );
+    const appBase = process.env.APP_BASE_URL || "https://thoughtify.web.app";
+    res.status(200).send(`
+      <html><body><script>
+        if (window.opener) {
+          window.opener.location = '${appBase}/dashboard';
+          window.close();
+        } else {
+          window.location = '${appBase}/dashboard';
+        }
+      </script></body></html>
+    `);
   } catch (err) {
     console.error("emailOAuthCallback error", err);
     res
@@ -154,9 +162,26 @@ async function getToken(uid, provider) {
 
 // 3. Send or draft email and record provider message ID
 export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
-  const uid = context.auth?.uid;
-  if (!uid) throw new functions.https.HttpsError("unauthenticated", "Auth required");
-  const { provider, recipientEmail, subject, message, questionId, draft = false } = data;
+  let uid = context.auth?.uid;
+  // If the callable request didn't include auth context, fall back to an idToken
+  if (!uid && data.idToken) {
+    try {
+      const decoded = await admin.auth().verifyIdToken(data.idToken);
+      uid = decoded.uid;
+    } catch (err) {
+      console.error("verifyIdToken error", err);
+    }
+  }
+  if (!uid)
+    throw new functions.https.HttpsError("unauthenticated", "Auth required");
+  const {
+    provider,
+    recipientEmail,
+    subject,
+    message,
+    questionId,
+    draft = false,
+  } = data;
   if (!provider || !recipientEmail || !subject || !message || !questionId) {
     throw new functions.https.HttpsError("invalid-argument", "Missing fields");
   }
