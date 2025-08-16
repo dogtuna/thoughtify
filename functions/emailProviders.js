@@ -21,6 +21,7 @@ function encrypt(text) {
     Buffer.from(ENCRYPTION_KEY, "hex"),
     iv
   );
+
   let encrypted = cipher.update(text, "utf8", "hex");
   encrypted += cipher.final("hex");
   return iv.toString("hex") + ":" + encrypted;
@@ -236,3 +237,4 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError("internal", err.message);
   }
 });
+
