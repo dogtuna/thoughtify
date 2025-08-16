@@ -128,9 +128,17 @@ export const emailOAuthCallback = functions.https.onRequest(async (req, res) => 
     } else {
       return res.status(400).send("Unknown provider");
     }
-    res.status(200).send(
-      "<p>Gmail account connected. You can close this window.</p>"
-    );
+    const appBase = process.env.APP_BASE_URL || "https://thoughtify.web.app";
+    res.status(200).send(`
+      <html><body><script>
+        if (window.opener) {
+          window.opener.location = '${appBase}/dashboard';
+          window.close();
+        } else {
+          window.location = '${appBase}/dashboard';
+        }
+      </script></body></html>
+    `);
   } catch (err) {
     console.error("emailOAuthCallback error", err);
     res
