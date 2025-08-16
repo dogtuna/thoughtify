@@ -38,6 +38,8 @@ const DiscoveryHub = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [menu, setMenu] = useState(null);
+  const [focusRole, setFocusRole] = useState("");
+  const [editData, setEditData] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -242,12 +244,21 @@ const DiscoveryHub = () => {
     }
   };
 
+  const sortUnassignedFirst = (arr) =>
+    arr.sort((a, b) => {
+      const aUn = a.contacts.length === 0;
+      const bUn = b.contacts.length === 0;
+      if (aUn && !bUn) return -1;
+      if (!aUn && bUn) return 1;
+      return a.idx - b.idx;
+    });
+
   const getColor = (name) =>
     contacts.find((c) => c.name === name)?.color || "#e9ecef";
 
-  const openContextMenu = (e, name) => {
+  const openContextMenu = (e, name, idx) => {
     e.preventDefault();
-    setMenu({ x: e.clientX, y: e.clientY, name });
+    setMenu({ x: e.clientX, y: e.clientY, name, idx });
   };
 
   useEffect(() => {
@@ -256,21 +267,25 @@ const DiscoveryHub = () => {
     return () => window.removeEventListener("click", close);
   }, []);
 
-  const editContact = (name) => {
-    const idx = contacts.findIndex((c) => c.name === name);
+  const startEditContact = (name) => {
+    const contact = contacts.find((c) => c.name === name);
+    if (!contact) return;
+    setEditData({ original: name, name: contact.name, role: contact.role });
+  };
+
+  const saveEditContact = () => {
+    if (!editData) return;
+    const { original, name, role } = editData;
+    const idx = contacts.findIndex((c) => c.name === original);
     if (idx === -1) return;
-    const newName =
-      prompt("Edit name:", contacts[idx].name) || contacts[idx].name;
-    const newRole =
-      prompt("Edit role:", contacts[idx].role) || contacts[idx].role;
     const updatedContacts = contacts.map((c, i) =>
-      i === idx ? { ...c, name: newName, role: newRole } : c
+      i === idx ? { ...c, name, role } : c
     );
     const updatedQuestions = questions.map((q) => {
-      const newContacts = q.contacts.map((n) => (n === name ? newName : n));
+      const newContacts = q.contacts.map((n) => (n === original ? name : n));
       const newAnswers = {};
       Object.entries(q.answers).forEach(([n, v]) => {
-        newAnswers[n === name ? newName : n] = v;
+        newAnswers[n === original ? name : n] = v;
       });
       return { ...q, contacts: newContacts, answers: newAnswers };
     });
@@ -285,6 +300,7 @@ const DiscoveryHub = () => {
         clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
       });
     }
+    setEditData(null);
   };
 
   if (!loaded) {
@@ -303,12 +319,14 @@ const DiscoveryHub = () => {
     const status = !q.asked ? "toask" : allAnswered ? "answered" : "asked";
     return { ...q, idx, status };
   });
+  sortUnassignedFirst(items);
 
   let filtered = items.filter(
     (q) =>
       (!contactFilter || q.contacts.includes(contactFilter)) &&
       (!statusFilter || q.status === statusFilter)
   );
+  sortUnassignedFirst(filtered);
 
   let grouped = { All: filtered };
   if (groupBy === "contact") {
@@ -320,6 +338,46 @@ const DiscoveryHub = () => {
         grouped[n].push(q);
       });
     });
+    const ordered = {};
+    if (grouped["Unassigned"]) {
+      ordered["Unassigned"] = sortUnassignedFirst(grouped["Unassigned"]);
+      delete grouped["Unassigned"];
+    }
+    Object.keys(grouped)
+      .sort()
+      .forEach((k) => {
+        ordered[k] = sortUnassignedFirst(grouped[k]);
+      });
+    grouped = ordered;
+  } else if (groupBy === "role") {
+    grouped = {};
+    filtered.forEach((q) => {
+      const roles = q.contacts.length
+        ? q.contacts.map(
+            (n) => contacts.find((c) => c.name === n)?.role || "No Role"
+          )
+        : ["Unassigned"];
+      roles.forEach((r) => {
+        const label = r && r !== "" ? r : "No Role";
+        grouped[label] = grouped[label] || [];
+        grouped[label].push(q);
+      });
+    });
+    const ordered = {};
+    if (grouped["Unassigned"]) {
+      ordered["Unassigned"] = sortUnassignedFirst(grouped["Unassigned"]);
+      delete grouped["Unassigned"];
+    }
+    if (focusRole && grouped[focusRole]) {
+      ordered[focusRole] = sortUnassignedFirst(grouped[focusRole]);
+      delete grouped[focusRole];
+    }
+    Object.keys(grouped)
+      .sort()
+      .forEach((k) => {
+        ordered[k] = sortUnassignedFirst(grouped[k]);
+      });
+    grouped = ordered;
   } else if (groupBy === "status") {
     grouped = {};
     filtered.forEach((q) => {
@@ -327,6 +385,9 @@ const DiscoveryHub = () => {
       grouped[label] = grouped[label] || [];
       grouped[label].push(q);
     });
+    Object.keys(grouped).forEach((k) => sortUnassignedFirst(grouped[k]));
+  } else {
+    grouped["All"] = sortUnassignedFirst(grouped["All"]);
   }
 
   return (
@@ -445,6 +506,7 @@ const DiscoveryHub = () => {
                 >
                   <option value="">None</option>
                   <option value="contact">Contact</option>
+                  <option value="role">Role</option>
                   <option value="status">Status</option>
                 </select>
               </label>
@@ -483,7 +545,7 @@ const DiscoveryHub = () => {
                           key={name}
                           className="contact-tag"
                           style={{ backgroundColor: getColor(name) }}
-                          onClick={(e) => openContextMenu(e, name)}
+                          onClick={(e) => openContextMenu(e, name, q.idx)}
                         >
                           {name}
                           <button
@@ -549,14 +611,6 @@ const DiscoveryHub = () => {
                           />
                         </div>
                       ))}
-                    {q.status === "toask" && (
-                      <button
-                        className="generator-button"
-                        onClick={() => markAsked(q.idx)}
-                      >
-                        Ask
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -572,11 +626,19 @@ const DiscoveryHub = () => {
         >
           <li
             onClick={() => {
-              editContact(menu.name);
+              startEditContact(menu.name);
               setMenu(null);
             }}
           >
             Edit
+          </li>
+          <li
+            onClick={() => {
+              markAsked(menu.idx);
+              setMenu(null);
+            }}
+          >
+            Ask
           </li>
           <li
             onClick={() => {
@@ -586,15 +648,59 @@ const DiscoveryHub = () => {
           >
             Filter
           </li>
-          <li
-            onClick={() => {
-              setGroupBy("contact");
-              setMenu(null);
-            }}
-          >
-            Group
-          </li>
+            <li
+              onClick={() => {
+                const role =
+                  contacts.find((c) => c.name === menu.name)?.role || "No Role";
+                setGroupBy("role");
+                setFocusRole(role);
+                setMenu(null);
+              }}
+            >
+              Group
+            </li>
         </ul>
+      )}
+      {editData && (
+        <div className="modal-overlay" onClick={() => setEditData(null)}>
+          <div
+            className="initiative-card modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Edit Contact</h3>
+            <label>
+              Name:
+              <input
+                className="generator-input"
+                value={editData.name}
+                onChange={(e) =>
+                  setEditData((d) => ({ ...d, name: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Role:
+              <input
+                className="generator-input"
+                value={editData.role}
+                onChange={(e) =>
+                  setEditData((d) => ({ ...d, role: e.target.value }))
+                }
+              />
+            </label>
+            <div className="modal-actions">
+              <button className="generator-button" onClick={saveEditContact}>
+                Save
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => setEditData(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {showSummary && (
         <div className="modal-overlay" onClick={() => setShowSummary(false)}>
