@@ -6,8 +6,6 @@ import { google } from "googleapis";
 import { ConfidentialClientApplication } from "@azure/msal-node";
 import crypto from "crypto";
 
-const db = admin.firestore();
-
 // Encryption helpers for storing tokens securely
 const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY || ""; // must be 32 bytes hex
 function encrypt(text) {
@@ -84,6 +82,7 @@ export const emailOAuthCallback = functions.https.onRequest(async (req, res) => 
   const uid = state; // state should carry the user ID
   if (!uid) return res.status(400).send("Missing user state");
   try {
+    const db = admin.firestore();
     if (provider === "gmail") {
       const { tokens } = await gmailClient.getToken(code);
       const enc = encrypt(JSON.stringify(tokens));
@@ -118,6 +117,7 @@ export const emailOAuthCallback = functions.https.onRequest(async (req, res) => 
 
 // Helper to read stored token
 async function getToken(uid, provider) {
+  const db = admin.firestore();
   const snap = await db
     .collection("users")
     .doc(uid)
@@ -137,6 +137,7 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError("invalid-argument", "Missing fields");
   }
   try {
+    const db = admin.firestore();
     let messageId = "";
     if (provider === "gmail") {
       const tokens = await getToken(uid, "gmail");
