@@ -66,7 +66,6 @@ const DiscoveryHub = () => {
         message: q.question,
         questionId: q.id ?? q.idx,
         draft: true,
-        idToken,
       });
       alert("Draft created in Gmail");
     } catch (err) {
