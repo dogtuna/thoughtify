@@ -11,13 +11,15 @@ if (!admin.apps.length) {
 }
 
 // Encryption helpers for storing tokens securely
-const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY || ""; // must be 32 bytes hex
+const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY; // must be 32 bytes hex
+const MISSING_KEY_MSG =
+  "TOKEN_ENCRYPTION_KEY environment variable is required to encrypt OAuth tokens";
+if (!ENCRYPTION_KEY) {
+  console.error(MISSING_KEY_MSG);
+}
 function encrypt(text) {
   if (!ENCRYPTION_KEY) {
-    console.warn(
-      "TOKEN_ENCRYPTION_KEY not set; storing OAuth token in plain text"
-    );
-    return text;
+    throw new Error(MISSING_KEY_MSG);
   }
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(
@@ -31,7 +33,9 @@ function encrypt(text) {
   return iv.toString("hex") + ":" + encrypted;
 }
 function decrypt(text) {
-  if (!ENCRYPTION_KEY) return text;
+  if (!ENCRYPTION_KEY) {
+    throw new Error(MISSING_KEY_MSG);
+  }
   const [ivHex, data] = text.split(":");
   const iv = Buffer.from(ivHex, "hex");
   const decipher = crypto.createDecipheriv(
@@ -103,6 +107,12 @@ export const emailOAuthCallback = functions.https.onRequest(async (req, res) => 
   const { code, state, provider } = { ...req.query, ...req.body };
   const uid = state; // state should carry the user ID
   if (!uid) return res.status(400).send("Missing user state");
+  if (!ENCRYPTION_KEY) {
+    const msg =
+      "Server misconfigured: TOKEN_ENCRYPTION_KEY is not set";
+    console.error(msg);
+    return res.status(500).send(msg);
+  }
   try {
     const db = admin.firestore();
     if (provider === "gmail") {
@@ -167,6 +177,13 @@ async function getToken(uid, provider) {
 // 3. Send or draft email and record provider message ID
 export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
   let uid = context.auth?.uid;
+
+  if (!ENCRYPTION_KEY) {
+    const msg =
+      "Server misconfigured: TOKEN_ENCRYPTION_KEY is not set";
+    console.error(msg);
+    throw new functions.https.HttpsError("failed-precondition", msg);
+  }
 
   if (!uid && data.idToken) {
     try {
