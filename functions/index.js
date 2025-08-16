@@ -4,6 +4,7 @@ import process from "process";
 import functions from "firebase-functions";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
+if (!admin.apps.length) admin.initializeApp();
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
