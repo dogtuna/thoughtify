@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db, functions } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
@@ -40,11 +42,41 @@ const DiscoveryHub = () => {
   const [menu, setMenu] = useState(null);
   const [focusRole, setFocusRole] = useState("");
   const [editData, setEditData] = useState(null);
+  const [emailConnected, setEmailConnected] = useState(false);
+  const navigate = useNavigate();
+
+  const draftEmail = async (q) => {
+    if (!emailConnected) {
+      if (window.confirm("Connect your Gmail account in settings?")) {
+        navigate("/settings");
+      }
+      return;
+    }
+    try {
+      const callable = httpsCallable(functions, "sendQuestionEmail");
+      await callable({
+        provider: "gmail",
+        recipientEmail: auth.currentUser?.email || "",
+        subject: q.question,
+        message: q.question,
+        questionId: q.id ?? q.idx,
+        draft: true,
+      });
+      alert("Draft created in Gmail");
+    } catch (err) {
+      console.error("draftEmail error", err);
+      alert("Error drafting email");
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUid(user.uid);
+        const tokenSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "gmail")
+        );
+        setEmailConnected(tokenSnap.exists());
         if (initiativeId) {
           const init = await loadInitiative(user.uid, initiativeId);
           const contactsInit = (init?.keyContacts || []).map((c, i) => ({
@@ -647,6 +679,12 @@ const DiscoveryHub = () => {
                       )}
                       <p>{q.question}</p>
                       <span className="status-tag">{statusLabel(q.status)}</span>
+                      <button
+                        className="draft-email-btn"
+                        onClick={() => draftEmail(q)}
+                      >
+                        Draft Email
+                      </button>
                     </div>
                     {q.status !== "toask" &&
                       q.contacts.map((name) => (
