@@ -3,7 +3,7 @@ import { Buffer } from "buffer";
 import functions from "firebase-functions";
 import admin from "firebase-admin";
 import { google } from "googleapis";
-import { ConfidentialClientApplication } from "@azure/msal-node";
+// import { ConfidentialClientApplication } from "@azure/msal-node"; // Outlook integration disabled
 import crypto from "crypto";
 
 // Encryption helpers for storing tokens securely
@@ -40,14 +40,14 @@ const gmailClient = new google.auth.OAuth2(
   process.env.GMAIL_REDIRECT_URI
 );
 
-// Microsoft OAuth configuration
-const msalClient = new ConfidentialClientApplication({
-  auth: {
-    clientId: process.env.OUTLOOK_CLIENT_ID || "",
-    authority: `https://login.microsoftonline.com/${process.env.OUTLOOK_TENANT_ID}`,
-    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || "",
-  },
-});
+// Microsoft OAuth configuration (temporarily disabled)
+// const msalClient = new ConfidentialClientApplication({
+//   auth: {
+//    clientId: process.env.OUTLOOK_CLIENT_ID || "",
+//    authority: `https://login.microsoftonline.com/${process.env.OUTLOOK_TENANT_ID}`,
+//    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || "",
+//   },
+// });
 
 // 1. Generate provider authorization URL
 export const getEmailAuthUrl = functions.https.onRequest(async (req, res) => {
@@ -60,13 +60,14 @@ export const getEmailAuthUrl = functions.https.onRequest(async (req, res) => {
         state,
       });
       res.redirect(url);
-    } else if (provider === "outlook") {
-      const url = await msalClient.getAuthCodeUrl({
-        scopes: ["https://graph.microsoft.com/Mail.Send", "offline_access"],
-        redirectUri: process.env.OUTLOOK_REDIRECT_URI,
-        state,
-      });
-      res.redirect(url);
+      // Outlook integration temporarily disabled
+      // } else if (provider === "outlook") {
+      //   const url = await msalClient.getAuthCodeUrl({
+      //     scopes: ["https://graph.microsoft.com/Mail.Send", "offline_access"],
+      //     redirectUri: process.env.OUTLOOK_REDIRECT_URI,
+      //     state,
+      //   });
+      //   res.redirect(url);
     } else {
       res.status(400).send("Unknown provider");
     }
@@ -92,19 +93,20 @@ export const emailOAuthCallback = functions.https.onRequest(async (req, res) => 
         .collection("emailTokens")
         .doc("gmail")
         .set({ token: enc });
-    } else if (provider === "outlook") {
-      const tokenResponse = await msalClient.acquireTokenByCode({
-        code,
-        scopes: ["https://graph.microsoft.com/Mail.Send", "offline_access"],
-        redirectUri: process.env.OUTLOOK_REDIRECT_URI,
-      });
-      const enc = encrypt(JSON.stringify(tokenResponse));
-      await db
-        .collection("users")
-        .doc(uid)
-        .collection("emailTokens")
-        .doc("outlook")
-        .set({ token: enc });
+      // Outlook integration temporarily disabled
+      // } else if (provider === "outlook") {
+      //   const tokenResponse = await msalClient.acquireTokenByCode({
+      //     code,
+      //     scopes: ["https://graph.microsoft.com/Mail.Send", "offline_access"],
+      //     redirectUri: process.env.OUTLOOK_REDIRECT_URI,
+      //   });
+      //   const enc = encrypt(JSON.stringify(tokenResponse));
+      //   await db
+      //     .collection("users")
+      //     .doc(uid)
+      //     .collection("emailTokens")
+      //     .doc("outlook")
+      //     .set({ token: enc });
     } else {
       return res.status(400).send("Unknown provider");
     }
@@ -160,42 +162,43 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
             requestBody: { raw },
           });
       messageId = response.data.id;
-    } else if (provider === "outlook") {
-      const tokens = await getToken(uid, "outlook");
-      const accessToken = tokens.accessToken;
-      const url = draft
-        ? "https://graph.microsoft.com/v1.0/me/messages"
-        : "https://graph.microsoft.com/v1.0/me/sendMail";
-      const payload = draft
-        ? {
-            subject,
-            body: { contentType: "Text", content: message },
-            toRecipients: [{ emailAddress: { address: recipientEmail } }],
-          }
-        : {
-            message: {
-              subject,
-              body: { contentType: "Text", content: message },
-              toRecipients: [{ emailAddress: { address: recipientEmail } }],
-            },
-          };
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!resp.ok) {
-        throw new Error(await resp.text());
-      }
-      if (draft) {
-        const data = await resp.json();
-        messageId = data.id;
-      } else {
-        messageId = "sent";
-      }
+      // Outlook integration temporarily disabled
+      // } else if (provider === "outlook") {
+      //   const tokens = await getToken(uid, "outlook");
+      //   const accessToken = tokens.accessToken;
+      //   const url = draft
+      //     ? "https://graph.microsoft.com/v1.0/me/messages"
+      //     : "https://graph.microsoft.com/v1.0/me/sendMail";
+      //   const payload = draft
+      //     ? {
+      //         subject,
+      //         body: { contentType: "Text", content: message },
+      //         toRecipients: [{ emailAddress: { address: recipientEmail } }],
+      //       }
+      //     : {
+      //         message: {
+      //           subject,
+      //           body: { contentType: "Text", content: message },
+      //           toRecipients: [{ emailAddress: { address: recipientEmail } }],
+      //         },
+      //       };
+      //   const resp = await fetch(url, {
+      //     method: "POST",
+      //     headers: {
+      //       Authorization: `Bearer ${accessToken}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //     body: JSON.stringify(payload),
+      //   });
+      //   if (!resp.ok) {
+      //     throw new Error(await resp.text());
+      //   }
+      //   if (draft) {
+      //     const data = await resp.json();
+      //     messageId = data.id;
+      //   } else {
+      //     messageId = "sent";
+      //   }
     } else {
       throw new Error("Unknown provider");
     }
