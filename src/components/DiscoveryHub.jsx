@@ -30,11 +30,14 @@ const DiscoveryHub = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
   const [selected, setSelected] = useState([]);
+  const [selectMode, setSelectMode] = useState(false);
   const [uid, setUid] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [active, setActive] = useState("questions");
   const [summary, setSummary] = useState("");
   const [showSummary, setShowSummary] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [menu, setMenu] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -50,9 +53,15 @@ const DiscoveryHub = () => {
           const qs = (init?.clarifyingQuestions || []).map((q, idx) => {
             const contactValue =
               init?.clarifyingContacts?.[idx] ?? q.stakeholders ?? [];
+            const names = normalizeContacts(contactValue).map((c) => {
+              const match = contactsInit.find(
+                (k) => k.role === c || k.name === c
+              );
+              return match?.name || c;
+            });
             return {
               question: typeof q === "string" ? q : q.question,
-              contacts: normalizeContacts(contactValue),
+              contacts: names,
               answers: init?.clarifyingAnswers?.[idx] || {},
               asked: init?.clarifyingAsked?.[idx] || false,
               id: idx,
@@ -69,11 +78,11 @@ const DiscoveryHub = () => {
     return () => unsubscribe();
   }, [initiativeId]);
 
-  const updateAnswer = (idx, role, value) => {
+  const updateAnswer = (idx, name, value) => {
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      q.answers = { ...q.answers, [role]: value };
+      q.answers = { ...q.answers, [name]: value };
       if (uid) {
         saveInitiative(uid, initiativeId, {
           clarifyingAnswers: updated.map((qq) => qq.answers),
@@ -84,9 +93,9 @@ const DiscoveryHub = () => {
   };
 
   const addContact = () => {
-    const role = prompt("Contact role?");
-    if (!role) return null;
-    const name = prompt("Contact name? (optional)") || "";
+    const name = prompt("Contact name?");
+    if (!name) return null;
+    const role = prompt("Contact role? (optional)") || "";
     const color = colorPalette[contacts.length % colorPalette.length];
     const newContact = { role, name, color };
     const updated = [...contacts, newContact];
@@ -96,15 +105,15 @@ const DiscoveryHub = () => {
         keyContacts: updated.map(({ name, role }) => ({ name, role })),
       });
     }
-    return role;
+    return name;
   };
 
-  const addContactToQuestion = (idx, role) => {
+  const addContactToQuestion = (idx, name) => {
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      if (!q.contacts.includes(role)) {
-        q.contacts = [...q.contacts, role];
+      if (!q.contacts.includes(name)) {
+        q.contacts = [...q.contacts, name];
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -117,13 +126,13 @@ const DiscoveryHub = () => {
     });
   };
 
-  const removeContactFromQuestion = (idx, role) => {
+  const removeContactFromQuestion = (idx, name) => {
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      q.contacts = q.contacts.filter((r) => r !== role);
-      if (q.answers[role]) {
-        delete q.answers[role];
+      q.contacts = q.contacts.filter((r) => r !== name);
+      if (q.answers[name]) {
+        delete q.answers[name];
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -139,8 +148,8 @@ const DiscoveryHub = () => {
 
   const handleContactSelect = (idx, value) => {
     if (value === "__add__") {
-      const newRole = addContact();
-      if (newRole) addContactToQuestion(idx, newRole);
+      const newName = addContact();
+      if (newName) addContactToQuestion(idx, newName);
     } else if (value) {
       addContactToQuestion(idx, value);
     }
@@ -166,22 +175,6 @@ const DiscoveryHub = () => {
       navigator.clipboard.writeText(texts.join("\n\n"));
     }
     setSelected((prev) => prev.filter((i) => !indices.includes(i)));
-  };
-
-  const moveToToAsk = (idx) => {
-    setQuestions((prev) => {
-      const updated = [...prev];
-      const q = updated[idx];
-      q.asked = false;
-      q.answers = {};
-      if (uid) {
-        saveInitiative(uid, initiativeId, {
-          clarifyingAsked: updated.map((qq) => qq.asked),
-          clarifyingAnswers: updated.map((qq) => qq.answers),
-        });
-      }
-      return updated;
-    });
   };
 
   const handleDocFiles = async (files) => {
@@ -249,8 +242,50 @@ const DiscoveryHub = () => {
     }
   };
 
-  const getColor = (role) =>
-    contacts.find((c) => c.role === role)?.color || "#e9ecef";
+  const getColor = (name) =>
+    contacts.find((c) => c.name === name)?.color || "#e9ecef";
+
+  const openContextMenu = (e, name) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, name });
+  };
+
+  useEffect(() => {
+    const close = () => setMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
+
+  const editContact = (name) => {
+    const idx = contacts.findIndex((c) => c.name === name);
+    if (idx === -1) return;
+    const newName =
+      prompt("Edit name:", contacts[idx].name) || contacts[idx].name;
+    const newRole =
+      prompt("Edit role:", contacts[idx].role) || contacts[idx].role;
+    const updatedContacts = contacts.map((c, i) =>
+      i === idx ? { ...c, name: newName, role: newRole } : c
+    );
+    const updatedQuestions = questions.map((q) => {
+      const newContacts = q.contacts.map((n) => (n === name ? newName : n));
+      const newAnswers = {};
+      Object.entries(q.answers).forEach(([n, v]) => {
+        newAnswers[n === name ? newName : n] = v;
+      });
+      return { ...q, contacts: newContacts, answers: newAnswers };
+    });
+    setContacts(updatedContacts);
+    setQuestions(updatedQuestions);
+    if (uid) {
+      saveInitiative(uid, initiativeId, {
+        keyContacts: updatedContacts.map(({ name, role }) => ({ name, role })),
+        clarifyingContacts: Object.fromEntries(
+          updatedQuestions.map((qq, i) => [i, qq.contacts])
+        ),
+        clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
+      });
+    }
+  };
 
   if (!loaded) {
     return (
@@ -264,10 +299,10 @@ const DiscoveryHub = () => {
 
   const items = questions.map((q, idx) => {
     const allAnswered =
-      q.contacts.length && q.contacts.every((r) => (q.answers[r] || "").trim());
+      q.contacts.length && q.contacts.every((n) => (q.answers[n] || "").trim());
     const status = !q.asked ? "toask" : allAnswered ? "answered" : "asked";
     return { ...q, idx, status };
-    });
+  });
 
   let filtered = items.filter(
     (q) =>
@@ -279,10 +314,10 @@ const DiscoveryHub = () => {
   if (groupBy === "contact") {
     grouped = {};
     filtered.forEach((q) => {
-      const roles = q.contacts.length ? q.contacts : ["Unassigned"];
-      roles.forEach((r) => {
-        grouped[r] = grouped[r] || [];
-        grouped[r].push(q);
+      const names = q.contacts.length ? q.contacts : ["Unassigned"];
+      names.forEach((n) => {
+        grouped[n] = grouped[n] || [];
+        grouped[n].push(q);
       });
     });
   } else if (groupBy === "status") {
@@ -384,8 +419,8 @@ const DiscoveryHub = () => {
                 >
                   <option value="">All</option>
                   {contacts.map((c) => (
-                    <option key={c.role} value={c.role}>
-                      {c.role}
+                    <option key={c.name} value={c.name}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -413,10 +448,19 @@ const DiscoveryHub = () => {
                   <option value="status">Status</option>
                 </select>
               </label>
+              <button
+                className="generator-button"
+                onClick={() => {
+                  setSelectMode((s) => !s);
+                  if (selectMode) setSelected([]);
+                }}
+              >
+                {selectMode ? "Cancel" : "Select"}
+              </button>
               <button className="generator-button" onClick={addContact}>
                 Add Contact
               </button>
-              {selected.length > 0 && (
+              {selectMode && selected.length > 0 && (
                 <button
                   className="generator-button ask-selected"
                   onClick={askSelected}
@@ -433,70 +477,84 @@ const DiscoveryHub = () => {
                     key={q.idx}
                     className={`initiative-card question-card ${q.status}`}
                   >
-                    <div className="question-header">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(q.idx)}
-                        onChange={() => toggleSelect(q.idx)}
-                      />
-                      <p>{q.question}</p>
-                      <span className="status-tag">{statusLabel(q.status)}</span>
-                    </div>
                     <div className="contact-row">
-                      {q.contacts.map((r) => (
+                      {q.contacts.map((name) => (
                         <span
-                          key={r}
+                          key={name}
                           className="contact-tag"
-                          style={{ backgroundColor: getColor(r) }}
+                          style={{ backgroundColor: getColor(name) }}
+                          onClick={(e) => openContextMenu(e, name)}
                         >
-                          {r}
-                          <button onClick={() => removeContactFromQuestion(q.idx, r)}>
+                          {name}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeContactFromQuestion(q.idx, name);
+                            }}
+                          >
                             ×
                           </button>
                         </span>
                       ))}
-                      <select
-                        className="contact-select"
-                        value=""
-                        onChange={(e) => handleContactSelect(q.idx, e.target.value)}
+                      <button
+                        className="add-contact-btn"
+                        onClick={() =>
+                          setOpenDropdown((d) => (d === q.idx ? null : q.idx))
+                        }
                       >
-                        <option value="">Add Contact</option>
-                        {contacts
-                          .filter((c) => !q.contacts.includes(c.role))
-                          .map((c) => (
-                            <option key={c.role} value={c.role}>
-                              {c.role}
-                            </option>
-                          ))}
-                        <option value="__add__">Add New Contact</option>
-                      </select>
+                        +
+                      </button>
+                      {openDropdown === q.idx && (
+                        <select
+                          className="contact-select"
+                          value=""
+                          onChange={(e) => {
+                            handleContactSelect(q.idx, e.target.value);
+                            setOpenDropdown(null);
+                          }}
+                        >
+                          <option value="">Select Contact</option>
+                          {contacts
+                            .filter((c) => !q.contacts.includes(c.name))
+                            .map((c) => (
+                              <option key={c.name} value={c.name}>
+                                {c.name}
+                              </option>
+                            ))}
+                          <option value="__add__">Add New Contact</option>
+                        </select>
+                      )}
+                    </div>
+                    <div className="question-header">
+                      {selectMode && (
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(q.idx)}
+                          onChange={() => toggleSelect(q.idx)}
+                        />
+                      )}
+                      <p>{q.question}</p>
+                      <span className="status-tag">{statusLabel(q.status)}</span>
                     </div>
                     {q.status !== "toask" &&
-                      q.contacts.map((r) => (
-                        <div key={r} className="answer-block">
-                          <strong>{r}:</strong>
+                      q.contacts.map((name) => (
+                        <div key={name} className="answer-block">
+                          <strong>{name}:</strong>
                           <textarea
                             className="generator-input"
                             placeholder="Paste Answer/Notes Here"
-                            value={q.answers[r] || ""}
-                            onChange={(e) => updateAnswer(q.idx, r, e.target.value)}
+                            value={q.answers[name] || ""}
+                            onChange={(e) => updateAnswer(q.idx, name, e.target.value)}
                             rows={3}
                           />
                         </div>
                       ))}
-                    {q.status === "toask" ? (
+                    {q.status === "toask" && (
                       <button
                         className="generator-button"
                         onClick={() => markAsked(q.idx)}
                       >
                         Ask
-                      </button>
-                    ) : (
-                      <button
-                        className="generator-button secondary"
-                        onClick={() => moveToToAsk(q.idx)}
-                      >
-                        Move to To Ask
                       </button>
                     )}
                   </div>
@@ -506,6 +564,38 @@ const DiscoveryHub = () => {
           </>
         )}
       </div>
+      {menu && (
+        <ul
+          className="contact-menu"
+          style={{ top: menu.y, left: menu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <li
+            onClick={() => {
+              editContact(menu.name);
+              setMenu(null);
+            }}
+          >
+            Edit
+          </li>
+          <li
+            onClick={() => {
+              setContactFilter(menu.name);
+              setMenu(null);
+            }}
+          >
+            Filter
+          </li>
+          <li
+            onClick={() => {
+              setGroupBy("contact");
+              setMenu(null);
+            }}
+          >
+            Group
+          </li>
+        </ul>
+      )}
       {showSummary && (
         <div className="modal-overlay" onClick={() => setShowSummary(false)}>
           <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>

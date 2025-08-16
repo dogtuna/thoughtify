@@ -185,7 +185,13 @@ const ProjectSetup = () => {
       const uid = auth.currentUser?.uid;
       if (uid) {
         const contactsMap = Object.fromEntries(
-          qs.map((q, idx) => [idx, q.stakeholders || []])
+          qs.map((q, idx) => {
+            const names = (q.stakeholders || []).map((role) => {
+              const match = keyContacts.find((c) => c.role === role);
+              return match?.name || role;
+            });
+            return [idx, names];
+          })
         );
         await saveInitiative(uid, initiativeId, {
           projectName,

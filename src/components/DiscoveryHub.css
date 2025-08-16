@@ -70,6 +70,7 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0.5rem 0;
+  flex-wrap: wrap;
 }
 
 .contact-tag {
@@ -84,6 +85,15 @@
 
 .contact-select {
   flex: 1;
+}
+
+.add-contact-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0 6px;
 }
 
 .ask-selected {
@@ -103,6 +113,26 @@
   border: none;
   cursor: pointer;
   font-weight: bold;
+}
+
+.contact-menu {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+  list-style: none;
+  padding: 0.25rem 0;
+  margin: 0;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+.contact-menu li {
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+}
+
+.contact-menu li:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .document-section {
