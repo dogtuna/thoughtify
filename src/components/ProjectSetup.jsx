@@ -21,7 +21,9 @@ const ProjectSetup = () => {
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
-  const [keyContacts, setKeyContacts] = useState([{ name: "", role: "" }]);
+  const [keyContacts, setKeyContacts] = useState([
+    { name: "", role: "", email: "" },
+  ]);
   const [sourceMaterials, setSourceMaterials] = useState([]);
 
   const [loading, setLoading] = useState(false);
@@ -36,7 +38,9 @@ const ProjectSetup = () => {
           setBusinessGoal(init.businessGoal || "");
           setAudienceProfile(init.audienceProfile || "");
           setProjectConstraints(init.projectConstraints || "");
-          setKeyContacts(init.keyContacts || [{ name: "", role: "" }]);
+          setKeyContacts(
+            init.keyContacts || [{ name: "", role: "", email: "" }]
+          );
           setSourceMaterials(init.sourceMaterials || []);
         }
       }
@@ -159,7 +163,10 @@ const ProjectSetup = () => {
   };
 
   const addKeyContact = () => {
-    setKeyContacts((prev) => [...prev, { name: "", role: "" }]);
+    setKeyContacts((prev) => [
+      ...prev,
+      { name: "", role: "", email: "" },
+    ]);
   };
 
   const removeKeyContact = (index) => {
@@ -273,6 +280,15 @@ const ProjectSetup = () => {
                       value={c.role}
                       placeholder="Role"
                       onChange={(e) => handleContactChange(idx, "role", e.target.value)}
+                      className="generator-input"
+                    />
+                    <input
+                      type="email"
+                      value={c.email}
+                      placeholder="Email"
+                      onChange={(e) =>
+                        handleContactChange(idx, "email", e.target.value)
+                      }
                       className="generator-input"
                     />
                     {keyContacts.length > 1 && (
