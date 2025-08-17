@@ -31,10 +31,10 @@ const appCheck = initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true,
 });
 
-await getToken(appCheck);
-
+const functions = getToken(appCheck).then(() =>
+  getFunctions(app, "us-central1")
+);
 const db = getFirestore(app);
-const functions = getFunctions(app, "us-central1");
 const auth = getAuth(app);
 
 export { app, db, functions, auth };
