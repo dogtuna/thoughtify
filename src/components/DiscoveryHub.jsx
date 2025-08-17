@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
+import ai from "../ai";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -50,6 +51,7 @@ const DiscoveryHub = () => {
   const [draftQueue, setDraftQueue] = useState([]);
   const [draftIndex, setDraftIndex] = useState(0);
   const [recipientModal, setRecipientModal] = useState(null);
+  const [analysisModal, setAnalysisModal] = useState(null);
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -178,6 +180,49 @@ const DiscoveryHub = () => {
       );
       nextDraft();
     }
+  };
+
+  const analyzeAnswer = async (text) => {
+    try {
+      const prompt =
+        `Review the following answer and identify any additional documents or types of information that could clarify or support it. ` +
+        `Respond in JSON format as {"analysis":"...","suggestions":["..."]}.\nAnswer:\n${text}`;
+      const { text: res } = await ai.generate(prompt);
+      return JSON.parse(res);
+    } catch (err) {
+      console.error("analyzeAnswer error", err);
+      return { analysis: "", suggestions: [] };
+    }
+  };
+
+  const draftReply = (idx, name, suggestions) => {
+    const follow = `Could you share the following to help clarify: ${suggestions.join(", ")}?`;
+    const draft = generateDraft([name], [{ text: follow, id: idx }]);
+    startDraftQueue([draft]);
+  };
+
+  const createTaskFromAnalysis = async ({ name, suggestions }) => {
+    if (!uid) return;
+    const email = contacts.find((c) => c.name === name)?.email || "";
+    try {
+      await addDoc(collection(db, "profiles", uid, "taskQueue"), {
+        name,
+        email,
+        message: `Locate: ${suggestions.join(", ")}`,
+        status: "open",
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("createTaskFromAnalysis error", err);
+    }
+  };
+
+  const handleAnswerPaste = (idx, name, e) => {
+    const pasted = e.clipboardData.getData("text");
+    setTimeout(async () => {
+      const result = await analyzeAnswer(pasted);
+      setAnalysisModal({ idx, name, ...result });
+    }, 0);
   };
 
   useEffect(() => {
@@ -846,6 +891,7 @@ const DiscoveryHub = () => {
                             placeholder="Paste Answer/Notes Here"
                             value={q.answers[name] || ""}
                             onChange={(e) => updateAnswer(q.idx, name, e.target.value)}
+                            onPaste={(e) => handleAnswerPaste(q.idx, name, e)}
                             rows={3}
                           />
                         </div>
@@ -904,11 +950,62 @@ const DiscoveryHub = () => {
             </li>
         </ul>
         )}
-        {recipientModal && (
+      {analysisModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setAnalysisModal(null)}
+        >
           <div
-            className="modal-overlay"
-            onClick={() => setRecipientModal(null)}
+            className="initiative-card modal-content"
+            onClick={(e) => e.stopPropagation()}
           >
+            <h3>Answer Analysis</h3>
+            {analysisModal.analysis && <p>{analysisModal.analysis}</p>}
+            {analysisModal.suggestions && analysisModal.suggestions.length > 0 && (
+              <ul>
+                {analysisModal.suggestions.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button
+                className="generator-button"
+                onClick={() => {
+                  draftReply(
+                    analysisModal.idx,
+                    analysisModal.name,
+                    analysisModal.suggestions,
+                  );
+                  setAnalysisModal(null);
+                }}
+              >
+                Draft Reply
+              </button>
+              <button
+                className="generator-button"
+                onClick={async () => {
+                  await createTaskFromAnalysis(analysisModal);
+                  setAnalysisModal(null);
+                }}
+              >
+                Create Task
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => setAnalysisModal(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {recipientModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setRecipientModal(null)}
+        >
             <div
               className="initiative-card modal-content"
               onClick={(e) => e.stopPropagation()}
