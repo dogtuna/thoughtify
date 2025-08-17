@@ -1,48 +1,19 @@
 // src/ai.js
-import { genkit } from 'genkit';
-import { gemini, googleAI } from '@genkit-ai/googleai';
-/** @typedef {import('./ai.types').ContentAssetGenerationResult} ContentAssetGenerationResult */
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// The googleAI plugin should automatically pick up your API key from your environment.
-// (Ensure your .env file contains REACT_APP_GOOGLE_GENAI_API_KEY if using Create React App.)
-const ai = genkit({
-  plugins: [googleAI()],
-  model: gemini('gemini-2.5-pro'), // set the default model
-});
+const apiKey = import.meta.env.VITE_GOOGLE_GENAI_API_KEY || "";
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// Define a flow for generating a course outline.
-// This flow takes a course topic as input and returns a course outline.
-export const courseOutlineFlow = ai.defineFlow('courseOutlineFlow', async (topic) => {
-  // Construct a prompt that includes your guidelines.
-  const prompt = `Generate a professional, multi-module course outline for a course on "${topic}". 
-Include the following sections:
-  - Course Title
-  - Introduction/Overview
-  - Target Audience
-  - Learning Objectives
-  - Module Summaries (each with a module title, key concepts, and recommended resources)
-  - Conclusion or Next Steps
+/**
+ * Simple wrapper around the Google Generative AI client that mirrors the
+ * previous `ai.generate` interface used by the app.
+ * @param {string} prompt
+ * @returns {Promise<{text: string}>}
+ */
+export async function generate(prompt) {
+  const result = await model.generateContent(prompt);
+  return { text: result.response.text() };
+}
 
-Use clear, concise language suitable for a general audience.`;
-  
-  // Make the generation request.
-  const { text } = await ai.generate(prompt);
-  return text;
-});
-
-// Define a flow for generating detailed draft content and a media asset list from an LDD.
-// The flow expects a Learning Design Document (object or string) and returns the drafts
-// alongside suggested media assets for each content block.
-export const contentAssetGenerationFlow = ai.defineFlow(
-  'contentAssetGenerationFlow',
-  async (ldd) => {
-    const prompt = `You are acting as a subject matter expert and content developer. Given the Learning Design Document below, produce draft materials and a media asset list for each component.\n\nLDD:\n${JSON.stringify(ldd, null, 2)}\n\nRespond ONLY with valid JSON matching this structure:\n{\n  "lessonContent": [],\n  "videoScripts": [],\n  "facilitatorGuides": [],\n  "participantWorkbooks": [],\n  "knowledgeBaseArticles": [],\n  "mediaAssets": []\n}\nEach array should contain entries for the corresponding components. Each mediaAssets entry should include a type, description, and usage notes. Do not include any explanatory text outside the JSON.`;
-
-    const { text } = await ai.generate(prompt);
-    /** @type {ContentAssetGenerationResult} */
-    const result = JSON.parse(text);
-    return result;
-  },
-);
-
-export default ai;
+export default { generate };
