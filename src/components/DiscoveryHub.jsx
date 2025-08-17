@@ -60,7 +60,8 @@ const DiscoveryHub = () => {
     try {
       const token = await auth.currentUser.getIdToken(true);
       console.log("Refreshed token:", token);
-      const callable = httpsCallable(functions, "sendQuestionEmail");
+      const functionsInstance = await functions;
+      const callable = httpsCallable(functionsInstance, "sendQuestionEmail");
       await callable({
         provider: "gmail",
         recipientEmail: auth.currentUser.email || "",
