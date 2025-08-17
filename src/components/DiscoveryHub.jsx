@@ -54,6 +54,10 @@ const DiscoveryHub = () => {
   const [analysisModal, setAnalysisModal] = useState(null);
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [analyzing, setAnalyzing] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [businessGoal, setBusinessGoal] = useState("");
+  const [audienceProfile, setAudienceProfile] = useState("");
+  const [projectConstraints, setProjectConstraints] = useState("");
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -191,22 +195,55 @@ const DiscoveryHub = () => {
 
   const analyzeAnswer = async (text) => {
     try {
-      const prompt =
-        `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a discovery question. Your primary goal is to understand how this information impacts the potential training solution and to determine the next steps required to get a complete picture.
+      const contextPieces = [];
+      if (projectName) contextPieces.push(`Project Name: ${projectName}`);
+      if (businessGoal) contextPieces.push(`Business Goal: ${businessGoal}`);
+      if (audienceProfile)
+        contextPieces.push(`Audience Profile: ${audienceProfile}`);
+      if (projectConstraints)
+        contextPieces.push(`Project Constraints: ${projectConstraints}`);
+      if (contacts.length) {
+        contextPieces.push(
+          `Key Contacts: ${contacts
+            .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
+            .join(", ")}`
+        );
+      }
+      if (questions.length) {
+        const qa = questions
+          .map((q) => {
+            const answers = Object.entries(q.answers || {})
+              .map(([name, ans]) => `${name}: ${ans}`)
+              .join("; ");
+            return answers ? `${q.question} | ${answers}` : `${q.question}`;
+          })
+          .join("\n");
+        contextPieces.push(`Existing Q&A:\n${qa}`);
+      }
+      if (documents.length) {
+        const docs = documents
+          .map((d) => `${d.name}:\n${d.content}`)
+          .join("\n");
+        contextPieces.push(`Source Materials:\n${docs}`);
+      }
+      const projectContext = contextPieces.join("\n\n");
+
+      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a discovery question. Your primary goal is to understand how this information impacts the potential training solution and to determine the next discovery steps.
+
+Project Context:
+${projectContext}
 
 Carefully review the answer provided and perform the following two steps:
 
 Analyze the Training Impact: In the "analysis" field, write a concise summary of what this answer reveals about the training project. Consider: Does this information validate a known performance gap? Does it suggest the problem is not a training issue (e.g., it's a process or technology problem)? Does it help define the scope, target audience, or learning objectives more clearly?
 
-Suggest Actionable Next Steps: In the "suggestions" field, generate a list of concrete, actionable tasks to address any new questions or information gaps exposed by the answer. Each suggestion should be a clear command. If the initial answer is incomplete, suggest ways to get more detail.
+Suggest Follow-Up Discovery Actions: In the "suggestions" field, list concrete next steps focused strictly on gathering more information or clarifying uncertainties. Avoid design, development, or implementation tasks. Do not propose actions that duplicate existing clarifying questions unless recommending that a different stakeholder be asked the same question to verify the information. Each suggestion should be a clear command. If the initial answer is incomplete, suggest ways to get more detail.
 
 Examples of good suggestions include:
 
 "Request the 'Q3 2024 Sales Report' from the Sales Director to validate the provided data."
 
-"Schedule a 30-minute meeting with the IT Manager to discuss the system limitations mentioned."
-
-"Research 'best practices for customer de-escalation' to inform the content outline."
+"Cross-check this answer with the Operations Manager to confirm alignment."
 
 "Ask a follow-up question to the stakeholder: 'You mentioned the process is inefficient; can you walk me through the specific steps that cause delays?'"
 
@@ -320,6 +357,10 @@ ${text}`;
         setEmailConnected(tokenSnap.exists());
         if (initiativeId) {
           const init = await loadInitiative(user.uid, initiativeId);
+          setProjectName(init?.projectName || "");
+          setBusinessGoal(init?.businessGoal || "");
+          setAudienceProfile(init?.audienceProfile || "");
+          setProjectConstraints(init?.projectConstraints || "");
           const contactsInit = (init?.keyContacts || []).map((c, i) => ({
             ...c,
             color: colorPalette[i % colorPalette.length],
