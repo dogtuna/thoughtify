@@ -26,14 +26,20 @@ if (import.meta.env.DEV && import.meta.env.VITE_APPCHECK_DEBUG_TOKEN) {
     import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
 }
 
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
-  isTokenAutoRefreshEnabled: true,
-});
+const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
-const functions = getToken(appCheck).then(() =>
-  getFunctions(app, "us-central1")
-);
+let appCheckPromise = Promise.resolve();
+if (siteKey) {
+  const appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(siteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+  appCheckPromise = getToken(appCheck);
+} else {
+  console.warn("VITE_RECAPTCHA_SITE_KEY is not set; App Check disabled");
+}
+
+const functions = appCheckPromise.then(() => getFunctions(app, "us-central1"));
 const db = getFirestore(app);
 const auth = getAuth(app);
 
