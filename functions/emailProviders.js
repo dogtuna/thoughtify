@@ -263,6 +263,9 @@ export const sendQuestionEmail = onCall(
       });
       const messageId = resp.data.id || "";
 
+      // Ensure user document exists so the questions subcollection is visible
+      await db.collection("users").doc(uid).set({}, { merge: true });
+
       await db
         .collection("users")
         .doc(uid)
