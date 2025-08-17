@@ -47,7 +47,63 @@ const DiscoveryHub = () => {
   const [emailDraft, setEmailDraft] = useState(null);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [editingDraft, setEditingDraft] = useState(false);
+  const [draftQueue, setDraftQueue] = useState([]);
+  const [draftIndex, setDraftIndex] = useState(0);
   const navigate = useNavigate();
+
+  const generateDraft = (recipients, questionObjs) => {
+    const userName =
+      auth.currentUser?.displayName || auth.currentUser?.email || "";
+    const toNames = recipients.join(", ");
+    const questionsText =
+      questionObjs.length === 1
+        ? questionObjs[0].text
+        : questionObjs.map((q) => `- ${q.text}`).join("\n");
+    const subject =
+      questionObjs.length === 1
+        ? `Clarification Needed: ${questionObjs[0].text}`
+        : `Clarification Needed on ${questionObjs.length} Questions`;
+    const body = `Hi ${toNames},\n\nWe're collecting information to ensure our work stays on track and would appreciate your input. Could you please answer the following ${
+      questionObjs.length > 1 ? "questions" : "question"
+    }?\n\n${questionsText}\n\nYour response will help us move forward.\n\nBest regards,\n${userName}`;
+    return {
+      subject,
+      body,
+      recipients,
+      questionIds: questionObjs.map((q) => q.id),
+    };
+  };
+
+  const showDraft = (draft) => {
+    setGeneratingEmail(true);
+    setEditingDraft(false);
+    setEmailDraft({
+      recipients: draft.recipients,
+      questionIds: draft.questionIds,
+    });
+    setTimeout(() => {
+      setEmailDraft(draft);
+      setGeneratingEmail(false);
+    }, 500);
+  };
+
+  const startDraftQueue = (drafts) => {
+    setDraftQueue(drafts);
+    setDraftIndex(0);
+    showDraft(drafts[0]);
+  };
+
+  const nextDraft = () => {
+    if (draftIndex < draftQueue.length - 1) {
+      const next = draftIndex + 1;
+      setDraftIndex(next);
+      showDraft(draftQueue[next]);
+    } else {
+      setEmailDraft(null);
+      setDraftQueue([]);
+      setDraftIndex(0);
+    }
+  };
 
   const draftEmail = (q) => {
     if (!emailConnected) {
@@ -61,21 +117,32 @@ const DiscoveryHub = () => {
       console.warn("auth.currentUser is null when drafting email");
       return;
     }
-    setGeneratingEmail(true);
-    setEditingDraft(false);
-    setEmailDraft({ subject: "", body: "", questionId: q.id });
-    const userName = auth.currentUser.displayName || auth.currentUser.email || "";
-    setTimeout(() => {
-      const subject = `Clarification Needed: ${q.question}`;
-      const toNames = q.contacts && q.contacts.length ? q.contacts.join(", ") : "there";
-      const body = `Hi ${toNames},\n\nWe're collecting information to ensure our work stays on track and would appreciate your input. Could you please answer the following question?\n\n${q.question}\n\nYour response will help us move forward.\n\nBest regards,\n${userName}`;
-      setEmailDraft({ subject, body, questionId: q.id });
-      setGeneratingEmail(false);
-    }, 500);
+    let targets = q.contacts || [];
+    if (targets.length > 1) {
+      const input = prompt(
+        `Email which contacts? (comma-separated)`,
+        targets.join(", ")
+      );
+      if (input === null) return;
+      targets = input
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+    }
+    if (!targets.length) return;
+    const draft = generateDraft(targets, [{ text: q.question, id: q.id }]);
+    startDraftQueue([draft]);
   };
 
   const sendEmail = async () => {
     if (!emailDraft) return;
+    const emails = emailDraft.recipients
+      .map((n) => contacts.find((c) => c.name === n)?.email)
+      .filter((e) => e);
+    if (!emails.length) {
+      alert("Missing email address for selected contact");
+      return;
+    }
     try {
       if (appCheck) {
         await getAppCheckToken(appCheck);
@@ -84,13 +151,16 @@ const DiscoveryHub = () => {
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
-        recipientEmail: auth.currentUser.email || "",
+        recipientEmail: emails.join(","),
         subject: emailDraft.subject,
         message: emailDraft.body,
-        questionId: emailDraft.questionId,
+        questionId: emailDraft.questionIds[0],
       });
+      emailDraft.questionIds.forEach((idx) =>
+        markAsked(idx, emailDraft.recipients)
+      );
       alert("Email sent");
-      setEmailDraft(null);
+      nextDraft();
     } catch (err) {
       console.error("sendEmail error", err);
       alert("Error sending email");
@@ -99,7 +169,10 @@ const DiscoveryHub = () => {
 
   const copyDraft = () => {
     if (emailDraft && navigator.clipboard) {
-      navigator.clipboard.writeText(`${emailDraft.subject}\n\n${emailDraft.body}`);
+      navigator.clipboard.writeText(
+        `${emailDraft.subject}\n\n${emailDraft.body}`
+      );
+      nextDraft();
     }
   };
 
@@ -177,13 +250,18 @@ const DiscoveryHub = () => {
     const name = prompt("Contact name?");
     if (!name) return null;
     const role = prompt("Contact role? (optional)") || "";
+    const email = prompt("Contact email? (optional)") || "";
     const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = { role, name, color };
+    const newContact = { role, name, email, color };
     const updated = [...contacts, newContact];
     setContacts(updated);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ name, role }) => ({ name, role })),
+        keyContacts: updated.map(({ name, role, email }) => ({
+          name,
+          role,
+          email,
+        })),
       });
     }
     return name;
@@ -329,10 +407,33 @@ const DiscoveryHub = () => {
         names: parts[2] ? parts[2].split(",") : [],
       };
     });
-    const texts = selections.map((s) => markAsked(s.idx, s.names));
-    if (navigator.clipboard && texts.length) {
-      navigator.clipboard.writeText(texts.join("\n\n"));
-    }
+    const contactMap = {};
+    selections.forEach((s) => {
+      const q = questions[s.idx];
+      const targets = s.names.length ? s.names : q.contacts;
+      targets.forEach((n) => {
+        if (!contactMap[n]) contactMap[n] = [];
+        contactMap[n].push({ text: q.question, id: s.idx });
+      });
+    });
+    const allContacts = Object.keys(contactMap);
+    if (!allContacts.length) return;
+    const input = prompt(
+      `Email which contacts? (comma-separated)`,
+      allContacts.join(", ")
+    );
+    if (input === null) return;
+    const chosen = input
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s);
+    const drafts = chosen
+      .map((name) =>
+        contactMap[name] ? generateDraft([name], contactMap[name]) : null
+      )
+      .filter((d) => d && d.questionIds.length);
+    if (!drafts.length) return;
+    startDraftQueue(drafts);
     setSelected([]);
   };
 
@@ -363,16 +464,21 @@ const DiscoveryHub = () => {
   const startEditContact = (name) => {
     const contact = contacts.find((c) => c.name === name);
     if (!contact) return;
-    setEditData({ original: name, name: contact.name, role: contact.role });
+    setEditData({
+      original: name,
+      name: contact.name,
+      role: contact.role,
+      email: contact.email || "",
+    });
   };
 
   const saveEditContact = () => {
     if (!editData) return;
-    const { original, name, role } = editData;
+    const { original, name, role, email } = editData;
     const idx = contacts.findIndex((c) => c.name === original);
     if (idx === -1) return;
     const updatedContacts = contacts.map((c, i) =>
-      i === idx ? { ...c, name, role } : c
+      i === idx ? { ...c, name, role, email } : c
     );
     const updatedQuestions = questions.map((q) => {
       const newContacts = q.contacts.map((n) => (n === original ? name : n));
@@ -390,7 +496,11 @@ const DiscoveryHub = () => {
     setQuestions(updatedQuestions);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updatedContacts.map(({ name, role }) => ({ name, role })),
+        keyContacts: updatedContacts.map(({ name, role, email }) => ({
+          name,
+          role,
+          email,
+        })),
         clarifyingContacts: Object.fromEntries(
           updatedQuestions.map((qq, i) => [i, qq.contacts])
         ),
@@ -793,6 +903,8 @@ const DiscoveryHub = () => {
             onClick={() => {
               setEmailDraft(null);
               setEditingDraft(false);
+              setDraftQueue([]);
+              setDraftIndex(0);
             }}
           >
             <div
@@ -803,6 +915,11 @@ const DiscoveryHub = () => {
                 <p>Generating...</p>
               ) : (
                 <>
+                  {draftQueue.length > 1 && (
+                    <p>
+                      Draft {draftIndex + 1} of {draftQueue.length}
+                    </p>
+                  )}
                   {editingDraft ? (
                     <>
                       <input
@@ -882,6 +999,16 @@ const DiscoveryHub = () => {
                 value={editData.role}
                 onChange={(e) =>
                   setEditData((d) => ({ ...d, role: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Email:
+              <input
+                className="generator-input"
+                value={editData.email}
+                onChange={(e) =>
+                  setEditData((d) => ({ ...d, email: e.target.value }))
                 }
               />
             </label>
