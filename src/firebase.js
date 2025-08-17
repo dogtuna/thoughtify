@@ -1,49 +1,56 @@
-
-import { initializeApp } from "firebase/app";
+// firebase.js
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
-import { getAuth } from "firebase/auth";
 import {
   initializeAppCheck,
   ReCaptchaV3Provider,
-  getToken,
+  ReCaptchaEnterpriseProvider,
 } from "firebase/app-check";
 
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
-    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-  };
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
 
-const app = initializeApp(firebaseConfig);
+// ✅ HMR-safe singleton app
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+// 🔧 Set debug token BEFORE initializing App Check (dev only)
 if (import.meta.env.DEV && import.meta.env.VITE_APPCHECK_DEBUG_TOKEN) {
-  globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN =
-    import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
+  // `self` works in both window and workers
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
 }
 
-const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+// 🔐 Initialize App Check (prefer Enterprise if provided)
+const enterpriseKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+const v3Key = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
 let appCheck = null;
-if (siteKey) {
+if (enterpriseKey) {
   appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(siteKey),
+    provider: new ReCaptchaEnterpriseProvider(enterpriseKey),
     isTokenAutoRefreshEnabled: true,
   });
-  // Warm up the App Check token so that subsequent requests include it
-  getToken(appCheck).catch((err) => {
-    console.warn("App Check token fetch failed", err);
+} else if (v3Key) {
+  appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(v3Key),
+    isTokenAutoRefreshEnabled: true,
   });
 } else {
-  console.warn("VITE_RECAPTCHA_SITE_KEY is not set; App Check disabled");
+  console.warn("No reCAPTCHA site key found; App Check not initialized.");
 }
 
-const functions = getFunctions(app, "us-central1");
-const db = getFirestore(app);
+// ⚠️ No manual getToken() needed — SDK will attach tokens automatically
+// export services from the SAME app instance
 const auth = getAuth(app);
+const db = getFirestore(app);
+const functions = getFunctions(app, "us-central1");
 
-export { app, db, functions, auth, appCheck };
+export { app, auth, db, functions, appCheck };
