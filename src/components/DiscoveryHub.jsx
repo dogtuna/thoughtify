@@ -49,6 +49,7 @@ const DiscoveryHub = () => {
   const [editingDraft, setEditingDraft] = useState(false);
   const [draftQueue, setDraftQueue] = useState([]);
   const [draftIndex, setDraftIndex] = useState(0);
+  const [recipientModal, setRecipientModal] = useState(null);
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -105,6 +106,10 @@ const DiscoveryHub = () => {
     }
   };
 
+  const openRecipientModal = (options, onConfirm) => {
+    setRecipientModal({ options, selected: [], onConfirm });
+  };
+
   const draftEmail = (q) => {
     if (!emailConnected) {
       if (window.confirm("Connect your Gmail account in settings?")) {
@@ -117,21 +122,20 @@ const DiscoveryHub = () => {
       console.warn("auth.currentUser is null when drafting email");
       return;
     }
-    let targets = q.contacts || [];
-    if (targets.length > 1) {
-      const input = prompt(
-        `Email which contacts? (comma-separated)`,
-        targets.join(", ")
-      );
-      if (input === null) return;
-      targets = input
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s);
-    }
+    const targets = q.contacts || [];
     if (!targets.length) return;
-    const draft = generateDraft(targets, [{ text: q.question, id: q.id }]);
-    startDraftQueue([draft]);
+    const handleSelection = (chosen) => {
+      if (!chosen.length) return;
+      const drafts = chosen.map((name) =>
+        generateDraft([name], [{ text: q.question, id: q.id }])
+      );
+      startDraftQueue(drafts);
+    };
+    if (targets.length === 1) {
+      handleSelection(targets);
+    } else {
+      openRecipientModal(targets, handleSelection);
+    }
   };
 
   const sendEmail = async () => {
@@ -156,9 +160,9 @@ const DiscoveryHub = () => {
         message: emailDraft.body,
         questionId: emailDraft.questionIds[0],
       });
-      emailDraft.questionIds.forEach((idx) =>
-        markAsked(idx, emailDraft.recipients)
-      );
+      for (const idx of emailDraft.questionIds) {
+        await markAsked(idx, emailDraft.recipients);
+      }
       alert("Email sent");
       nextDraft();
     } catch (err) {
@@ -320,22 +324,27 @@ const DiscoveryHub = () => {
     }
   };
 
-  const markAsked = (idx, names = []) => {
+  const markAsked = async (idx, names = []) => {
     const text = questions[idx]?.question || "";
+    let updatedQuestions = questions;
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      const targets = names.length ? names : q.contacts;
-      targets.forEach((n) => {
-        q.asked[n] = true;
-      });
-      if (uid) {
-        saveInitiative(uid, initiativeId, {
-          clarifyingAsked: updated.map((qq) => qq.asked),
+      if (q) {
+        const targets = names.length ? names : q.contacts;
+        targets.forEach((n) => {
+          q.asked[n] = true;
         });
       }
+      updatedQuestions = updated;
       return updated;
     });
+    if (uid) {
+      const askedArray = updatedQuestions.map((qq) => qq?.asked || {});
+      await saveInitiative(uid, initiativeId, {
+        clarifyingAsked: askedArray,
+      });
+    }
     return text;
   };
 
@@ -418,23 +427,21 @@ const DiscoveryHub = () => {
     });
     const allContacts = Object.keys(contactMap);
     if (!allContacts.length) return;
-    const input = prompt(
-      `Email which contacts? (comma-separated)`,
-      allContacts.join(", ")
-    );
-    if (input === null) return;
-    const chosen = input
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s);
-    const drafts = chosen
-      .map((name) =>
-        contactMap[name] ? generateDraft([name], contactMap[name]) : null
-      )
-      .filter((d) => d && d.questionIds.length);
-    if (!drafts.length) return;
-    startDraftQueue(drafts);
-    setSelected([]);
+    const handleSelection = (chosen) => {
+      const drafts = chosen
+        .map((name) =>
+          contactMap[name] ? generateDraft([name], contactMap[name]) : null
+        )
+        .filter((d) => d && d.questionIds.length);
+      if (!drafts.length) return;
+      startDraftQueue(drafts);
+      setSelected([]);
+    };
+    if (allContacts.length === 1) {
+      handleSelection(allContacts);
+    } else {
+      openRecipientModal(allContacts, handleSelection);
+    }
   };
 
   const sortUnassignedFirst = (arr) =>
@@ -866,8 +873,8 @@ const DiscoveryHub = () => {
             Edit
           </li>
           <li
-            onClick={() => {
-              const text = markAsked(menu.idx, [menu.name]);
+            onClick={async () => {
+              const text = await markAsked(menu.idx, [menu.name]);
               if (navigator.clipboard && text) {
                 navigator.clipboard.writeText(text);
               }
@@ -896,6 +903,56 @@ const DiscoveryHub = () => {
               Group
             </li>
         </ul>
+        )}
+        {recipientModal && (
+          <div
+            className="modal-overlay"
+            onClick={() => setRecipientModal(null)}
+          >
+            <div
+              className="initiative-card modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3>Select Contacts</h3>
+              <select
+                multiple
+                className="generator-input"
+                value={recipientModal.selected}
+                onChange={(e) =>
+                  setRecipientModal((m) => ({
+                    ...m,
+                    selected: Array.from(
+                      e.target.selectedOptions,
+                      (o) => o.value
+                    ),
+                  }))
+                }
+              >
+                {recipientModal.options.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <div className="modal-actions">
+                <button
+                  className="generator-button"
+                  onClick={() => {
+                    recipientModal.onConfirm(recipientModal.selected);
+                    setRecipientModal(null);
+                  }}
+                >
+                  Confirm
+                </button>
+                <button
+                  className="generator-button"
+                  onClick={() => setRecipientModal(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         {emailDraft && (
           <div
