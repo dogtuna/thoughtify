@@ -195,10 +195,21 @@ const DiscoveryHub = () => {
         `Review the following answer and identify any additional documents or types of information that could clarify or support it. ` +
         `Respond in JSON format as {"analysis":"...","suggestions":["..."]}.\nAnswer:\n${text}`;
       const { text: res } = await ai.generate(prompt);
-      return JSON.parse(res);
+      try {
+        return JSON.parse(res);
+      } catch {
+        const match = res.match(/\{[\s\S]*\}/);
+        if (match) {
+          return JSON.parse(match[0]);
+        }
+        return { analysis: res.trim(), suggestions: [] };
+      }
     } catch (err) {
       console.error("analyzeAnswer error", err);
-      return { analysis: "", suggestions: [] };
+      return {
+        analysis: "Analysis could not be generated.",
+        suggestions: [],
+      };
     }
   };
 
