@@ -192,8 +192,29 @@ const DiscoveryHub = () => {
   const analyzeAnswer = async (text) => {
     try {
       const prompt =
-        `Review the following answer and identify any additional documents or types of information that could clarify or support it. ` +
-        `Respond in JSON format as {"analysis":"...","suggestions":["..."]}.\nAnswer:\n${text}`;
+        `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a discovery question. Your primary goal is to understand how this information impacts the potential training solution and to determine the next steps required to get a complete picture.
+
+Carefully review the answer provided and perform the following two steps:
+
+Analyze the Training Impact: In the "analysis" field, write a concise summary of what this answer reveals about the training project. Consider: Does this information validate a known performance gap? Does it suggest the problem is not a training issue (e.g., it's a process or technology problem)? Does it help define the scope, target audience, or learning objectives more clearly?
+
+Suggest Actionable Next Steps: In the "suggestions" field, generate a list of concrete, actionable tasks to address any new questions or information gaps exposed by the answer. Each suggestion should be a clear command. If the initial answer is incomplete, suggest ways to get more detail.
+
+Examples of good suggestions include:
+
+"Request the 'Q3 2024 Sales Report' from the Sales Director to validate the provided data."
+
+"Schedule a 30-minute meeting with the IT Manager to discuss the system limitations mentioned."
+
+"Research 'best practices for customer de-escalation' to inform the content outline."
+
+"Ask a follow-up question to the stakeholder: 'You mentioned the process is inefficient; can you walk me through the specific steps that cause delays?'"
+
+Respond ONLY in the following JSON format:
+{"analysis": "...", "suggestions": ["..."]}
+
+Answer:
+${text}`;
       const { text: res } = await ai.generate(prompt);
       const parseResponse = (str) => {
         const parsed = JSON.parse(str);
