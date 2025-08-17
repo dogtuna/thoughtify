@@ -44,9 +44,73 @@ const DiscoveryHub = () => {
   const [focusRole, setFocusRole] = useState("");
   const [editData, setEditData] = useState(null);
   const [emailConnected, setEmailConnected] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(null);
+  const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [draftQueue, setDraftQueue] = useState([]);
+  const [draftIndex, setDraftIndex] = useState(0);
+  const [recipientModal, setRecipientModal] = useState(null);
   const navigate = useNavigate();
 
-  const draftEmail = async (q) => {
+  const generateDraft = (recipients, questionObjs) => {
+    const userName =
+      auth.currentUser?.displayName || auth.currentUser?.email || "";
+    const toNames = recipients.join(", ");
+    const questionsText =
+      questionObjs.length === 1
+        ? questionObjs[0].text
+        : questionObjs.map((q) => `- ${q.text}`).join("\n");
+    const subject =
+      questionObjs.length === 1
+        ? `Clarification Needed: ${questionObjs[0].text}`
+        : `Clarification Needed on ${questionObjs.length} Questions`;
+    const body = `Hi ${toNames},\n\nWe're collecting information to ensure our work stays on track and would appreciate your input. Could you please answer the following ${
+      questionObjs.length > 1 ? "questions" : "question"
+    }?\n\n${questionsText}\n\nYour response will help us move forward.\n\nBest regards,\n${userName}`;
+    return {
+      subject,
+      body,
+      recipients,
+      questionIds: questionObjs.map((q) => q.id),
+    };
+  };
+
+  const showDraft = (draft) => {
+    setGeneratingEmail(true);
+    setEditingDraft(false);
+    setEmailDraft({
+      recipients: draft.recipients,
+      questionIds: draft.questionIds,
+    });
+    setTimeout(() => {
+      setEmailDraft(draft);
+      setGeneratingEmail(false);
+    }, 500);
+  };
+
+  const startDraftQueue = (drafts) => {
+    setDraftQueue(drafts);
+    setDraftIndex(0);
+    showDraft(drafts[0]);
+  };
+
+  const nextDraft = () => {
+    if (draftIndex < draftQueue.length - 1) {
+      const next = draftIndex + 1;
+      setDraftIndex(next);
+      showDraft(draftQueue[next]);
+    } else {
+      setEmailDraft(null);
+      setDraftQueue([]);
+      setDraftIndex(0);
+    }
+  };
+
+  const openRecipientModal = (options, onConfirm) => {
+    setRecipientModal({ options, selected: [], onConfirm });
+  };
+
+  const draftEmail = (q) => {
     if (!emailConnected) {
       if (window.confirm("Connect your Gmail account in settings?")) {
         navigate("/settings");
@@ -58,27 +122,61 @@ const DiscoveryHub = () => {
       console.warn("auth.currentUser is null when drafting email");
       return;
     }
+    const targets = q.contacts || [];
+    if (!targets.length) return;
+    const handleSelection = (chosen) => {
+      if (!chosen.length) return;
+      const drafts = chosen.map((name) =>
+        generateDraft([name], [{ text: q.question, id: q.id }])
+      );
+      startDraftQueue(drafts);
+    };
+    if (targets.length === 1) {
+      handleSelection(targets);
+    } else {
+      openRecipientModal(targets, handleSelection);
+    }
+  };
+
+  const sendEmail = async () => {
+    if (!emailDraft) return;
+    const emails = emailDraft.recipients
+      .map((n) => contacts.find((c) => c.name === n)?.email)
+      .filter((e) => e);
+    if (!emails.length) {
+      alert("Missing email address for selected contact");
+      return;
+    }
     try {
-      // Ensure fresh App Check token and auth token before calling the function
       if (appCheck) {
-        const token = await getAppCheckToken(appCheck);
-        console.log("AppCheck token", token.token);
+        await getAppCheckToken(appCheck);
       }
-      const idToken = await auth.currentUser.getIdToken(true);
-      console.log("ID token", idToken);
+      await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
-        recipientEmail: auth.currentUser.email || "",
-        subject: q.question,
-        message: q.question,
-        questionId: q.id,
-        draft: true,
+        recipientEmail: emails.join(","),
+        subject: emailDraft.subject,
+        message: emailDraft.body,
+        questionId: emailDraft.questionIds[0],
       });
-      alert("Draft created in Gmail");
+      for (const idx of emailDraft.questionIds) {
+        await markAsked(idx, emailDraft.recipients);
+      }
+      alert("Email sent");
+      nextDraft();
     } catch (err) {
-      console.error("draftEmail error", err);
-      alert("Error drafting email");
+      console.error("sendEmail error", err);
+      alert("Error sending email");
+    }
+  };
+
+  const copyDraft = () => {
+    if (emailDraft && navigator.clipboard) {
+      navigator.clipboard.writeText(
+        `${emailDraft.subject}\n\n${emailDraft.body}`
+      );
+      nextDraft();
     }
   };
 
@@ -156,13 +254,18 @@ const DiscoveryHub = () => {
     const name = prompt("Contact name?");
     if (!name) return null;
     const role = prompt("Contact role? (optional)") || "";
+    const email = prompt("Contact email? (optional)") || "";
     const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = { role, name, color };
+    const newContact = { role, name, email, color };
     const updated = [...contacts, newContact];
     setContacts(updated);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ name, role }) => ({ name, role })),
+        keyContacts: updated.map(({ name, role, email }) => ({
+          name,
+          role,
+          email,
+        })),
       });
     }
     return name;
@@ -221,22 +324,27 @@ const DiscoveryHub = () => {
     }
   };
 
-  const markAsked = (idx, names = []) => {
+  const markAsked = async (idx, names = []) => {
     const text = questions[idx]?.question || "";
+    let updatedQuestions = questions;
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      const targets = names.length ? names : q.contacts;
-      targets.forEach((n) => {
-        q.asked[n] = true;
-      });
-      if (uid) {
-        saveInitiative(uid, initiativeId, {
-          clarifyingAsked: updated.map((qq) => qq.asked),
+      if (q) {
+        const targets = names.length ? names : q.contacts;
+        targets.forEach((n) => {
+          q.asked[n] = true;
         });
       }
+      updatedQuestions = updated;
       return updated;
     });
+    if (uid) {
+      const askedArray = updatedQuestions.map((qq) => qq?.asked || {});
+      await saveInitiative(uid, initiativeId, {
+        clarifyingAsked: askedArray,
+      });
+    }
     return text;
   };
 
@@ -308,11 +416,32 @@ const DiscoveryHub = () => {
         names: parts[2] ? parts[2].split(",") : [],
       };
     });
-    const texts = selections.map((s) => markAsked(s.idx, s.names));
-    if (navigator.clipboard && texts.length) {
-      navigator.clipboard.writeText(texts.join("\n\n"));
+    const contactMap = {};
+    selections.forEach((s) => {
+      const q = questions[s.idx];
+      const targets = s.names.length ? s.names : q.contacts;
+      targets.forEach((n) => {
+        if (!contactMap[n]) contactMap[n] = [];
+        contactMap[n].push({ text: q.question, id: s.idx });
+      });
+    });
+    const allContacts = Object.keys(contactMap);
+    if (!allContacts.length) return;
+    const handleSelection = (chosen) => {
+      const drafts = chosen
+        .map((name) =>
+          contactMap[name] ? generateDraft([name], contactMap[name]) : null
+        )
+        .filter((d) => d && d.questionIds.length);
+      if (!drafts.length) return;
+      startDraftQueue(drafts);
+      setSelected([]);
+    };
+    if (allContacts.length === 1) {
+      handleSelection(allContacts);
+    } else {
+      openRecipientModal(allContacts, handleSelection);
     }
-    setSelected([]);
   };
 
   const sortUnassignedFirst = (arr) =>
@@ -342,16 +471,21 @@ const DiscoveryHub = () => {
   const startEditContact = (name) => {
     const contact = contacts.find((c) => c.name === name);
     if (!contact) return;
-    setEditData({ original: name, name: contact.name, role: contact.role });
+    setEditData({
+      original: name,
+      name: contact.name,
+      role: contact.role,
+      email: contact.email || "",
+    });
   };
 
   const saveEditContact = () => {
     if (!editData) return;
-    const { original, name, role } = editData;
+    const { original, name, role, email } = editData;
     const idx = contacts.findIndex((c) => c.name === original);
     if (idx === -1) return;
     const updatedContacts = contacts.map((c, i) =>
-      i === idx ? { ...c, name, role } : c
+      i === idx ? { ...c, name, role, email } : c
     );
     const updatedQuestions = questions.map((q) => {
       const newContacts = q.contacts.map((n) => (n === original ? name : n));
@@ -369,7 +503,11 @@ const DiscoveryHub = () => {
     setQuestions(updatedQuestions);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updatedContacts.map(({ name, role }) => ({ name, role })),
+        keyContacts: updatedContacts.map(({ name, role, email }) => ({
+          name,
+          role,
+          email,
+        })),
         clarifyingContacts: Object.fromEntries(
           updatedQuestions.map((qq, i) => [i, qq.contacts])
         ),
@@ -735,8 +873,8 @@ const DiscoveryHub = () => {
             Edit
           </li>
           <li
-            onClick={() => {
-              const text = markAsked(menu.idx, [menu.name]);
+            onClick={async () => {
+              const text = await markAsked(menu.idx, [menu.name]);
               if (navigator.clipboard && text) {
                 navigator.clipboard.writeText(text);
               }
@@ -765,13 +903,141 @@ const DiscoveryHub = () => {
               Group
             </li>
         </ul>
-      )}
-      {editData && (
-        <div className="modal-overlay" onClick={() => setEditData(null)}>
+        )}
+        {recipientModal && (
           <div
-            className="initiative-card modal-content"
-            onClick={(e) => e.stopPropagation()}
+            className="modal-overlay"
+            onClick={() => setRecipientModal(null)}
           >
+            <div
+              className="initiative-card modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3>Select Contacts</h3>
+              <select
+                multiple
+                className="generator-input"
+                value={recipientModal.selected}
+                onChange={(e) =>
+                  setRecipientModal((m) => ({
+                    ...m,
+                    selected: Array.from(
+                      e.target.selectedOptions,
+                      (o) => o.value
+                    ),
+                  }))
+                }
+              >
+                {recipientModal.options.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <div className="modal-actions">
+                <button
+                  className="generator-button"
+                  onClick={() => {
+                    recipientModal.onConfirm(recipientModal.selected);
+                    setRecipientModal(null);
+                  }}
+                >
+                  Confirm
+                </button>
+                <button
+                  className="generator-button"
+                  onClick={() => setRecipientModal(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {emailDraft && (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              setEmailDraft(null);
+              setEditingDraft(false);
+              setDraftQueue([]);
+              setDraftIndex(0);
+            }}
+          >
+            <div
+              className="initiative-card modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {generatingEmail ? (
+                <p>Generating...</p>
+              ) : (
+                <>
+                  {draftQueue.length > 1 && (
+                    <p>
+                      Draft {draftIndex + 1} of {draftQueue.length}
+                    </p>
+                  )}
+                  {editingDraft ? (
+                    <>
+                      <input
+                        className="generator-input"
+                        value={emailDraft.subject}
+                        onChange={(e) =>
+                          setEmailDraft((d) => ({
+                            ...d,
+                            subject: e.target.value,
+                          }))
+                        }
+                      />
+                      <textarea
+                        className="generator-input"
+                        rows={10}
+                        value={emailDraft.body}
+                        onChange={(e) =>
+                          setEmailDraft((d) => ({
+                            ...d,
+                            body: e.target.value,
+                          }))
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <h3>{emailDraft.subject}</h3>
+                      <pre style={{ whiteSpace: "pre-wrap" }}>{emailDraft.body}</pre>
+                    </>
+                  )}
+                  <div className="modal-actions">
+                    <button
+                      className="generator-button"
+                      onClick={() => setEditingDraft((e) => !e)}
+                    >
+                      {editingDraft ? "Done" : "Edit Draft"}
+                    </button>
+                    <button
+                      className="generator-button"
+                      onClick={sendEmail}
+                    >
+                      Send with Gmail
+                    </button>
+                    <button
+                      className="generator-button"
+                      onClick={copyDraft}
+                    >
+                      Copy Draft
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {editData && (
+          <div className="modal-overlay" onClick={() => setEditData(null)}>
+            <div
+              className="initiative-card modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
             <h3>Edit Contact</h3>
             <label>
               Name:
@@ -790,6 +1056,16 @@ const DiscoveryHub = () => {
                 value={editData.role}
                 onChange={(e) =>
                   setEditData((d) => ({ ...d, role: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Email:
+              <input
+                className="generator-input"
+                value={editData.email}
+                onChange={(e) =>
+                  setEditData((d) => ({ ...d, email: e.target.value }))
                 }
               />
             </label>

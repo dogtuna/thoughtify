@@ -299,7 +299,9 @@ const InitiativesNew = () => {
   const getCombinedSource = () =>
     sourceMaterials.map((f) => f.content).join("\n");
   const [projectConstraints, setProjectConstraints] = useState("");
-  const [keyContacts, setKeyContacts] = useState([{ name: "", role: "" }]);
+  const [keyContacts, setKeyContacts] = useState([
+    { name: "", role: "", email: "" },
+  ]);
 
   const [projectBrief, setProjectBrief] = useState("");
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
@@ -637,7 +639,7 @@ const InitiativesNew = () => {
           setKeyContacts(
             data.keyContacts && data.keyContacts.length
               ? data.keyContacts
-              : [{ name: "", role: "" }]
+              : [{ name: "", role: "", email: "" }]
           );
         }
       })
@@ -857,7 +859,10 @@ const InitiativesNew = () => {
   };
 
   const addKeyContact = () => {
-    setKeyContacts((prev) => [...prev, { name: "", role: "" }]);
+    setKeyContacts((prev) => [
+      ...prev,
+      { name: "", role: "", email: "" },
+    ]);
   };
 
   const removeKeyContact = (index) => {
@@ -1436,6 +1441,15 @@ const InitiativesNew = () => {
                       value={c.role}
                       placeholder="Role"
                       onChange={(e) => handleContactChange(idx, "role", e.target.value)}
+                      className="generator-input"
+                    />
+                    <input
+                      type="email"
+                      value={c.email}
+                      placeholder="Email"
+                      onChange={(e) =>
+                        handleContactChange(idx, "email", e.target.value)
+                      }
                       className="generator-input"
                     />
                     {keyContacts.length > 1 && (
