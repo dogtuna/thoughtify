@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db, functions } from "../firebase";
+import { auth, db, functions, appCheck } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
@@ -58,10 +59,12 @@ const DiscoveryHub = () => {
       return;
     }
     try {
-      const token = await auth.currentUser.getIdToken(true);
-      console.log("Refreshed token:", token);
-      const functionsInstance = await functions;
-      const callable = httpsCallable(functionsInstance, "sendQuestionEmail");
+      // Ensure fresh App Check token and auth token before calling the function
+      if (appCheck) {
+        await getAppCheckToken(appCheck);
+      }
+      await auth.currentUser.getIdToken(true);
+      const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
         recipientEmail: auth.currentUser.email || "",
