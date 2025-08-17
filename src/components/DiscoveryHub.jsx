@@ -54,6 +54,10 @@ const DiscoveryHub = () => {
   const [analysisModal, setAnalysisModal] = useState(null);
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [analyzing, setAnalyzing] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [businessGoal, setBusinessGoal] = useState("");
+  const [audienceProfile, setAudienceProfile] = useState("");
+  const [projectConstraints, setProjectConstraints] = useState("");
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -189,32 +193,58 @@ const DiscoveryHub = () => {
     }
   };
 
-  const analyzeAnswer = async (text) => {
+  const analyzeAnswer = async (question, text) => {
     try {
-      const prompt =
-        `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a discovery question. Your primary goal is to understand how this information impacts the potential training solution and to determine the next steps required to get a complete picture.
+      const contextPieces = [];
+      if (projectName) contextPieces.push(`Project Name: ${projectName}`);
+      if (businessGoal) contextPieces.push(`Business Goal: ${businessGoal}`);
+      if (audienceProfile)
+        contextPieces.push(`Audience Profile: ${audienceProfile}`);
+      if (projectConstraints)
+        contextPieces.push(`Project Constraints: ${projectConstraints}`);
+      if (contacts.length) {
+        contextPieces.push(
+          `Key Contacts: ${contacts
+            .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
+            .join(", ")}`
+        );
+      }
+      if (questions.length) {
+        const qa = questions
+          .map((q) => {
+            const answers = Object.entries(q.answers || {})
+              .map(([name, ans]) => `${name}: ${ans}`)
+              .join("; ");
+            return answers ? `${q.question} | ${answers}` : `${q.question}`;
+          })
+          .join("\n");
+        contextPieces.push(`Existing Q&A:\n${qa}`);
+      }
+      if (documents.length) {
+        const docs = documents
+          .map((d) => `${d.name}:\n${d.content}`)
+          .join("\n");
+        contextPieces.push(`Source Materials:\n${docs}`);
+      }
+      const projectContext = contextPieces.join("\n\n");
 
-Carefully review the answer provided and perform the following two steps:
+      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine if any further clarification is needed for this question only.
 
-Analyze the Training Impact: In the "analysis" field, write a concise summary of what this answer reveals about the training project. Consider: Does this information validate a known performance gap? Does it suggest the problem is not a training issue (e.g., it's a process or technology problem)? Does it help define the scope, target audience, or learning objectives more clearly?
+Project Context:
+${projectContext}
 
-Suggest Actionable Next Steps: In the "suggestions" field, generate a list of concrete, actionable tasks to address any new questions or information gaps exposed by the answer. Each suggestion should be a clear command. If the initial answer is incomplete, suggest ways to get more detail.
-
-Examples of good suggestions include:
-
-"Request the 'Q3 2024 Sales Report' from the Sales Director to validate the provided data."
-
-"Schedule a 30-minute meeting with the IT Manager to discuss the system limitations mentioned."
-
-"Research 'best practices for customer de-escalation' to inform the content outline."
-
-"Ask a follow-up question to the stakeholder: 'You mentioned the process is inefficient; can you walk me through the specific steps that cause delays?'"
-
-Respond ONLY in the following JSON format:
-{"analysis": "...", "suggestions": ["..."]}
+Discovery Question:
+${question}
 
 Answer:
-${text}`;
+${text}
+
+Please provide a JSON object with two fields:
+- "analysis": a concise summary of what this answer reveals about the question in the context of the project.
+- "suggestions": follow-up discovery actions strictly for clarifying or verifying this question. Avoid design, development, or implementation tasks. Do not propose actions that duplicate existing clarifying questions unless recommending that a different stakeholder be asked to confirm the information. If the answer fully addresses the question, return an empty array.
+
+Respond ONLY in this JSON format:
+{"analysis": "...", "suggestions": ["..."]}`;
       const { text: res } = await ai.generate(prompt);
       const parseResponse = (str) => {
         const parsed = JSON.parse(str);
@@ -296,7 +326,7 @@ ${text}`;
     updateAnswer(idx, name, text);
     setAnswerDrafts((prev) => ({ ...prev, [key]: "" }));
     setAnalyzing(true);
-    const result = await analyzeAnswer(text);
+    const result = await analyzeAnswer(questions[idx]?.question || "", text);
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
@@ -320,6 +350,10 @@ ${text}`;
         setEmailConnected(tokenSnap.exists());
         if (initiativeId) {
           const init = await loadInitiative(user.uid, initiativeId);
+          setProjectName(init?.projectName || "");
+          setBusinessGoal(init?.businessGoal || "");
+          setAudienceProfile(init?.audienceProfile || "");
+          setProjectConstraints(init?.projectConstraints || "");
           const contactsInit = (init?.keyContacts || []).map((c, i) => ({
             ...c,
             color: colorPalette[i % colorPalette.length],
@@ -1101,18 +1135,20 @@ ${text}`;
               >
                 Draft Reply
               </button>
-              <button
-                className="generator-button"
-                onClick={async () => {
-                  await createTasksFromAnalysis(
-                    analysisModal.name,
-                    analysisModal.selected,
-                  );
-                  setAnalysisModal(null);
-                }}
-              >
-                Add Selected Tasks
-              </button>
+              {analysisModal.suggestions.length > 0 && (
+                <button
+                  className="generator-button"
+                  onClick={async () => {
+                    await createTasksFromAnalysis(
+                      analysisModal.name,
+                      analysisModal.selected,
+                    );
+                    setAnalysisModal(null);
+                  }}
+                >
+                  Add Selected Tasks
+                </button>
+              )}
               <button
                 className="generator-button"
                 onClick={() => setAnalysisModal(null)}
