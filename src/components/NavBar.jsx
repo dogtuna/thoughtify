@@ -48,6 +48,9 @@ const NavBar = () => {
           <Link to="/ai-tools" className="nav-link">
             Tools
           </Link>
+          <Link to="/tasks" className="nav-link">
+            Tasks
+          </Link>
           <Link to="#" className="nav-link">
             Projects
           </Link>

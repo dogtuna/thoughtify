@@ -27,6 +27,7 @@ import "./App.css";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CookieConsent from "./components/CookieConsent";
 import Settings from "./components/Settings";
+import Tasks from "./components/Tasks";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -91,6 +92,10 @@ export default function App() {
         <Route
           path="/discovery"
           element={user ? <DiscoveryHub /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/tasks"
+          element={user ? <Tasks /> : <Navigate to="/login" />}
         />
         <Route path="/settings" element={<Settings />} />
         <Route
