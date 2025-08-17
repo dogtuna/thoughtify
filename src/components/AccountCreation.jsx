@@ -24,7 +24,6 @@ const AccountCreation = () => {
   const invitationCode = searchParams.get("invite");
   const [invitationData, setInvitationData] = useState(null);
   const [invitationLoading, setInvitationLoading] = useState(true);
-  // New state to capture the user's personal name
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
