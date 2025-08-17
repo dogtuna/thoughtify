@@ -102,6 +102,7 @@ export const getEmailAuthUrl = onRequest(
       const url = gmailClient.generateAuthUrl({
   access_type: "offline",
   prompt: "consent",
+  include_granted_scopes: false,
   scope: [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.compose",
