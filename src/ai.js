@@ -1,12 +1,11 @@
 // src/ai.js
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import aiClient from './aiClient';
+import { getGenerativeModel } from 'firebase/ai';
 
-const apiKey = import.meta.env.VITE_GOOGLE_GENAI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = getGenerativeModel(aiClient, { model: 'gemini-1.5-flash' });
 
 /**
- * Simple wrapper around the Google Generative AI client that mirrors the
+ * Simple wrapper around the Firebase AI client that mirrors the
  * previous `ai.generate` interface used by the app.
  * @param {string} prompt
  * @returns {Promise<{text: string}>}
