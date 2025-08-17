@@ -1,9 +1,21 @@
 // src/ai.js
-import aiClient, { modelName } from './aiClient';
 import { getGenerativeModel } from 'firebase/ai';
+import { initAIClient } from './aiClient';
 
-// Use model name from Remote Config (with defaults handled in aiClient)
-const model = getGenerativeModel(aiClient, { model: modelName });
+let modelPromise;
+
+/**
+ * Lazily load the generative model configured via Remote Config.
+ * @returns {Promise<import('firebase/ai').GenerativeModel>}
+ */
+async function getModel() {
+  if (!modelPromise) {
+    modelPromise = initAIClient().then(({ aiClient, modelName }) =>
+      getGenerativeModel(aiClient, { model: modelName }),
+    );
+  }
+  return modelPromise;
+}
 
 /**
  * Simple wrapper around the Firebase AI client that mirrors the
@@ -12,8 +24,10 @@ const model = getGenerativeModel(aiClient, { model: modelName });
  * @returns {Promise<{text: string}>}
  */
 export async function generate(prompt) {
+  const model = await getModel();
   const result = await model.generateContent(prompt);
   return { text: result.response.text() };
 }
 
 export default { generate };
+
