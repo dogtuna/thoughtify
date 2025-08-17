@@ -54,9 +54,12 @@ const DiscoveryHub = () => {
     }
     if (!auth.currentUser) {
       alert("Please log in to draft emails.");
+      console.warn("auth.currentUser is null when drafting email");
       return;
     }
     try {
+      const token = await auth.currentUser.getIdToken(true);
+      console.log("Refreshed token:", token);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
