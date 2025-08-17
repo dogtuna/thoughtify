@@ -184,8 +184,14 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
   }
 
   const uid = context.auth?.uid;
+  console.log("sendQuestionEmail context.auth", context.auth);
+  console.log("sendQuestionEmail context.app", context.app);
   if (!uid) {
-    const msg = "Authentication required: missing context.auth";
+    const msg =
+      "Authentication required: missing context.auth" +
+      (context.app
+        ? ""
+        : "; App Check token required – ensure your client includes a valid App Check token.");
     console.error("sendQuestionEmail unauthenticated", msg);
     throw new functions.https.HttpsError("unauthenticated", msg);
   }
