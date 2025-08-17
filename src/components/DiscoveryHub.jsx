@@ -195,15 +195,34 @@ const DiscoveryHub = () => {
         `Review the following answer and identify any additional documents or types of information that could clarify or support it. ` +
         `Respond in JSON format as {"analysis":"...","suggestions":["..."]}.\nAnswer:\n${text}`;
       const { text: res } = await ai.generate(prompt);
-      try {
-        return JSON.parse(res);
-      } catch {
-        const match = res.match(/\{[\s\S]*\}/);
-        if (match) {
-          return JSON.parse(match[0]);
+      const parseResponse = (str) => {
+        const parsed = JSON.parse(str);
+        const analysis =
+          typeof parsed.analysis === "string"
+            ? parsed.analysis
+            : JSON.stringify(parsed.analysis);
+        const suggestions = Array.isArray(parsed.suggestions)
+          ? parsed.suggestions.filter((s) => typeof s === "string")
+          : [];
+        return { analysis, suggestions };
+      };
+
+      if (typeof res === "string") {
+        try {
+          return parseResponse(res);
+        } catch {
+          const match = res.match(/\{[\s\S]*\}/);
+          if (match) {
+            try {
+              return parseResponse(match[0]);
+            } catch {
+              // fall through
+            }
+          }
+          return { analysis: res.trim(), suggestions: [] };
         }
-        return { analysis: res.trim(), suggestions: [] };
       }
+      return { analysis: "Unexpected response format.", suggestions: [] };
     } catch (err) {
       console.error("analyzeAnswer error", err);
       return {
@@ -1021,7 +1040,13 @@ const DiscoveryHub = () => {
           >
             <h3>Answer Analysis</h3>
             <p>Question has been moved to answered.</p>
-            {analysisModal.analysis && <p>{analysisModal.analysis}</p>}
+            {analysisModal.analysis && (
+              <p>
+                {typeof analysisModal.analysis === "string"
+                  ? analysisModal.analysis
+                  : JSON.stringify(analysisModal.analysis)}
+              </p>
+            )}
             {analysisModal.suggestions && analysisModal.suggestions.length > 0 && (
               <>
                 <p>Suggested tasks:</p>
