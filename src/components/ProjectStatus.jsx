@@ -1,11 +1,29 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
-import { auth, db } from "../firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  Timestamp,
+} from "firebase/firestore";
+import {
+  auth,
+  db,
+  functions,
+  appCheck,
+} from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import ai from "../ai";
 import PropTypes from "prop-types";
 
-const ProjectStatus = ({ questions = [] }) => {
+const ProjectStatus = ({
+  questions = [],
+  contacts = [],
+  setContacts = () => {},
+  emailConnected = false,
+}) => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [audience, setAudience] = useState("client");
@@ -18,6 +36,10 @@ const ProjectStatus = ({ questions = [] }) => {
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [editing, setEditing] = useState(false);
+  const [recipientModal, setRecipientModal] = useState(null);
+  const [newContact, setNewContact] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
@@ -38,10 +60,24 @@ const ProjectStatus = ({ questions = [] }) => {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("projectStatusLast");
-      if (stored) setLastUpdate(JSON.parse(stored));
+      const hist = JSON.parse(
+        localStorage.getItem("projectStatusHistory") || "[]"
+      );
+      if (hist.length) {
+        setHistory(hist);
+        setLastUpdate(hist[0]);
+        setSummary(hist[0].summary);
+      } else {
+        const stored = localStorage.getItem("projectStatusLast");
+        if (stored) {
+          const last = JSON.parse(stored);
+          setHistory([last]);
+          setLastUpdate(last);
+          setSummary(last.summary);
+        }
+      }
     } catch (err) {
-      console.error("load last project status", err);
+      console.error("load project status", err);
     }
   }, []);
 
@@ -74,15 +110,113 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
       const clean = text.trim();
       setSummary(clean);
       const now = new Date().toISOString();
-      localStorage.setItem(
-        "projectStatusLast",
-        JSON.stringify({ date: now, summary: clean })
-      );
-      setLastUpdate({ date: now, summary: clean });
+      const entry = { date: now, summary: clean, sent: false };
+      setHistory((h) => {
+        const updated = [entry, ...h];
+        localStorage.setItem(
+          "projectStatusHistory",
+          JSON.stringify(updated)
+        );
+        localStorage.setItem("projectStatusLast", JSON.stringify(entry));
+        setLastUpdate(entry);
+        return updated;
+      });
     } catch (err) {
       console.error("generateSummary error", err);
     }
     setLoading(false);
+  };
+
+  const saveEdit = () => {
+    setHistory((h) => {
+      if (!h.length) return h;
+      const updatedFirst = { ...h[0], summary };
+      const updated = [updatedFirst, ...h.slice(1)];
+      localStorage.setItem(
+        "projectStatusHistory",
+        JSON.stringify(updated)
+      );
+      localStorage.setItem("projectStatusLast", JSON.stringify(updatedFirst));
+      setLastUpdate(updatedFirst);
+      return updated;
+    });
+    setEditing(false);
+  };
+
+  const markSent = () => {
+    setHistory((h) => {
+      if (!h.length) return h;
+      const updatedFirst = { ...h[0], sent: true };
+      const updated = [updatedFirst, ...h.slice(1)];
+      localStorage.setItem(
+        "projectStatusHistory",
+        JSON.stringify(updated)
+      );
+      localStorage.setItem("projectStatusLast", JSON.stringify(updatedFirst));
+      setLastUpdate(updatedFirst);
+      return updated;
+    });
+  };
+
+  const copySummary = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(summary);
+    }
+  };
+
+  const openSendModal = () => {
+    if (!emailConnected) {
+      alert("Connect your Gmail account in settings.");
+      return;
+    }
+    if (!auth.currentUser) {
+      alert("Please log in to send emails.");
+      return;
+    }
+    setRecipientModal({ selected: [] });
+  };
+
+  const sendEmail = async (names) => {
+    const emails = names
+      .map((n) => contacts.find((c) => c.name === n)?.email)
+      .filter((e) => e);
+    if (!emails.length) {
+      alert("Missing email address for selected contact");
+      return;
+    }
+    try {
+      if (appCheck) {
+        await getAppCheckToken(appCheck);
+      }
+      await auth.currentUser.getIdToken(true);
+      const callable = httpsCallable(functions, "sendQuestionEmail");
+      await callable({
+        provider: "gmail",
+        recipientEmail: emails.join(","),
+        subject: `Project Status Update - ${new Date().toDateString()}`,
+        message: summary,
+        questionId: `status-${Date.now()}`,
+      });
+      alert("Email sent");
+      markSent();
+    } catch (err) {
+      console.error("sendStatusEmail error", err);
+      alert("Error sending email");
+    }
+  };
+
+  const confirmRecipients = () => {
+    sendEmail(recipientModal.selected);
+    setRecipientModal(null);
+  };
+
+  const saveContact = () => {
+    const updated = [...contacts, newContact];
+    setContacts(updated);
+    setNewContact(null);
+    setRecipientModal((m) =>
+      m ? { ...m, selected: [...m.selected, newContact.name] } : m
+    );
   };
 
   return (
@@ -114,19 +248,206 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
           {loading ? "Generating..." : "Generate Summary"}
         </button>
       </div>
-      <textarea
-        rows={10}
-        value={summary}
-        onChange={(e) => setSummary(e.target.value)}
-        placeholder="AI-generated summary will appear here"
-        style={{ width: "100%" }}
-      />
+      {summary ? (
+        editing ? (
+          <>
+            <textarea
+              rows={10}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              style={{ width: "100%" }}
+            />
+            <div className="status-actions">
+              <button className="generator-button" onClick={saveEdit}>
+                Save
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => {
+                  setSummary(history[0].summary);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="initiative-card">
+              <pre style={{ whiteSpace: "pre-wrap" }}>{summary}</pre>
+            </div>
+            <div className="status-actions">
+              <button
+                className="generator-button"
+                onClick={() => setEditing(true)}
+              >
+                Edit
+              </button>
+              <button
+                className="generator-button"
+                onClick={openSendModal}
+              >
+                Send with Gmail
+              </button>
+              <button
+                className="generator-button"
+                onClick={copySummary}
+              >
+                Copy to Clipboard
+              </button>
+              {!history[0]?.sent && (
+                <button
+                  className="generator-button"
+                  onClick={markSent}
+                >
+                  Mark as Sent
+                </button>
+              )}
+            </div>
+          </>
+        )
+      ) : (
+        <p>AI-generated summary will appear here</p>
+      )}
+
+      {history.slice(1).length > 0 && (
+        <div className="past-updates">
+          <h3>Past Updates</h3>
+          {history.slice(1).map((u, i) => (
+            <div
+              key={i}
+              className="initiative-card"
+              style={{ marginTop: "10px" }}
+            >
+              <strong>
+                {new Date(u.date).toDateString()}
+                {u.sent ? " (sent)" : ""}
+              </strong>
+              <pre style={{ whiteSpace: "pre-wrap" }}>{u.summary}</pre>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {recipientModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setRecipientModal(null)}
+        >
+          <div
+            className="initiative-card modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Select Contacts</h3>
+            <select
+              multiple
+              className="generator-input"
+              value={recipientModal.selected}
+              onChange={(e) =>
+                setRecipientModal((m) => ({
+                  ...m,
+                  selected: Array.from(
+                    e.target.selectedOptions,
+                    (o) => o.value
+                  ),
+                }))
+              }
+            >
+              {contacts.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <div className="modal-actions">
+              <button
+                className="generator-button"
+                onClick={() => setNewContact({
+                  name: "",
+                  role: "",
+                  email: "",
+                })}
+              >
+                Add Contact
+              </button>
+              <button
+                className="generator-button"
+                onClick={confirmRecipients}
+              >
+                Send
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => setRecipientModal(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newContact && (
+        <div className="modal-overlay" onClick={() => setNewContact(null)}>
+          <div
+            className="initiative-card modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Add Contact</h3>
+            <label>
+              Name:
+              <input
+                className="generator-input"
+                value={newContact.name}
+                onChange={(e) =>
+                  setNewContact((c) => ({ ...c, name: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Role:
+              <input
+                className="generator-input"
+                value={newContact.role}
+                onChange={(e) =>
+                  setNewContact((c) => ({ ...c, role: e.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Email:
+              <input
+                className="generator-input"
+                value={newContact.email}
+                onChange={(e) =>
+                  setNewContact((c) => ({ ...c, email: e.target.value }))
+                }
+              />
+            </label>
+            <div className="modal-actions">
+              <button className="generator-button" onClick={saveContact}>
+                Save
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => setNewContact(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 ProjectStatus.propTypes = {
   questions: PropTypes.array,
+  contacts: PropTypes.array,
+  setContacts: PropTypes.func,
+  emailConnected: PropTypes.bool,
 };
 
 export default ProjectStatus;

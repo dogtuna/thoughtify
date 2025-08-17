@@ -872,7 +872,12 @@ Respond ONLY in this JSON format:
             </div>
           </div>
          ) : active === "status" ? (
-          <ProjectStatus questions={questions} />
+          <ProjectStatus
+            questions={questions}
+            contacts={contacts}
+            setContacts={setContacts}
+            emailConnected={emailConnected}
+          />
         ) : (
           <>
             <div className="filter-bar">
