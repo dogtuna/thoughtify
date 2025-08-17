@@ -61,9 +61,11 @@ const DiscoveryHub = () => {
     try {
       // Ensure fresh App Check token and auth token before calling the function
       if (appCheck) {
-        await getAppCheckToken(appCheck);
+        const token = await getAppCheckToken(appCheck);
+        console.log("AppCheck token", token.token);
       }
-      await auth.currentUser.getIdToken(true);
+      const idToken = await auth.currentUser.getIdToken(true);
+      console.log("ID token", idToken);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
