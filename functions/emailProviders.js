@@ -100,12 +100,16 @@ export const getEmailAuthUrl = onRequest(
       );
 
       const url = gmailClient.generateAuthUrl({
-        access_type: "offline",
-        prompt: "consent",
-        scope: ["https://www.googleapis.com/auth/gmail.send"],
-        state,
-        client_id: GMAIL_CLIENT_ID.value(),
-      });
+  access_type: "offline",
+  prompt: "consent",
+  scope: [
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.modify"
+  ],
+  state,
+  client_id: GMAIL_CLIENT_ID.value(),
+});
 
       res.redirect(url);
     } catch (err) {
