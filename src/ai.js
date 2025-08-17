@@ -1,8 +1,9 @@
 // src/ai.js
-import aiClient from './aiClient';
+import aiClient, { modelName } from './aiClient';
 import { getGenerativeModel } from 'firebase/ai';
 
-const model = getGenerativeModel(aiClient, { model: 'gemini-1.5-flash' });
+// Use model name from Remote Config (with defaults handled in aiClient)
+const model = getGenerativeModel(aiClient, { model: modelName });
 
 /**
  * Simple wrapper around the Firebase AI client that mirrors the
