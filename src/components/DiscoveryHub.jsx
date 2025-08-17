@@ -52,6 +52,8 @@ const DiscoveryHub = () => {
   const [draftIndex, setDraftIndex] = useState(0);
   const [recipientModal, setRecipientModal] = useState(null);
   const [analysisModal, setAnalysisModal] = useState(null);
+  const [answerDrafts, setAnswerDrafts] = useState({});
+  const [analyzing, setAnalyzing] = useState(false);
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -107,6 +109,11 @@ const DiscoveryHub = () => {
       setDraftIndex(0);
     }
   };
+
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", analyzing);
+    return () => document.body.classList.remove("pulsing");
+  }, [analyzing]);
 
   const openRecipientModal = (options, onConfirm) => {
     setRecipientModal({ options, selected: [], onConfirm });
@@ -196,33 +203,60 @@ const DiscoveryHub = () => {
   };
 
   const draftReply = (idx, name, suggestions) => {
-    const follow = `Could you share the following to help clarify: ${suggestions.join(", ")}?`;
-    const draft = generateDraft([name], [{ text: follow, id: idx }]);
+    const userName =
+      auth.currentUser?.displayName || auth.currentUser?.email || "";
+    const toNames = name;
+    let body = `Hi ${toNames},\n\nThank you for the information.\n`;
+    if (suggestions.length) {
+      body += `Could you also provide the following: ${suggestions.join(", ")}?\n\n`;
+    }
+    body += `Best regards,\n${userName}`;
+    const draft = {
+      subject: "Thank you for the information",
+      body,
+      recipients: [name],
+      questionIds: [idx],
+    };
     startDraftQueue([draft]);
   };
 
-  const createTaskFromAnalysis = async ({ name, suggestions }) => {
-    if (!uid) return;
+  const createTasksFromAnalysis = async (name, suggestions) => {
+    if (!uid || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
     try {
-      await addDoc(collection(db, "profiles", uid, "taskQueue"), {
-        name,
-        email,
-        message: `Locate: ${suggestions.join(", ")}`,
-        status: "open",
-        createdAt: serverTimestamp(),
-      });
+      for (const s of suggestions) {
+        await addDoc(collection(db, "profiles", uid, "taskQueue"), {
+          name,
+          email,
+          message: `Locate: ${s}`,
+          status: "open",
+          createdAt: serverTimestamp(),
+        });
+      }
     } catch (err) {
-      console.error("createTaskFromAnalysis error", err);
+      console.error("createTasksFromAnalysis error", err);
     }
   };
 
-  const handleAnswerPaste = (idx, name, e) => {
-    const pasted = e.clipboardData.getData("text");
-    setTimeout(async () => {
-      const result = await analyzeAnswer(pasted);
-      setAnalysisModal({ idx, name, ...result });
-    }, 0);
+  const handleAnswerSubmit = async (idx, name) => {
+    const key = `${idx}-${name}`;
+    const text = (answerDrafts[key] || "").trim();
+    if (!text) return;
+    updateAnswer(idx, name, text);
+    setAnswerDrafts((prev) => ({ ...prev, [key]: "" }));
+    setAnalyzing(true);
+    const result = await analyzeAnswer(text);
+    setAnalyzing(false);
+    setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
+  };
+
+  const toggleSuggestion = (s) => {
+    setAnalysisModal((prev) => {
+      const selected = prev.selected.includes(s)
+        ? prev.selected.filter((t) => t !== s)
+        : [...prev.selected, s];
+      return { ...prev, selected };
+    });
   };
 
   useEffect(() => {
@@ -883,19 +917,34 @@ const DiscoveryHub = () => {
                       </button>
                     </div>
                     {q.status !== "toask" &&
-                      q.contacts.map((name) => (
-                        <div key={name} className="answer-block">
-                          <strong>{name}:</strong>
-                          <textarea
-                            className="generator-input"
-                            placeholder="Paste Answer/Notes Here"
-                            value={q.answers[name] || ""}
-                            onChange={(e) => updateAnswer(q.idx, name, e.target.value)}
-                            onPaste={(e) => handleAnswerPaste(q.idx, name, e)}
-                            rows={3}
-                          />
-                        </div>
-                      ))}
+                      q.contacts.map((name) => {
+                        const key = `${q.idx}-${name}`;
+                        const draft = answerDrafts[key];
+                        return (
+                          <div key={name} className="answer-block">
+                            <strong>{name}:</strong>
+                            <textarea
+                              className="generator-input"
+                              placeholder="Enter answer or notes here"
+                              value={draft !== undefined ? draft : q.answers[name] || ""}
+                              onChange={(e) =>
+                                setAnswerDrafts((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                              rows={3}
+                            />
+                            <button
+                              className="generator-button"
+                              disabled={!answerDrafts[key]?.trim()}
+                              onClick={() => handleAnswerSubmit(q.idx, name)}
+                            >
+                              Submit
+                            </button>
+                          </div>
+                        );
+                      })}
                   </div>
                 );
                 })}
@@ -960,13 +1009,26 @@ const DiscoveryHub = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <h3>Answer Analysis</h3>
+            <p>Question has been moved to answered.</p>
             {analysisModal.analysis && <p>{analysisModal.analysis}</p>}
             {analysisModal.suggestions && analysisModal.suggestions.length > 0 && (
-              <ul>
-                {analysisModal.suggestions.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
+              <>
+                <p>Suggested tasks:</p>
+                <ul>
+                  {analysisModal.suggestions.map((s, i) => (
+                    <li key={i}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={analysisModal.selected.includes(s)}
+                          onChange={() => toggleSuggestion(s)}
+                        />
+                        {s}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
             <div className="modal-actions">
               <button
@@ -975,7 +1037,7 @@ const DiscoveryHub = () => {
                   draftReply(
                     analysisModal.idx,
                     analysisModal.name,
-                    analysisModal.suggestions,
+                    analysisModal.selected,
                   );
                   setAnalysisModal(null);
                 }}
@@ -985,11 +1047,14 @@ const DiscoveryHub = () => {
               <button
                 className="generator-button"
                 onClick={async () => {
-                  await createTaskFromAnalysis(analysisModal);
+                  await createTasksFromAnalysis(
+                    analysisModal.name,
+                    analysisModal.selected,
+                  );
                   setAnalysisModal(null);
                 }}
               >
-                Create Task
+                Add Selected Tasks
               </button>
               <button
                 className="generator-button"
