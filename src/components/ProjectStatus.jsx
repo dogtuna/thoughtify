@@ -17,6 +17,7 @@ const ProjectStatus = ({ questions = [] }) => {
   const [since, setSince] = useState(defaultSince);
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
@@ -35,6 +36,15 @@ const ProjectStatus = ({ questions = [] }) => {
     });
   }, [user, since]);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("projectStatusLast");
+      if (stored) setLastUpdate(JSON.parse(stored));
+    } catch (err) {
+      console.error("load last project status", err);
+    }
+  }, []);
+
   const generateSummary = async () => {
     setLoading(true);
     const tasksList = tasks
@@ -49,15 +59,26 @@ const ProjectStatus = ({ questions = [] }) => {
       .map((q) => `- ${q.question}`)
       .join("\n");
     const sinceDate = new Date(since).toDateString();
+    const today = new Date().toDateString();
     const audiencePrompt =
       audience === "client"
         ? "Write for a client-facing audience with a professional, progress-focused tone."
         : "Write for an internal audience, candidly highlighting risks and detailed blockers.";
-    const prompt = `You are preparing a project status update for work done since ${sinceDate}.
-Tasks:\n${tasksList || "None"}\n\nAnswered Questions:\n${answered || "None"}\n\nOutstanding Questions:\n${outstanding || "None"}\n\n${audiencePrompt}\nStructure the update under the headings: What's New, Outstanding / Blockers, and Next Steps for Design.`;
+    const previous = lastUpdate
+      ? `Previous update on ${new Date(lastUpdate.date).toDateString()}:\n${lastUpdate.summary}\n\n`
+      : "There is no previous update; this is the first project status.\n\n";
+    const prompt = `Today is ${today}. ${previous}You are preparing a project status update for work done since ${sinceDate}.
+Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questions:\n${answered || "None"}\n\nOutstanding Questions:\n${outstanding || "None"}\n\nUse only the information provided above. Do not add or assume any details, names, dates, or outcomes that aren't explicitly given. If information is missing, state that it is unknown or pending. Each task's status indicates progress; do not imply completion unless the status is done. If there is no information for a section, respond with "None."\n\n${audiencePrompt}\nBegin the response with 'Date: ${today}' and structure it under the headings: What's New, Outstanding / Blockers, and Next Steps for Design.`;
     try {
       const { text } = await ai.generate(prompt);
-      setSummary(text.trim());
+      const clean = text.trim();
+      setSummary(clean);
+      const now = new Date().toISOString();
+      localStorage.setItem(
+        "projectStatusLast",
+        JSON.stringify({ date: now, summary: clean })
+      );
+      setLastUpdate({ date: now, summary: clean });
     } catch (err) {
       console.error("generateSummary error", err);
     }
