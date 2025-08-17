@@ -1239,8 +1239,10 @@ Respond ONLY in this JSON format:
             >
               {generatingEmail ? (
                 <p>Generating...</p>
-              ) : (
-                <>
+               ) : active === "status" ? (
+          <ProjectStatus questions={questions} />
+        ) : (
+          <>
                   {draftQueue.length > 1 && (
                     <p>
                       Draft {draftIndex + 1} of {draftQueue.length}
@@ -1270,8 +1272,10 @@ Respond ONLY in this JSON format:
                         }
                       />
                     </>
-                  ) : (
-                    <>
+                   ) : active === "status" ? (
+          <ProjectStatus questions={questions} />
+        ) : (
+          <>
                       <h3>{emailDraft.subject}</h3>
                       <pre style={{ whiteSpace: "pre-wrap" }}>{emailDraft.body}</pre>
                     </>
