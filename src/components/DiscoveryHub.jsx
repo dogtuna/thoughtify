@@ -44,9 +44,12 @@ const DiscoveryHub = () => {
   const [focusRole, setFocusRole] = useState("");
   const [editData, setEditData] = useState(null);
   const [emailConnected, setEmailConnected] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(null);
+  const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [editingDraft, setEditingDraft] = useState(false);
   const navigate = useNavigate();
 
-  const draftEmail = async (q) => {
+  const draftEmail = (q) => {
     if (!emailConnected) {
       if (window.confirm("Connect your Gmail account in settings?")) {
         navigate("/settings");
@@ -58,27 +61,45 @@ const DiscoveryHub = () => {
       console.warn("auth.currentUser is null when drafting email");
       return;
     }
+    setGeneratingEmail(true);
+    setEditingDraft(false);
+    setEmailDraft({ subject: "", body: "", questionId: q.id });
+    const userName = auth.currentUser.displayName || auth.currentUser.email || "";
+    setTimeout(() => {
+      const subject = `Clarification Needed: ${q.question}`;
+      const toNames = q.contacts && q.contacts.length ? q.contacts.join(", ") : "there";
+      const body = `Hi ${toNames},\n\nWe're collecting information to ensure our work stays on track and would appreciate your input. Could you please answer the following question?\n\n${q.question}\n\nYour response will help us move forward.\n\nBest regards,\n${userName}`;
+      setEmailDraft({ subject, body, questionId: q.id });
+      setGeneratingEmail(false);
+    }, 500);
+  };
+
+  const sendEmail = async () => {
+    if (!emailDraft) return;
     try {
-      // Ensure fresh App Check token and auth token before calling the function
       if (appCheck) {
-        const token = await getAppCheckToken(appCheck);
-        console.log("AppCheck token", token.token);
+        await getAppCheckToken(appCheck);
       }
-      const idToken = await auth.currentUser.getIdToken(true);
-      console.log("ID token", idToken);
+      await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: "gmail",
         recipientEmail: auth.currentUser.email || "",
-        subject: q.question,
-        message: q.question,
-        questionId: q.id,
-        draft: true,
+        subject: emailDraft.subject,
+        message: emailDraft.body,
+        questionId: emailDraft.questionId,
       });
-      alert("Draft created in Gmail");
+      alert("Email sent");
+      setEmailDraft(null);
     } catch (err) {
-      console.error("draftEmail error", err);
-      alert("Error drafting email");
+      console.error("sendEmail error", err);
+      alert("Error sending email");
+    }
+  };
+
+  const copyDraft = () => {
+    if (emailDraft && navigator.clipboard) {
+      navigator.clipboard.writeText(`${emailDraft.subject}\n\n${emailDraft.body}`);
     }
   };
 
@@ -765,13 +786,84 @@ const DiscoveryHub = () => {
               Group
             </li>
         </ul>
-      )}
-      {editData && (
-        <div className="modal-overlay" onClick={() => setEditData(null)}>
+        )}
+        {emailDraft && (
           <div
-            className="initiative-card modal-content"
-            onClick={(e) => e.stopPropagation()}
+            className="modal-overlay"
+            onClick={() => {
+              setEmailDraft(null);
+              setEditingDraft(false);
+            }}
           >
+            <div
+              className="initiative-card modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {generatingEmail ? (
+                <p>Generating...</p>
+              ) : (
+                <>
+                  {editingDraft ? (
+                    <>
+                      <input
+                        className="generator-input"
+                        value={emailDraft.subject}
+                        onChange={(e) =>
+                          setEmailDraft((d) => ({
+                            ...d,
+                            subject: e.target.value,
+                          }))
+                        }
+                      />
+                      <textarea
+                        className="generator-input"
+                        rows={10}
+                        value={emailDraft.body}
+                        onChange={(e) =>
+                          setEmailDraft((d) => ({
+                            ...d,
+                            body: e.target.value,
+                          }))
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <h3>{emailDraft.subject}</h3>
+                      <pre style={{ whiteSpace: "pre-wrap" }}>{emailDraft.body}</pre>
+                    </>
+                  )}
+                  <div className="modal-actions">
+                    <button
+                      className="generator-button"
+                      onClick={() => setEditingDraft((e) => !e)}
+                    >
+                      {editingDraft ? "Done" : "Edit Draft"}
+                    </button>
+                    <button
+                      className="generator-button"
+                      onClick={sendEmail}
+                    >
+                      Send with Gmail
+                    </button>
+                    <button
+                      className="generator-button"
+                      onClick={copyDraft}
+                    >
+                      Copy Draft
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {editData && (
+          <div className="modal-overlay" onClick={() => setEditData(null)}>
+            <div
+              className="initiative-card modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
             <h3>Edit Contact</h3>
             <label>
               Name:

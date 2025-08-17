@@ -100,17 +100,13 @@ export const getEmailAuthUrl = onRequest(
       );
 
       const url = gmailClient.generateAuthUrl({
-  access_type: "offline",
-  prompt: "consent",
-  include_granted_scopes: false,
-  scope: [
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.compose",
-    "https://www.googleapis.com/auth/gmail.modify"
-  ],
-  state,
-  client_id: GMAIL_CLIENT_ID.value(),
-});
+        access_type: "offline",
+        prompt: "consent",
+        include_granted_scopes: false,
+        scope: ["https://www.googleapis.com/auth/gmail.send"],
+        state,
+        client_id: GMAIL_CLIENT_ID.value(),
+      });
 
       res.redirect(url);
     } catch (err) {
@@ -200,7 +196,7 @@ async function getStoredProviderToken(uid, provider, keyHex) {
 }
 
 // ==============================
-// 3) Send or draft email (CALLABLE with App Check)
+// 3) Send email (CALLABLE with App Check)
 // ==============================
 export const sendQuestionEmail = onCall(
   {
@@ -220,14 +216,8 @@ export const sendQuestionEmail = onCall(
       throw new HttpsError("unauthenticated", "Sign in required.");
     }
 
-    const {
-      provider,
-      recipientEmail,
-      subject,
-      message,
-      questionId,
-      draft = false,
-    } = request.data || {};
+    const { provider, recipientEmail, subject, message, questionId } =
+      request.data || {};
 
     if (
       !provider ||
@@ -267,20 +257,11 @@ export const sendQuestionEmail = onCall(
         .replace(/\//g, "_")
         .replace(/=+$/, "");
 
-      let messageId = "";
-      if (draft) {
-        const resp = await gmail.users.drafts.create({
-          userId: "me",
-          requestBody: { message: { raw } },
-        });
-        messageId = resp.data.id || "";
-      } else {
-        const resp = await gmail.users.messages.send({
-          userId: "me",
-          requestBody: { raw },
-        });
-        messageId = resp.data.id || "";
-      }
+      const resp = await gmail.users.messages.send({
+        userId: "me",
+        requestBody: { raw },
+      });
+      const messageId = resp.data.id || "";
 
       await db
         .collection("users")
