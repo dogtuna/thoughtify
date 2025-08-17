@@ -7,6 +7,8 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai from "../ai";
+import ProjectStatus from "./ProjectStatus.jsx";
+import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -58,6 +60,8 @@ const DiscoveryHub = () => {
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
+  const [statusHistory, setStatusHistory] = useState([]);
+  const [viewingStatus, setViewingStatus] = useState(null);
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -113,6 +117,17 @@ const DiscoveryHub = () => {
       setDraftIndex(0);
     }
   };
+
+  useEffect(() => {
+    try {
+      const hist = JSON.parse(
+        localStorage.getItem("projectStatusHistory") || "[]"
+      );
+      setStatusHistory(hist);
+    } catch (err) {
+      console.error("load status history", err);
+    }
+  }, []);
 
   useEffect(() => {
     document.body.classList.toggle("pulsing", analyzing);
@@ -829,6 +844,31 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
+          <li
+            className={active === "status" && !viewingStatus ? "active" : ""}
+            onClick={() => {
+              setActive("status");
+              setViewingStatus(null);
+            }}
+          >
+            Project Status
+          </li>
+          {active === "status" && statusHistory.filter((u) => u.sent).length > 0 && (
+            <ul className="sub-menu">
+              <li className="subheading">Past Updates</li>
+              {statusHistory
+                .filter((u) => u.sent)
+                .map((u, i) => (
+                  <li
+                    key={i}
+                    className={viewingStatus === u ? "active" : ""}
+                    onClick={() => setViewingStatus(u)}
+                  >
+                    {new Date(u.date).toDateString()}
+                  </li>
+                ))}
+            </ul>
+          )}
         </ul>
       </aside>
       <div className="main-content">
@@ -864,6 +904,18 @@ Respond ONLY in this JSON format:
               <input type="file" multiple onChange={handleDocInput} />
             </div>
           </div>
+         ) : active === "status" ? (
+          viewingStatus ? (
+            <PastUpdateView update={viewingStatus} />
+          ) : (
+            <ProjectStatus
+              questions={questions}
+              contacts={contacts}
+              setContacts={setContacts}
+              emailConnected={emailConnected}
+              onHistoryChange={setStatusHistory}
+            />
+          )
         ) : (
           <>
             <div className="filter-bar">
