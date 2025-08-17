@@ -1,226 +1,259 @@
-import process from "process";
-import { Buffer } from "buffer";
-import functions from "firebase-functions";
-import admin from "firebase-admin";
+
+import { Buffer } from "node:buffer";
+import crypto from "node:crypto";
+
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+
 import { google } from "googleapis";
-// import { ConfidentialClientApplication } from "@azure/msal-node"; // Outlook integration disabled
-import crypto from "crypto";
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// --- Firebase Functions v2 (https) ---
+import {
+  onCall,
+  onRequest,
+  HttpsError,
+} from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 
-// Encryption helpers for storing tokens securely
-const ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY; // must be 32 bytes hex
-const MISSING_KEY_MSG =
-  "TOKEN_ENCRYPTION_KEY environment variable is required to encrypt OAuth tokens";
-if (!ENCRYPTION_KEY) {
-  console.error(MISSING_KEY_MSG);
+// ==============================
+// Admin initialization (singleton)
+// ==============================
+if (!getApps().length) {
+  initializeApp();
 }
-function encrypt(text) {
-  if (!ENCRYPTION_KEY) {
-    throw new Error(MISSING_KEY_MSG);
+const db = getFirestore();
+
+// ==============================
+// Secrets (configure via CLI)
+// ==============================
+const TOKEN_ENCRYPTION_KEY = defineSecret("TOKEN_ENCRYPTION_KEY"); // hex, 32 bytes => 64 hex chars
+const GMAIL_CLIENT_ID = defineSecret("GMAIL_CLIENT_ID");
+const GMAIL_CLIENT_SECRET = defineSecret("GMAIL_CLIENT_SECRET");
+const GMAIL_REDIRECT_URI = defineSecret("GMAIL_REDIRECT_URI");
+const APP_BASE_URL = defineSecret("APP_BASE_URL");
+
+// ==============================
+// Crypto helpers
+// ==============================
+function requireKey(keyHex) {
+  if (!keyHex) {
+    throw new Error("Server misconfigured: TOKEN_ENCRYPTION_KEY is not set");
   }
+  if (keyHex.length !== 64) {
+    throw new Error("TOKEN_ENCRYPTION_KEY must be a 32-byte hex string (64 hex chars)");
+  }
+  return Buffer.from(keyHex, "hex");
+}
+
+function encrypt(plain, keyHex) {
+  const key = requireKey(keyHex);
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(
-    "aes-256-cbc",
-    Buffer.from(ENCRYPTION_KEY, "hex"),
-    iv
-  );
-
-  let encrypted = cipher.update(text, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  return iv.toString("hex") + ":" + encrypted;
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  let enc = cipher.update(plain, "utf8", "hex");
+  enc += cipher.final("hex");
+  return `${iv.toString("hex")}:${enc}`;
 }
-function decrypt(text) {
-  if (!ENCRYPTION_KEY) {
-    throw new Error(MISSING_KEY_MSG);
-  }
-  const [ivHex, data] = text.split(":");
+
+function decrypt(enc, keyHex) {
+  const key = requireKey(keyHex);
+  const [ivHex, dataHex] = enc.split(":");
   const iv = Buffer.from(ivHex, "hex");
-  const decipher = crypto.createDecipheriv(
-    "aes-256-cbc",
-    Buffer.from(ENCRYPTION_KEY, "hex"),
-    iv
-  );
-  let decrypted = decipher.update(data, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+  let dec = decipher.update(dataHex, "hex", "utf8");
+  dec += decipher.final("utf8");
+  return dec;
 }
 
-// Helper to build a Google OAuth client after verifying env vars
-function createGmailClient() {
-  const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI } =
-    process.env;
-  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REDIRECT_URI) {
+// ==============================
+// Gmail OAuth client factory
+// ==============================
+function createGmailClient(clientId, clientSecret, redirectUri) {
+  if (!clientId || !clientSecret || !redirectUri) {
     throw new Error("Gmail OAuth environment variables are not set");
   }
-  return new google.auth.OAuth2(
-    GMAIL_CLIENT_ID,
-    GMAIL_CLIENT_SECRET,
-    GMAIL_REDIRECT_URI
-  );
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-// Microsoft OAuth configuration (temporarily disabled)
-// const msalClient = new ConfidentialClientApplication({
-//   auth: {
-//    clientId: process.env.OUTLOOK_CLIENT_ID || "",
-//    authority: `https://login.microsoftonline.com/${process.env.OUTLOOK_TENANT_ID}`,
-//    clientSecret: process.env.OUTLOOK_CLIENT_SECRET || "",
-//   },
-// });
+// ==============================
+// 1) Generate provider authorization URL (HTTP)
+// ==============================
+export const getEmailAuthUrl = onRequest(
+  {
+    region: "us-central1",
+    cors: true,
+    secrets: [GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI],
+  },
+  async (req, res) => {
+    try {
+      const provider = req.query.provider || "";
+      const state = req.query.state || "";
 
-// 1. Generate provider authorization URL
-export const getEmailAuthUrl = functions.https.onRequest(async (req, res) => {
-  const { provider, state = "" } = req.query;
-  try {
-    if (provider === "gmail") {
-      const gmailClient = createGmailClient();
+      if (provider !== "gmail") {
+        res.status(400).send("Unknown provider");
+        return;
+      }
+
+      const gmailClient = createGmailClient(
+        GMAIL_CLIENT_ID.value(),
+        GMAIL_CLIENT_SECRET.value(),
+        GMAIL_REDIRECT_URI.value()
+      );
+
       const url = gmailClient.generateAuthUrl({
         access_type: "offline",
         prompt: "consent",
         scope: ["https://www.googleapis.com/auth/gmail.send"],
         state,
-        client_id: process.env.GMAIL_CLIENT_ID,
+        client_id: GMAIL_CLIENT_ID.value(),
       });
-      res.redirect(url);
-      // Outlook integration temporarily disabled
-      // } else if (provider === "outlook") {
-      //   const url = await msalClient.getAuthCodeUrl({
-      //     scopes: ["https://graph.microsoft.com/Mail.Send", "offline_access"],
-      //     redirectUri: process.env.OUTLOOK_REDIRECT_URI,
-      //     state,
-      //   });
-      //   res.redirect(url);
-    } else {
-      res.status(400).send("Unknown provider");
-    }
-  } catch (err) {
-    console.error("getEmailAuthUrl error", err);
-    res.status(500).send("OAuth error");
-  }
-});
 
-// 2. OAuth callback to store encrypted tokens
-export const emailOAuthCallback = functions.https.onRequest(async (req, res) => {
-  const { code, state, provider } = { ...req.query, ...req.body };
-  const uid = state; // state should carry the user ID
-  if (!uid) return res.status(400).send("Missing user state");
-  if (!ENCRYPTION_KEY) {
-    const msg =
-      "Server misconfigured: TOKEN_ENCRYPTION_KEY is not set";
-    console.error(msg);
-    return res.status(500).send(msg);
+      res.redirect(url);
+    } catch (err) {
+      console.error("getEmailAuthUrl error", err);
+      res.status(500).send("OAuth error");
+    }
   }
-  try {
-    const db = admin.firestore();
-    if (provider === "gmail") {
-      const gmailClient = createGmailClient();
+);
+
+// ==============================
+// 2) OAuth callback to store encrypted tokens (HTTP)
+// ==============================
+export const emailOAuthCallback = onRequest(
+  {
+    region: "us-central1",
+    cors: true,
+    secrets: [
+      TOKEN_ENCRYPTION_KEY,
+      GMAIL_CLIENT_ID,
+      GMAIL_CLIENT_SECRET,
+      GMAIL_REDIRECT_URI,
+      APP_BASE_URL,
+    ],
+  },
+  async (req, res) => {
+    try {
+      const method = req.method.toUpperCase();
+      const payload = method === "GET" ? req.query : req.body;
+      const code = payload.code || "";
+      const state = payload.state || "";
+      const provider = payload.provider || "gmail";
+
+      const uid = state;
+      if (!uid) {
+        res.status(400).send("Missing user state");
+        return;
+      }
+      if (provider !== "gmail") {
+        res.status(400).send("Unknown provider");
+        return;
+      }
+
+      const gmailClient = createGmailClient(
+        GMAIL_CLIENT_ID.value(),
+        GMAIL_CLIENT_SECRET.value(),
+        GMAIL_REDIRECT_URI.value()
+      );
       const { tokens } = await gmailClient.getToken(code);
-      const enc = encrypt(JSON.stringify(tokens));
+
+      const enc = encrypt(JSON.stringify(tokens), TOKEN_ENCRYPTION_KEY.value());
       await db
         .collection("users")
         .doc(uid)
         .collection("emailTokens")
         .doc("gmail")
         .set({ token: enc });
-      // Outlook integration temporarily disabled
-      // } else if (provider === "outlook") {
-      //   const tokenResponse = await msalClient.acquireTokenByCode({
-      //     code,
-      //     scopes: ["https://graph.microsoft.com/Mail.Send", "offline_access"],
-      //     redirectUri: process.env.OUTLOOK_REDIRECT_URI,
-      //   });
-      //   const enc = encrypt(JSON.stringify(tokenResponse));
-      //   await db
-      //     .collection("users")
-      //     .doc(uid)
-      //     .collection("emailTokens")
-      //     .doc("outlook")
-      //     .set({ token: enc });
-    } else {
-      return res.status(400).send("Unknown provider");
-    }
-    const appBase = process.env.APP_BASE_URL || "https://thoughtify.web.app";
-    res.status(200).send(`
-      <html><body><script>
-        if (window.opener) {
-          window.opener.location = '${appBase}/dashboard';
-          window.close();
-        } else {
-          window.location = '${appBase}/dashboard';
-        }
-      </script></body></html>
-    `);
-  } catch (err) {
-    console.error("emailOAuthCallback error", err);
-    res
-      .status(500)
-      .send(`<p>OAuth error: ${err.message || "unknown"}</p>`);
-  }
-});
 
-// Helper to read stored token
-async function getToken(uid, provider) {
-  const db = admin.firestore();
+      const base = APP_BASE_URL.value() || "https://thoughtify.web.app";
+      res.status(200).send(
+        `<html><body><script>
+           if (window.opener) { window.opener.location = '${base}/dashboard'; window.close(); }
+           else { window.location = '${base}/dashboard'; }
+         </script></body></html>`
+      );
+    } catch (err) {
+      console.error("emailOAuthCallback error", err);
+      res.status(500).send(`<p>OAuth error: ${err.message || "unknown"}</p>`);
+    }
+  }
+);
+
+// ==============================
+// Helper: read stored (decrypted) token
+// ==============================
+async function getStoredProviderToken(uid, provider, keyHex) {
   const snap = await db
     .collection("users")
     .doc(uid)
     .collection("emailTokens")
     .doc(provider)
     .get();
+
   if (!snap.exists) throw new Error("No token stored");
-  return JSON.parse(decrypt(snap.data().token));
+  const enc = (snap.data() && snap.data().token) || "";
+  const json = decrypt(enc, keyHex);
+  return JSON.parse(json);
 }
 
-// 3. Send or draft email and record provider message ID
-export const sendQuestionEmail = functions.https.onCall(async (data, context) => {
-  if (!ENCRYPTION_KEY) {
-    const msg =
-      "Server misconfigured: TOKEN_ENCRYPTION_KEY is not set";
-    console.error(msg);
-    throw new functions.https.HttpsError("failed-precondition", msg);
-  }
+// ==============================
+// 3) Send or draft email (CALLABLE with App Check)
+// ==============================
+export const sendQuestionEmail = onCall(
+  {
+    region: "us-central1",
+    enforceAppCheck: true,
+    secrets: [
+      TOKEN_ENCRYPTION_KEY,
+      GMAIL_CLIENT_ID,
+      GMAIL_CLIENT_SECRET,
+      GMAIL_REDIRECT_URI,
+    ],
+  },
+  async (request) => {
+    const uid = (request.auth && request.auth.uid) || null;
 
-  const uid = context.auth?.uid;
-  console.log("sendQuestionEmail context.auth", context.auth);
-  console.log("sendQuestionEmail context.app", context.app);
-  if (!uid) {
-    const msg =
-      "Authentication required: missing context.auth" +
-      (context.app
-        ? ""
-        : "; App Check token required – ensure your client includes a valid App Check token.");
-    console.error("sendQuestionEmail unauthenticated", msg);
-    throw new functions.https.HttpsError("unauthenticated", msg);
-  }
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
+    }
 
-  const {
-    provider,
-    recipientEmail,
-    subject,
-    message,
-    questionId,
-    draft = false,
-  } = data;
-  if (
-    !provider ||
-    !recipientEmail ||
-    !subject ||
-    !message ||
-    questionId == null
-  ) {
-    throw new functions.https.HttpsError("invalid-argument", "Missing fields");
-  }
-  try {
-    const db = admin.firestore();
-    let messageId = "";
-    if (provider === "gmail") {
-      const gmailClient = createGmailClient();
-      const tokens = await getToken(uid, "gmail");
+    const {
+      provider,
+      recipientEmail,
+      subject,
+      message,
+      questionId,
+      draft = false,
+    } = request.data || {};
+
+    if (
+      !provider ||
+      !recipientEmail ||
+      !subject ||
+      !message ||
+      questionId === undefined ||
+      questionId === null
+    ) {
+      throw new HttpsError("invalid-argument", "Missing fields");
+    }
+
+    if (provider !== "gmail") {
+      throw new HttpsError("invalid-argument", "Unknown provider");
+    }
+
+    try {
+      const gmailClient = createGmailClient(
+        GMAIL_CLIENT_ID.value(),
+        GMAIL_CLIENT_SECRET.value(),
+        GMAIL_REDIRECT_URI.value()
+      );
+      const tokens = await getStoredProviderToken(
+        uid,
+        "gmail",
+        TOKEN_ENCRYPTION_KEY.value()
+      );
       gmailClient.setCredentials(tokens);
+
       const gmail = google.gmail({ version: "v1", auth: gmailClient });
+
       const raw = Buffer.from(
         `To: ${recipientEmail}\r\nSubject: ${subject}\r\n\r\n${message}`
       )
@@ -228,66 +261,37 @@ export const sendQuestionEmail = functions.https.onCall(async (data, context) =>
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=+$/, "");
-      const response = draft
-        ? await gmail.users.drafts.create({
-            userId: "me",
-            requestBody: { message: { raw } },
-          })
-        : await gmail.users.messages.send({
-            userId: "me",
-            requestBody: { raw },
-          });
-      messageId = response.data.id;
-      // Outlook integration temporarily disabled
-      // } else if (provider === "outlook") {
-      //   const tokens = await getToken(uid, "outlook");
-      //   const accessToken = tokens.accessToken;
-      //   const url = draft
-      //     ? "https://graph.microsoft.com/v1.0/me/messages"
-      //     : "https://graph.microsoft.com/v1.0/me/sendMail";
-      //   const payload = draft
-      //     ? {
-      //         subject,
-      //         body: { contentType: "Text", content: message },
-      //         toRecipients: [{ emailAddress: { address: recipientEmail } }],
-      //       }
-      //     : {
-      //         message: {
-      //           subject,
-      //           body: { contentType: "Text", content: message },
-      //           toRecipients: [{ emailAddress: { address: recipientEmail } }],
-      //         },
-      //       };
-      //   const resp = await fetch(url, {
-      //     method: "POST",
-      //     headers: {
-      //       Authorization: `Bearer ${accessToken}`,
-      //       "Content-Type": "application/json",
-      //     },
-      //     body: JSON.stringify(payload),
-      //   });
-      //   if (!resp.ok) {
-      //     throw new Error(await resp.text());
-      //   }
-      //   if (draft) {
-      //     const data = await resp.json();
-      //     messageId = data.id;
-      //   } else {
-      //     messageId = "sent";
-      //   }
-    } else {
-      throw new Error("Unknown provider");
-    }
-    await db
-      .collection("users")
-      .doc(uid)
-      .collection("questions")
-      .doc(questionId)
-      .set({ providerMessageId: messageId }, { merge: true });
-    return { messageId };
-  } catch (err) {
-    console.error("sendQuestionEmail error", err);
-    throw new functions.https.HttpsError("internal", err.message);
-  }
-});
 
+      let messageId = "";
+      if (draft) {
+        const resp = await gmail.users.drafts.create({
+          userId: "me",
+          requestBody: { message: { raw } },
+        });
+        messageId = resp.data.id || "";
+      } else {
+        const resp = await gmail.users.messages.send({
+          userId: "me",
+          requestBody: { raw },
+        });
+        messageId = resp.data.id || "";
+      }
+
+      await db
+        .collection("users")
+        .doc(uid)
+        .collection("questions")
+        .doc(String(questionId))
+        .set({ providerMessageId: messageId }, { merge: true });
+
+      return { messageId };
+    } catch (err) {
+      console.error("sendQuestionEmail error", (err && err.response && err.response.data) || err);
+      const msg =
+        (err && err.response && err.response.data && JSON.stringify(err.response.data)) ||
+        (err && err.message) ||
+        "internal error";
+      throw new HttpsError("internal", msg);
+    }
+  }
+);
