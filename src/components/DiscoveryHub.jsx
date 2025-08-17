@@ -54,6 +54,10 @@ const DiscoveryHub = () => {
   const [analysisModal, setAnalysisModal] = useState(null);
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [analyzing, setAnalyzing] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [businessGoal, setBusinessGoal] = useState("");
+  const [audienceProfile, setAudienceProfile] = useState("");
+  const [projectConstraints, setProjectConstraints] = useState("");
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -191,8 +195,43 @@ const DiscoveryHub = () => {
 
   const analyzeAnswer = async (text) => {
     try {
-      const prompt =
-        `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a discovery question. Your primary goal is to understand how this information impacts the potential training solution and to determine the next steps required to get a complete picture.
+      const contextPieces = [];
+      if (projectName) contextPieces.push(`Project Name: ${projectName}`);
+      if (businessGoal) contextPieces.push(`Business Goal: ${businessGoal}`);
+      if (audienceProfile)
+        contextPieces.push(`Audience Profile: ${audienceProfile}`);
+      if (projectConstraints)
+        contextPieces.push(`Project Constraints: ${projectConstraints}`);
+      if (contacts.length) {
+        contextPieces.push(
+          `Key Contacts: ${contacts
+            .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
+            .join(", ")}`
+        );
+      }
+      if (questions.length) {
+        const qa = questions
+          .map((q) => {
+            const answers = Object.entries(q.answers || {})
+              .map(([name, ans]) => `${name}: ${ans}`)
+              .join("; ");
+            return answers ? `${q.question} | ${answers}` : `${q.question}`;
+          })
+          .join("\n");
+        contextPieces.push(`Existing Q&A:\n${qa}`);
+      }
+      if (documents.length) {
+        const docs = documents
+          .map((d) => `${d.name}:\n${d.content}`)
+          .join("\n");
+        contextPieces.push(`Source Materials:\n${docs}`);
+      }
+      const projectContext = contextPieces.join("\n\n");
+
+      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a discovery question. Your primary goal is to understand how this information impacts the potential training solution and to determine the next steps required to get a complete picture.
+
+Project Context:
+${projectContext}
 
 Carefully review the answer provided and perform the following two steps:
 
@@ -320,6 +359,10 @@ ${text}`;
         setEmailConnected(tokenSnap.exists());
         if (initiativeId) {
           const init = await loadInitiative(user.uid, initiativeId);
+          setProjectName(init?.projectName || "");
+          setBusinessGoal(init?.businessGoal || "");
+          setAudienceProfile(init?.audienceProfile || "");
+          setProjectConstraints(init?.projectConstraints || "");
           const contactsInit = (init?.keyContacts || []).map((c, i) => ({
             ...c,
             color: colorPalette[i % colorPalette.length],
