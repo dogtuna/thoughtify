@@ -7,6 +7,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai from "../ai";
+import ProjectStatus from "./ProjectStatus.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -829,6 +830,12 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
+          <li
+            className={active === "status" ? "active" : ""}
+            onClick={() => setActive("status")}
+          >
+            Project Status
+          </li>
         </ul>
       </aside>
       <div className="main-content">
@@ -864,6 +871,8 @@ Respond ONLY in this JSON format:
               <input type="file" multiple onChange={handleDocInput} />
             </div>
           </div>
+         ) : active === "status" ? (
+          <ProjectStatus questions={questions} />
         ) : (
           <>
             <div className="filter-bar">
@@ -1225,8 +1234,10 @@ Respond ONLY in this JSON format:
             >
               {generatingEmail ? (
                 <p>Generating...</p>
-              ) : (
-                <>
+               ) : active === "status" ? (
+          <ProjectStatus questions={questions} />
+        ) : (
+          <>
                   {draftQueue.length > 1 && (
                     <p>
                       Draft {draftIndex + 1} of {draftQueue.length}
@@ -1256,8 +1267,10 @@ Respond ONLY in this JSON format:
                         }
                       />
                     </>
-                  ) : (
-                    <>
+                   ) : active === "status" ? (
+          <ProjectStatus questions={questions} />
+        ) : (
+          <>
                       <h3>{emailDraft.subject}</h3>
                       <pre style={{ whiteSpace: "pre-wrap" }}>{emailDraft.body}</pre>
                     </>
