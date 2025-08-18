@@ -24,6 +24,7 @@ const ProjectStatus = ({
   setContacts = () => {},
   emailConnected = false,
   onHistoryChange = () => {},
+  initiativeId = "",
 }) => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -41,6 +42,8 @@ const ProjectStatus = ({
   const [editing, setEditing] = useState(false);
   const [recipientModal, setRecipientModal] = useState(null);
   const [newContact, setNewContact] = useState(null);
+  const historyKey = `projectStatusHistory:${initiativeId}`;
+  const lastKey = `projectStatusLast:${initiativeId}`;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
@@ -61,16 +64,14 @@ const ProjectStatus = ({
 
   useEffect(() => {
     try {
-      const hist = JSON.parse(
-        localStorage.getItem("projectStatusHistory") || "[]"
-      );
+      const hist = JSON.parse(localStorage.getItem(historyKey) || "[]");
       if (hist.length) {
         setHistory(hist);
         setLastUpdate(hist[0]);
         setSummary(hist[0].summary);
         onHistoryChange(hist);
       } else {
-        const stored = localStorage.getItem("projectStatusLast");
+        const stored = localStorage.getItem(lastKey);
         if (stored) {
           const last = JSON.parse(stored);
           const arr = [last];
@@ -83,7 +84,7 @@ const ProjectStatus = ({
     } catch (err) {
       console.error("load project status", err);
     }
-  }, [onHistoryChange]);
+  }, [onHistoryChange, historyKey, lastKey]);
 
   const generateSummary = async () => {
     setLoading(true);
@@ -117,11 +118,8 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
       const entry = { date: now, summary: clean, sent: false };
       setHistory((h) => {
         const updated = [entry, ...h];
-        localStorage.setItem(
-          "projectStatusHistory",
-          JSON.stringify(updated)
-        );
-        localStorage.setItem("projectStatusLast", JSON.stringify(entry));
+        localStorage.setItem(historyKey, JSON.stringify(updated));
+        localStorage.setItem(lastKey, JSON.stringify(entry));
         setLastUpdate(entry);
         onHistoryChange(updated);
         return updated;
@@ -137,11 +135,8 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
       if (!h.length) return h;
       const updatedFirst = { ...h[0], summary };
       const updated = [updatedFirst, ...h.slice(1)];
-      localStorage.setItem(
-        "projectStatusHistory",
-        JSON.stringify(updated)
-      );
-      localStorage.setItem("projectStatusLast", JSON.stringify(updatedFirst));
+      localStorage.setItem(historyKey, JSON.stringify(updated));
+      localStorage.setItem(lastKey, JSON.stringify(updatedFirst));
       setLastUpdate(updatedFirst);
       onHistoryChange(updated);
       return updated;
@@ -154,11 +149,8 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
       if (!h.length) return h;
       const updatedFirst = { ...h[0], sent: true };
       const updated = [updatedFirst, ...h.slice(1)];
-      localStorage.setItem(
-        "projectStatusHistory",
-        JSON.stringify(updated)
-      );
-      localStorage.setItem("projectStatusLast", JSON.stringify(updatedFirst));
+      localStorage.setItem(historyKey, JSON.stringify(updated));
+      localStorage.setItem(lastKey, JSON.stringify(updatedFirst));
       setLastUpdate(updatedFirst);
       onHistoryChange(updated);
       return updated;
@@ -439,6 +431,7 @@ ProjectStatus.propTypes = {
   setContacts: PropTypes.func,
   emailConnected: PropTypes.bool,
   onHistoryChange: PropTypes.func,
+  initiativeId: PropTypes.string,
 };
 
 export default ProjectStatus;

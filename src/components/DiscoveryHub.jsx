@@ -121,13 +121,13 @@ const DiscoveryHub = () => {
   useEffect(() => {
     try {
       const hist = JSON.parse(
-        localStorage.getItem("projectStatusHistory") || "[]"
+        localStorage.getItem(`projectStatusHistory:${initiativeId}`) || "[]"
       );
       setStatusHistory(hist);
     } catch (err) {
       console.error("load status history", err);
     }
-  }, []);
+  }, [initiativeId]);
 
   useEffect(() => {
     document.body.classList.toggle("pulsing", analyzing);
@@ -919,6 +919,7 @@ Respond ONLY in this JSON format:
               setContacts={setContacts}
               emailConnected={emailConnected}
               onHistoryChange={setStatusHistory}
+              initiativeId={initiativeId}
             />
           )
         ) : (
@@ -1111,10 +1112,7 @@ Respond ONLY in this JSON format:
           </li>
           <li
             onClick={async () => {
-              const text = await markAsked(menu.idx, [menu.name]);
-              if (navigator.clipboard && text) {
-                navigator.clipboard.writeText(text);
-              }
+              await markAsked(menu.idx, [menu.name]);
               setMenu(null);
             }}
           >
