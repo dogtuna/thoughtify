@@ -20,6 +20,7 @@ import PropTypes from "prop-types";
 
 const ProjectStatus = ({
   questions = [],
+  documents = [],
   contacts = [],
   setContacts = () => {},
   emailConnected = false,
@@ -88,28 +89,74 @@ const ProjectStatus = ({
 
   const generateSummary = async () => {
     setLoading(true);
-    const tasksList = tasks
-      .map((t) => `- ${t.message || ""} (${t.status})`)
-      .join("\n");
     const answered = questions
       .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
-      .map((q) => `- ${q.question}`)
+      .map((q) => {
+        const ans = Object.entries(q.answers || {})
+          .filter(([, a]) => a && a.trim())
+          .map(([name, a]) => `${name}: ${a}`)
+          .join("; ");
+        return `- ${q.question} | ${ans}`;
+      })
       .join("\n");
-    const outstanding = questions
+    const outstandingQuestions = questions
       .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
       .map((q) => `- ${q.question}`)
+      .join("\n");
+    const outstandingTaskList = tasks
+      .filter((t) => t.status !== "done")
+      .map((t) => `- ${t.message || ""} (${t.status})`)
+      .join("\n");
+    const docSummaries = documents
+      .map((d) => `- ${d.name}: ${d.content ? d.content.slice(0, 200) : ""}`)
       .join("\n");
     const sinceDate = new Date(since).toDateString();
     const today = new Date().toDateString();
     const audiencePrompt =
       audience === "client"
-        ? "Write for a client-facing audience with a professional, progress-focused tone."
-        : "Write for an internal audience, candidly highlighting risks and detailed blockers.";
+        ? "Use a client-facing tone that is professional and progress-focused."
+        : "Use an internal tone that candidly highlights risks and detailed blockers.";
     const previous = lastUpdate
       ? `Previous update on ${new Date(lastUpdate.date).toDateString()}:\n${lastUpdate.summary}\n\n`
       : "There is no previous update; this is the first project status.\n\n";
-    const prompt = `Today is ${today}. ${previous}You are preparing a project status update for work done since ${sinceDate}.
-Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questions:\n${answered || "None"}\n\nOutstanding Questions:\n${outstanding || "None"}\n\nUse only the information provided above. Do not add or assume any details, names, dates, or outcomes that aren't explicitly given. If information is missing, state that it is unknown or pending. Each task's status indicates progress; do not imply completion unless the status is done. If there is no information for a section, respond with "None."\n\n${audiencePrompt}\nBegin the response with 'Date: ${today}' and structure it under the headings: What's New, Outstanding / Blockers, and Next Steps for Design.`;
+    const outstandingCombined = [outstandingQuestions, outstandingTaskList]
+      .filter(Boolean)
+      .join("\n");
+    const prompt = `${previous}You are an expert Instructional Designer and Performance Consultant. Your goal is to draft a project status update that is both strategically insightful and 100% factually accurate based ONLY on the provided data.
+
+Step 1: Factual Grounding (Internal Thought Process)
+First, review all the provided information below (Project Data). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete data points. For example:
+
+"The Project Sponsor stated the budget is firm at $50k."
+
+"The Q2 Sales Report shows a 15% drop in lead conversion."
+
+"User survey feedback repeatedly mentions a 'confusing user interface'."
+
+"The provided 'Onboarding Manual' was last updated in 2018."
+
+"An outstanding task is to interview the Head of IT about system capabilities."
+
+Step 2: Strategic Synthesis & Drafting (The Final Output)
+Now, using ONLY the factual points you summarized in Step 1, draft the project status update. Your task is to analyze these facts to identify emerging themes, critical disconnects between data points, and the most significant blockers. Explain the "so what?" behind the facts from a consultant's perspective.
+
+CRITICAL RULE: Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every statement in your analysis must be directly supported by the provided information. If a piece of information is unknown, frame it as a "key question" or an "outstanding task" rather than inventing an answer.
+
+${audiencePrompt}
+Begin the response with Date: ${today} and structure it under the following headings:
+
+Executive Summary & Key Insights
+
+Recent Activity & Findings
+
+Blockers & Next Actions
+
+Project Data
+Audience: ${audience === "client" ? "Client-Facing" : "Internal"}
+Date Range: ${sinceDate} to ${today}
+Stakeholder Answers: ${answered || "None"}
+Document Summaries: ${docSummaries || "None"}
+Outstanding Questions & Tasks: ${outstandingCombined || "None"}`;
     try {
       const { text } = await ai.generate(prompt);
       const clean = text.trim();
@@ -427,6 +474,7 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
 
 ProjectStatus.propTypes = {
   questions: PropTypes.array,
+  documents: PropTypes.array,
   contacts: PropTypes.array,
   setContacts: PropTypes.func,
   emailConnected: PropTypes.bool,

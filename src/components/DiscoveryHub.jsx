@@ -915,6 +915,7 @@ Respond ONLY in this JSON format:
           ) : (
             <ProjectStatus
               questions={questions}
+              documents={documents}
               contacts={contacts}
               setContacts={setContacts}
               emailConnected={emailConnected}
