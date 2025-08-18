@@ -338,10 +338,15 @@ Respond ONLY in this JSON format:
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
     if (!text) return;
+    const questionText = questions[idx]?.question || "";
     updateAnswer(idx, name, text);
-    setAnswerDrafts((prev) => ({ ...prev, [key]: "" }));
+    setAnswerDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     setAnalyzing(true);
-    const result = await analyzeAnswer(questions[idx]?.question || "", text);
+    const result = await analyzeAnswer(questionText, text);
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
