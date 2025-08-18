@@ -23,6 +23,7 @@ const ProjectStatus = ({
   contacts = [],
   setContacts = () => {},
   emailConnected = false,
+  onHistoryChange = () => {},
 }) => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -67,19 +68,22 @@ const ProjectStatus = ({
         setHistory(hist);
         setLastUpdate(hist[0]);
         setSummary(hist[0].summary);
+        onHistoryChange(hist);
       } else {
         const stored = localStorage.getItem("projectStatusLast");
         if (stored) {
           const last = JSON.parse(stored);
-          setHistory([last]);
+          const arr = [last];
+          setHistory(arr);
           setLastUpdate(last);
           setSummary(last.summary);
+          onHistoryChange(arr);
         }
       }
     } catch (err) {
       console.error("load project status", err);
     }
-  }, []);
+  }, [onHistoryChange]);
 
   const generateSummary = async () => {
     setLoading(true);
@@ -119,6 +123,7 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
         );
         localStorage.setItem("projectStatusLast", JSON.stringify(entry));
         setLastUpdate(entry);
+        onHistoryChange(updated);
         return updated;
       });
     } catch (err) {
@@ -138,6 +143,7 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
       );
       localStorage.setItem("projectStatusLast", JSON.stringify(updatedFirst));
       setLastUpdate(updatedFirst);
+      onHistoryChange(updated);
       return updated;
     });
     setEditing(false);
@@ -154,8 +160,11 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
       );
       localStorage.setItem("projectStatusLast", JSON.stringify(updatedFirst));
       setLastUpdate(updatedFirst);
+      onHistoryChange(updated);
       return updated;
     });
+    setSummary("");
+    setEditing(false);
   };
 
   const copySummary = () => {
@@ -311,25 +320,6 @@ Tasks (format: description (status)):\n${tasksList || "None"}\n\nAnswered Questi
         <p>AI-generated summary will appear here</p>
       )}
 
-      {history.slice(1).length > 0 && (
-        <div className="past-updates">
-          <h3>Past Updates</h3>
-          {history.slice(1).map((u, i) => (
-            <div
-              key={i}
-              className="initiative-card"
-              style={{ marginTop: "10px" }}
-            >
-              <strong>
-                {new Date(u.date).toDateString()}
-                {u.sent ? " (sent)" : ""}
-              </strong>
-              <pre style={{ whiteSpace: "pre-wrap" }}>{u.summary}</pre>
-            </div>
-          ))}
-        </div>
-      )}
-
       {recipientModal && (
         <div
           className="modal-overlay"
@@ -448,6 +438,7 @@ ProjectStatus.propTypes = {
   contacts: PropTypes.array,
   setContacts: PropTypes.func,
   emailConnected: PropTypes.bool,
+  onHistoryChange: PropTypes.func,
 };
 
 export default ProjectStatus;
