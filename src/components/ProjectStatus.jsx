@@ -104,6 +104,13 @@ const ProjectStatus = ({
       return ts.toDate ? ts.toDate() : new Date(ts);
     };
 
+    // Helper to normalize document timestamps
+    const getDocumentTimestamp = (doc) => {
+      const ts = doc.updatedAt || doc.addedAt || doc.createdAt || doc.uploadedAt;
+      if (!ts) return null;
+      return ts.toDate ? ts.toDate() : new Date(ts);
+    };
+
     // This logic now correctly uses the cutoff date from the local state.
     const newStakeholderAnswers = questions
       .map((q) => {
@@ -123,17 +130,11 @@ const ProjectStatus = ({
 
     const newDocuments = documents
       .filter((d) => {
-        const added = d.addedAt || d.createdAt || d.uploadedAt;
-        if (!added) {
+        const t = getDocumentTimestamp(d);
+        if (!t) {
           // Documents without timestamps should only be considered "new" on the first run
           return !cutoff;
         }
-        const t =
-          typeof added === "string"
-            ? new Date(added)
-            : added.toDate
-            ? added.toDate()
-            : new Date(added);
         return !cutoff || t > cutoff;
       })
       .map(
@@ -526,7 +527,7 @@ ${allOutstanding || "None"}`;
                 className="generator-input"
                 value={newContact.role}
                 onChange={(e) =>
-                  setNewContact((c) => ({ ...c, role: e.g.target.value }))
+                  setNewContact((c) => ({ ...c, role: e.target.value }))
                 }
               />
             </label>
