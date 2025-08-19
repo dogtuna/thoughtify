@@ -225,14 +225,14 @@ const DiscoveryHub = () => {
         );
       }
       if (questions.length) {
-        const qa = questions
-          .map((q) => {
-            const answers = Object.entries(q.answers || {})
-              .map(([name, ans]) => `${name}: ${ans}`)
-              .join("; ");
-            return answers ? `${q.question} | ${answers}` : `${q.question}`;
-          })
-          .join("\n");
+          const qa = questions
+            .map((q) => {
+              const answers = Object.entries(q.answers || {})
+                .map(([name, value]) => `${name}: ${value}`)
+                .join("; ");
+              return answers ? `${q.question} | ${answers}` : `${q.question}`;
+            })
+            .join("\n");
         contextPieces.push(`Existing Q&A:\n${qa}`);
       }
       if (documents.length) {
@@ -338,8 +338,7 @@ Respond ONLY in this JSON format:
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
     if (!text) return;
-    const questionText = questions[idx]?.question || "";
-    updateAnswer(idx, name, text);
+      updateAnswer(idx, name, text);
     setAnswerDrafts((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -921,6 +920,7 @@ Respond ONLY in this JSON format:
               emailConnected={emailConnected}
               onHistoryChange={setStatusHistory}
               initiativeId={initiativeId}
+              businessGoal={businessGoal}
             />
           )
         ) : (
@@ -1282,7 +1282,16 @@ Respond ONLY in this JSON format:
               {generatingEmail ? (
                 <p>Generating...</p>
                ) : active === "status" ? (
-          <ProjectStatus questions={questions} />
+          <ProjectStatus
+            questions={questions}
+            documents={documents}
+            contacts={contacts}
+            setContacts={setContacts}
+            emailConnected={emailConnected}
+            onHistoryChange={setStatusHistory}
+            initiativeId={initiativeId}
+            businessGoal={businessGoal}
+          />
         ) : (
           <>
                   {draftQueue.length > 1 && (
@@ -1315,7 +1324,16 @@ Respond ONLY in this JSON format:
                       />
                     </>
                    ) : active === "status" ? (
-          <ProjectStatus questions={questions} />
+          <ProjectStatus
+            questions={questions}
+            documents={documents}
+            contacts={contacts}
+            setContacts={setContacts}
+            emailConnected={emailConnected}
+            onHistoryChange={setStatusHistory}
+            initiativeId={initiativeId}
+            businessGoal={businessGoal}
+          />
         ) : (
           <>
                       <h3>{emailDraft.subject}</h3>
