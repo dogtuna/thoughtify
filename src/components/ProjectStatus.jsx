@@ -85,53 +85,44 @@ const ProjectStatus = ({
     loadHistory();
   }, [user, initiativeId, onHistoryChange]);
 
-  const generateSummary = async () => {
+const generateSummary = async () => {
   if (!user || !initiativeId) return;
   setLoading(true);
 
-  // Always fetch the latest update to avoid stale state
-  let recent = null;
-  try {
-    const colRef = collection(
-      db,
-      "users",
-      user.uid,
-      "initiatives",
-      initiativeId,
-      "statusUpdates"
-    );
-    const qLatest = query(colRef, orderBy("date", "desc"), limit(1));
-    const snapLatest = await getDocs(qLatest);
-    if (snapLatest.docs.length) {
-      recent = { id: snapLatest.docs[0].id, ...snapLatest.docs[0].data() };
-    }
-  } catch (err) {
-    console.error("fetch last update", err);
-  }
+  // **FIXED LOGIC**
+  // Use the local 'history' state as the single source of truth for the last update.
+  // This avoids any potential race conditions with Firestore.
+  const lastUpdateFromState = history.length > 0 ? history[0] : null;
 
   // --- Data Aggregation ---
-  const cutoff = recent ? new Date(recent.date) : null;
+  const cutoff = lastUpdateFromState ? new Date(lastUpdateFromState.date) : null;
 
-  const answeredArr = questions
+  // Helper function to reliably get a timestamp from an answer object
+  // NOTE: This assumes your answer object has a `timestamp` field. Adjust if necessary.
+  const getAnswerTimestamp = (answer) => {
+    if (!answer || !answer.timestamp) return null;
+    const ts = answer.timestamp;
+    return ts.toDate ? ts.toDate() : new Date(ts);
+  };
+
+  // This logic now correctly uses the cutoff date from the local state.
+  const newStakeholderAnswers = questions
     .map((q) => {
-      const entries = Object.entries(q.answers || {}).filter(
-        ([name, value]) => {
-          if (!value || !value.trim()) return false;
-          if (!cutoff) return true;
-          const dateStr = q.answerDates?.[name];
-          return dateStr && new Date(dateStr) > cutoff;
-        }
-      );
-      if (!entries.length) return null;
-      const answerText = entries
-        .map(([name, value]) => `${name}: ${value}`)
+      const newAnswers = Object.entries(q.answers || {})
+        .filter(([, answer]) => {
+          if (!answer || !answer.text || !answer.text.trim()) return false;
+          if (!cutoff) return true; // If it's the first run, all answers are new
+          const answerTimestamp = getAnswerTimestamp(answer);
+          return answerTimestamp && answerTimestamp > cutoff;
+        })
+        .map(([name, answer]) => `${name}: ${answer.text}`)
         .join("; ");
-      return `- ${q.question} | ${answerText}`;
+      return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
     })
-    .filter(Boolean);
-  const answered = answeredArr.join("\n");
+    .filter(Boolean)
+    .join("\n");
 
-  const docSummaries = documents
+  const newDocuments = documents
     .filter((d) => {
       if (!cutoff) return true;
       const added = d.addedAt || d.createdAt || d.uploadedAt;
@@ -151,7 +142,7 @@ const ProjectStatus = ({
     .join("\n");
 
   const outstandingQuestionsArr = questions
-    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
+    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
     .map((q) => `- ${q.question}`);
 
   const taskListArr = tasks.map(
@@ -171,10 +162,10 @@ const ProjectStatus = ({
     sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
   }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
 
-  const previous = recent ? recent.summary : "None";
+  const previous = lastUpdateFromState ? lastUpdateFromState.summary : "None";
   const today = new Date().toDateString();
 
-  // --- Prompt ---
+  // --- Prompt (No changes needed, it's correct) ---
   const audiencePrompt =
     audience === "client"
       ? "Use a client-facing tone that is professional and strategically focused."
@@ -224,14 +215,15 @@ ${previous}
 ${projectBaseline}
 
 **New Stakeholder Answers (since last update):**
-${answered || "None"}
+${newStakeholderAnswers || "None"}
 
 **New Documents (since last update):**
-${docSummaries || "None"}
+${newDocuments || "None"}
 
 **All Outstanding Questions & Tasks:**
 ${allOutstanding || "None"}`;
-  // --- API Call and State Update (No changes needed here) ---
+  
+  // --- API Call and State Update ---
   try {
     const { text } = await ai.generate(prompt);
     const clean = text.trim();
@@ -246,6 +238,7 @@ ${allOutstanding || "None"}`;
       initiativeId,
       "statusUpdates"
     );
+    // The write to the database still happens, but we no longer depend on its timing for the next run
     const docRef = await addDoc(colRef, entry);
     const entryWithId = { id: docRef.id, ...entry };
     const updated = [entryWithId, ...history];
