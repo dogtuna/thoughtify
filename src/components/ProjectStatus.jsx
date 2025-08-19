@@ -94,100 +94,122 @@ const ProjectStatus = ({
   }, [user, initiativeId, onHistoryChange]);
 
   const generateSummary = async () => {
-    if (!user || !initiativeId) return;
-    setLoading(true);
-    const answered = questions
-      .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
-      .map((q) => {
-        const ans = Object.entries(q.answers || {})
-          .filter(([, a]) => a && a.trim())
-          .map(([name, a]) => `${name}: ${a}`)
-          .join("; ");
-        return `- ${q.question} | ${ans}`;
-      })
-      .join("\n");
-    const outstandingQuestions = questions
-      .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
-      .map((q) => `- ${q.question}`)
-      .join("\n");
-    const outstandingTaskList = tasks
-      .filter((t) => t.status !== "done")
-      .map((t) => `- ${t.message || ""} (${t.status})`)
-      .join("\n");
-    const docSummaries = documents
-      .map((d) => `- ${d.name}: ${d.content ? d.content.slice(0, 200) : ""}`)
-      .join("\n");
-    const sinceDate = new Date(since).toDateString();
-    const today = new Date().toDateString();
-    const audiencePrompt =
-      audience === "client"
-        ? "Use a client-facing tone that is professional and progress-focused."
-        : "Use an internal tone that candidly highlights risks and detailed blockers.";
-    const previous = lastUpdate
-      ? `Previous update on ${new Date(lastUpdate.date).toDateString()}:\n${lastUpdate.summary}\n\n`
-      : "There is no previous update; this is the first project status.\n\n";
-    const outstandingCombined = [outstandingQuestions, outstandingTaskList]
-      .filter(Boolean)
-      .join("\n");
-    const prompt = `${previous}You are an expert Performance Consultant, preparing a strategic brief for a client. Your persona is that of Dana Scully from The X-Files: your voice should be intelligent, analytical, and evidence-based. You are skeptical of initial assumptions and relentlessly focused on uncovering the objective, data-supported truth to solve the stated business goal.
+  if (!user || !initiativeId) return;
+  setLoading(true);
 
-Step 1: Factual Grounding (Internal Thought Process)
-First, review all the provided information below (Project Data). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete data points. For example:
+  // --- Data Aggregation (No changes needed here, this is correct) ---
+  const answered = questions
+    .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
+    .map((q) => {
+      const ans = Object.entries(q.answers || {})
+        .filter(([, a]) => a && a.trim())
+        .map(([name, a]) => `${name}: ${a}`)
+        .join("; ");
+      return `- ${q.question} | ${ans}`;
+    })
+    .join("\n");
 
-"The Project Sponsor stated the budget is firm at $50k."
+  const outstandingQuestions = questions
+    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
+    .map((q) => `- ${q.question}`)
+    .join("\n");
 
-"The Q2 Sales Report shows a 15% drop in lead conversion."
+  const outstandingTaskList = tasks
+    .filter((t) => t.status !== "done")
+    .map((t) => `- ${t.message || ""} (${t.status})`)
+    .join("\n");
 
-"User survey feedback repeatedly mentions a 'confusing user interface'."
+  const docSummaries = documents
+    .map((d) => `- ${d.name}: ${d.content ? d.content.slice(0, 200) : ""}`)
+    .join("\n");
 
-"The provided 'Onboarding Manual' was last updated in 2018."
+  const sinceDate = new Date(since).toDateString();
+  const today = new Date().toDateString();
 
-"An outstanding task is to interview the Head of IT about system capabilities."
+  const outstandingCombined = [outstandingQuestions, outstandingTaskList]
+    .filter(Boolean)
+    .join("\n");
 
-Step 2: Strategic Synthesis & Drafting (The Final Output)
+  const previous = lastUpdate
+    ? `Previous update on ${new Date(lastUpdate.date).toDateString()}:\n${lastUpdate.summary}\n\n`
+    : "There is no previous update; this is the first project status.\n\n";
+
+  // --- REVISED PROMPT SECTION ---
+
+  const audiencePrompt =
+    audience === "client"
+      ? "Use a client-facing tone that is professional and strategically focused."
+      : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
+
+  const prompt = `You are an expert Performance Consultant, preparing a strategic brief for a client. Your persona is that of Dana Scully from The X-Files: your voice should be intelligent, analytical, and evidence-based. You are skeptical of initial assumptions and relentlessly focused on uncovering the objective, data-supported truth to solve the stated business goal.
+
+**Step 1: Factual Grounding (Internal Thought Process)**
+First, review all the provided information below (\`Project Data\`). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete, observable data points. For example:
+* "The Project Sponsor stated the budget is firm at $50k."
+* "The Q2 Sales Report shows a 15% drop in lead conversion."
+* "User survey feedback repeatedly mentions a 'confusing user interface'."
+* "The provided 'Onboarding Manual' was last updated in 2018."
+* "An outstanding task is to interview the Head of IT about system capabilities."
+
+**Step 2: Strategic Synthesis & Drafting (The Final Output)**
 Now, using ONLY the factual points you summarized in Step 1, draft the project brief in the Scully persona. Your primary objective is to analyze the evidence to distinguish between performance gaps that can be addressed by a training intervention and systemic issues that require strategic decisions from leadership.
-CRITICAL RULE: Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every statement in your analysis must be directly supported by the provided information. If a piece of information is unknown, frame it as a "key question" or an "outstanding task" rather than inventing an answer.
+
+**CRITICAL RULE:** Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the \`Project Data\` below. Every conclusion must be a logical deduction from the provided evidence. If a piece of information is unknown, it should be identified as a gap in the data that requires further investigation.
 
 ${audiencePrompt}
-Begin the response with Date: ${today} and structure it under the following headings:
 
-Executive Summary & Key Insights
+Begin the response with \`Date: ${today}\` and structure it under the following headings:
+* Situation Analysis & Working Hypothesis
+* Key Findings & Evidence
+* Recommendations & Required Actions
 
-Recent Activity & Findings
+---
+## Project Data
 
-Blockers & Next Actions
+**Previous Update:**
+${previous}
 
-Project Data
-Audience: ${audience === "client" ? "Client-Facing" : "Internal"}
-Date Range: ${sinceDate} to ${today}
-Stakeholder Answers: ${answered || "None"}
-Document Summaries: ${docSummaries || "None"}
-Outstanding Questions & Tasks: ${outstandingCombined || "None"}`;
-    try {
-      const { text } = await ai.generate(prompt);
-      const clean = text.trim();
-      setSummary(clean);
-      const now = new Date().toISOString();
-      const entry = { date: now, summary: clean, sent: false };
-      const colRef = collection(
-        db,
-        "users",
-        user.uid,
-        "initiatives",
-        initiativeId,
-        "statusUpdates"
-      );
-      const docRef = await addDoc(colRef, entry);
-      const entryWithId = { id: docRef.id, ...entry };
-      const updated = [entryWithId, ...history];
-      setHistory(updated);
-      setLastUpdate(entryWithId);
-      onHistoryChange(updated);
-    } catch (err) {
-      console.error("generateSummary error", err);
-    }
-    setLoading(false);
-  };
+**Audience:**
+${audience === "client" ? "Client-Facing" : "Internal"}
+
+**Date Range:**
+${sinceDate} to ${today}
+
+**Stakeholder Answers:**
+${answered || "None"}
+
+**Document Summaries:**
+${docSummaries || "None"}
+
+**Outstanding Questions & Tasks:**
+${outstandingCombined || "None"}`;
+
+  // --- API Call and State Update (No changes needed here) ---
+  try {
+    const { text } = await ai.generate(prompt);
+    const clean = text.trim();
+    setSummary(clean);
+    const now = new Date().toISOString();
+    const entry = { date: now, summary: clean, sent: false };
+    const colRef = collection(
+      db,
+      "users",
+      user.uid,
+      "initiatives",
+      initiativeId,
+      "statusUpdates"
+    );
+    const docRef = await addDoc(colRef, entry);
+    const entryWithId = { id: docRef.id, ...entry };
+    const updated = [entryWithId, ...history];
+    setHistory(updated);
+    setLastUpdate(entryWithId);
+    onHistoryChange(updated);
+  } catch (err) {
+    console.error("generateSummary error", err);
+  }
+  setLoading(false);
+};
 
   const saveEdit = async () => {
     if (!user || !history.length) return;
