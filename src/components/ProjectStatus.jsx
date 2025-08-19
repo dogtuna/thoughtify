@@ -123,16 +123,18 @@ const ProjectStatus = ({
 
     const newDocuments = documents
       .filter((d) => {
-        if (!cutoff) return true;
         const added = d.addedAt || d.createdAt || d.uploadedAt;
-        if (!added) return true; // Default to including if no timestamp
+        if (!added) {
+          // Documents without timestamps should only be considered "new" on the first run
+          return !cutoff;
+        }
         const t =
           typeof added === "string"
             ? new Date(added)
             : added.toDate
             ? added.toDate()
             : new Date(added);
-        return t > cutoff;
+        return !cutoff || t > cutoff;
       })
       .map(
         (d) =>
