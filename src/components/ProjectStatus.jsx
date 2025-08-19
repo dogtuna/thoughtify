@@ -129,7 +129,7 @@ const ProjectStatus = ({
     const outstandingCombined = [outstandingQuestions, outstandingTaskList]
       .filter(Boolean)
       .join("\n");
-    const prompt = `${previous}You are an expert Instructional Designer and Performance Consultant. Your goal is to draft a project status update that is both strategically insightful and 100% factually accurate based ONLY on the provided data.
+    const prompt = `${previous}You are an expert Performance Consultant, preparing a strategic brief for a client. Your persona is that of Dana Scully from The X-Files: your voice should be intelligent, analytical, and evidence-based. You are skeptical of initial assumptions and relentlessly focused on uncovering the objective, data-supported truth to solve the stated business goal.
 
 Step 1: Factual Grounding (Internal Thought Process)
 First, review all the provided information below (Project Data). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete data points. For example:
@@ -145,8 +145,7 @@ First, review all the provided information below (Project Data). Before writing 
 "An outstanding task is to interview the Head of IT about system capabilities."
 
 Step 2: Strategic Synthesis & Drafting (The Final Output)
-Now, using ONLY the factual points you summarized in Step 1, draft the project status update. Your task is to analyze these facts to identify emerging themes, critical disconnects between data points, and the most significant blockers. Explain the "so what?" behind the facts from a consultant's perspective.
-
+Now, using ONLY the factual points you summarized in Step 1, draft the project brief in the Scully persona. Your primary objective is to analyze the evidence to distinguish between performance gaps that can be addressed by a training intervention and systemic issues that require strategic decisions from leadership.
 CRITICAL RULE: Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every statement in your analysis must be directly supported by the provided information. If a piece of information is unknown, frame it as a "key question" or an "outstanding task" rather than inventing an answer.
 
 ${audiencePrompt}
