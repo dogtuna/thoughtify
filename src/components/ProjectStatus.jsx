@@ -112,43 +112,30 @@ const ProjectStatus = ({
   // --- Data Aggregation ---
   const cutoff = recent ? new Date(recent.date) : null;
 
-  // Helper function to reliably get a timestamp from an answer object
-  // NOTE: You may need to adjust this based on your exact Firestore data structure for answers
-  const getAnswerTimestamp = (answer) => {
-    if (!answer || !answer.timestamp) return null;
-    const ts = answer.timestamp;
-    return ts.toDate ? ts.toDate() : new Date(ts);
-  };
-
-  // **FIXED LOGIC HERE**
-  // Filter for questions that have NEW answers since the last update
-  const newStakeholderAnswers = questions
+  const answeredArr = questions
     .map((q) => {
-      // Find new answers for this specific question
-      const newAnswers = Object.entries(q.answers || {})
-        .filter(([, answer]) => {
-          if (!answer || !answer.text || !answer.text.trim()) return false;
-          if (!cutoff) return true; // If it's the first run, all answers are new
-          const answerTimestamp = getAnswerTimestamp(answer);
-          // Ensure the timestamp is valid and after the last update
-          return answerTimestamp && answerTimestamp > cutoff;
-        })
-        .map(([name, answer]) => `${name}: ${answer.text}`)
+      const entries = Object.entries(q.answers || {}).filter(
+        ([name, value]) => {
+          if (!value || !value.trim()) return false;
+          if (!cutoff) return true;
+          const dateStr = q.answerDates?.[name];
+          return dateStr && new Date(dateStr) > cutoff;
+        }
+      );
+      if (!entries.length) return null;
+      const answerText = entries
+        .map(([name, value]) => `${name}: ${value}`)
         .join("; ");
-
-      // Only include the question if it has new answers
-      return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
+      return `- ${q.question} | ${answerText}`;
     })
-    .filter(Boolean) // Remove any questions that didn't have new answers
-    .join("\n");
+    .filter(Boolean);
+  const answered = answeredArr.join("\n");
 
-
-  // This document filtering logic is correct
-  const newDocuments = documents
+  const docSummaries = documents
     .filter((d) => {
       if (!cutoff) return true;
       const added = d.addedAt || d.createdAt || d.uploadedAt;
-      if (!added) return true; // Default to including if no timestamp
+      if (!added) return true;
       const t =
         typeof added === "string"
           ? new Date(added)
@@ -164,7 +151,7 @@ const ProjectStatus = ({
     .join("\n");
 
   const outstandingQuestionsArr = questions
-    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
+    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
     .map((q) => `- ${q.question}`);
 
   const taskListArr = tasks.map(
@@ -187,7 +174,7 @@ const ProjectStatus = ({
   const previous = recent ? recent.summary : "None";
   const today = new Date().toDateString();
 
-  // --- Prompt (This is correct, no changes needed) ---
+  // --- Prompt ---
   const audiencePrompt =
     audience === "client"
       ? "Use a client-facing tone that is professional and strategically focused."
@@ -237,14 +224,13 @@ ${previous}
 ${projectBaseline}
 
 **New Stakeholder Answers (since last update):**
-${newStakeholderAnswers || "None"}
+${answered || "None"}
 
 **New Documents (since last update):**
-${newDocuments || "None"}
+${docSummaries || "None"}
 
 **All Outstanding Questions & Tasks:**
 ${allOutstanding || "None"}`;
-  
   // --- API Call and State Update (No changes needed here) ---
   try {
     const { text } = await ai.generate(prompt);
