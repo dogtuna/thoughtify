@@ -58,8 +58,10 @@ const DiscoveryHub = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
+  const [statusHistory, setStatusHistory] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
+  const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
