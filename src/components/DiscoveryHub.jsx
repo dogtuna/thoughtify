@@ -228,7 +228,8 @@ const DiscoveryHub = () => {
           const qa = questions
             .map((q) => {
               const answers = Object.entries(q.answers || {})
-                .map(([name, value]) => `${name}: ${value}`)
+                .map(([name, value]) => `${name}: ${value?.text || ""}`)
+                .filter((s) => s.trim())
                 .join("; ");
               return answers ? `${q.question} | ${answers}` : `${q.question}`;
             })
@@ -396,11 +397,23 @@ Respond ONLY in this JSON format:
                 asked[n] = !!askedData;
               }
             });
+            const rawAnswers = init?.clarifyingAnswers?.[idx] || {};
+            const dateMap = init?.clarifyingAnswerDates?.[idx] || {};
+            const answers = {};
+            Object.entries(rawAnswers).forEach(([n, v]) => {
+              if (v && typeof v === "object" && "text" in v) {
+                answers[n] = v;
+              } else {
+                answers[n] = {
+                  text: v,
+                  timestamp: dateMap[n] || null,
+                };
+              }
+            });
             return {
               question: typeof q === "string" ? q : q.question,
               contacts: names,
-              answers: init?.clarifyingAnswers?.[idx] || {},
-              answerDates: init?.clarifyingAnswerDates?.[idx] || {},
+              answers,
               asked,
               id: idx,
             };
@@ -420,10 +433,9 @@ Respond ONLY in this JSON format:
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      q.answers = { ...q.answers, [name]: value };
-      q.answerDates = {
-        ...q.answerDates,
-        [name]: new Date().toISOString(),
+      q.answers = {
+        ...q.answers,
+        [name]: { text: value, timestamp: new Date().toISOString() },
       };
       if (value && !q.asked[name]) {
         q.asked[name] = true;
@@ -431,7 +443,6 @@ Respond ONLY in this JSON format:
       if (uid) {
         saveInitiative(uid, initiativeId, {
           clarifyingAnswers: updated.map((qq) => qq.answers),
-          clarifyingAnswerDates: updated.map((qq) => qq.answerDates || {}),
           clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
@@ -488,9 +499,6 @@ Respond ONLY in this JSON format:
       if (q.answers[name]) {
         delete q.answers[name];
       }
-      if (q.answerDates && q.answerDates[name]) {
-        delete q.answerDates[name];
-      }
       if (q.asked[name] !== undefined) {
         delete q.asked[name];
       }
@@ -500,7 +508,6 @@ Respond ONLY in this JSON format:
             updated.map((qq, i) => [i, qq.contacts])
           ),
           clarifyingAnswers: updated.map((qq) => qq.answers),
-          clarifyingAnswerDates: updated.map((qq) => qq.answerDates || {}),
           clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
@@ -686,10 +693,6 @@ Respond ONLY in this JSON format:
       Object.entries(q.answers).forEach(([n, v]) => {
         newAnswers[n === original ? name : n] = v;
       });
-      const newAnswerDates = {};
-      Object.entries(q.answerDates || {}).forEach(([n, d]) => {
-        newAnswerDates[n === original ? name : n] = d;
-      });
       const newAsked = {};
       Object.entries(q.asked).forEach(([n, v]) => {
         newAsked[n === original ? name : n] = v;
@@ -698,7 +701,6 @@ Respond ONLY in this JSON format:
         ...q,
         contacts: newContacts,
         answers: newAnswers,
-        answerDates: newAnswerDates,
         asked: newAsked,
       };
     });
@@ -715,9 +717,6 @@ Respond ONLY in this JSON format:
           updatedQuestions.map((qq, i) => [i, qq.contacts])
         ),
         clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
-        clarifyingAnswerDates: updatedQuestions.map(
-          (qq) => qq.answerDates || {}
-        ),
         clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
       });
     }
@@ -741,12 +740,12 @@ Respond ONLY in this JSON format:
       items.push({ ...q, idx, contacts: toAskNames, status: "toask" });
     }
     const askedNames = q.contacts.filter(
-      (n) => q.asked[n] && !(q.answers[n] || "").trim()
+      (n) => q.asked[n] && !(q.answers[n]?.text || "").trim()
     );
     if (askedNames.length) {
       items.push({ ...q, idx, contacts: askedNames, status: "asked" });
     }
-    const answeredNames = q.contacts.filter((n) => (q.answers[n] || "").trim());
+    const answeredNames = q.contacts.filter((n) => (q.answers[n]?.text || "").trim());
     if (answeredNames.length) {
       items.push({ ...q, idx, contacts: answeredNames, status: "answered" });
     }
@@ -1093,7 +1092,11 @@ Respond ONLY in this JSON format:
                             <textarea
                               className="generator-input"
                               placeholder="Enter answer or notes here"
-                              value={draft !== undefined ? draft : q.answers[name] || ""}
+                              value={
+                                draft !== undefined
+                                  ? draft
+                                  : q.answers[name]?.text || ""
+                              }
                               onChange={(e) =>
                                 setAnswerDrafts((prev) => ({
                                   ...prev,
