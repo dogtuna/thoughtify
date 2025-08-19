@@ -84,93 +84,93 @@ const ProjectStatus = ({
     loadHistory();
   }, [user, initiativeId, onHistoryChange]);
 
-const generateSummary = async () => {
-  if (!user || !initiativeId) return;
-  setLoading(true);
+  const generateSummary = async () => {
+    if (!user || !initiativeId) return;
+    setLoading(true);
 
-  // **FIXED LOGIC**
-  // Use the local 'history' state as the single source of truth for the last update.
-  // This avoids any potential race conditions with Firestore.
-  const lastUpdateFromState = history.length > 0 ? history[0] : null;
+    // **FIXED LOGIC**
+    // Use the local 'history' state as the single source of truth for the last update.
+    // This avoids any potential race conditions with Firestore.
+    const lastUpdateFromState = history.length > 0 ? history[0] : null;
 
-  // --- Data Aggregation ---
-  const cutoff = lastUpdateFromState ? new Date(lastUpdateFromState.date) : null;
+    // --- Data Aggregation ---
+    const cutoff = lastUpdateFromState ? new Date(lastUpdateFromState.date) : null;
 
-  // Helper function to reliably get a timestamp from an answer object
-  // NOTE: This assumes your answer object has a `timestamp` field. Adjust if necessary.
-  const getAnswerTimestamp = (answer) => {
-    if (!answer || !answer.timestamp) return null;
-    const ts = answer.timestamp;
-    return ts.toDate ? ts.toDate() : new Date(ts);
-  };
+    // Helper function to reliably get a timestamp from an answer object
+    // NOTE: This assumes your answer object has a `timestamp` field. Adjust if necessary.
+    const getAnswerTimestamp = (answer) => {
+      if (!answer || !answer.timestamp) return null;
+      const ts = answer.timestamp;
+      return ts.toDate ? ts.toDate() : new Date(ts);
+    };
 
-  // This logic now correctly uses the cutoff date from the local state.
-  const newStakeholderAnswers = questions
-    .map((q) => {
-      const newAnswers = Object.entries(q.answers || {})
-        .filter(([, answer]) => {
-          if (!answer || !answer.text || !answer.text.trim()) return false;
-          if (!cutoff) return true; // If it's the first run, all answers are new
-          const answerTimestamp = getAnswerTimestamp(answer);
-          return answerTimestamp && answerTimestamp > cutoff;
-        })
-        .map(([name, answer]) => `${name}: ${answer.text}`)
+    // This logic now correctly uses the cutoff date from the local state.
+    const newStakeholderAnswers = questions
+      .map((q) => {
+        const newAnswers = Object.entries(q.answers || {})
+          .filter(([, answer]) => {
+            if (!answer || !answer.text || !answer.text.trim()) return false;
+            if (!cutoff) return true; // If it's the first run, all answers are new
+            const answerTimestamp = getAnswerTimestamp(answer);
+            return answerTimestamp && answerTimestamp > cutoff;
+          })
+          .map(([name, answer]) => `${name}: ${answer.text}`)
+          .join("; ");
+        return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    const newDocuments = documents
+      .filter((d) => {
+        if (!cutoff) return true;
+        const added = d.addedAt || d.createdAt || d.uploadedAt;
+        if (!added) return true; // Default to including if no timestamp
+        const t =
+          typeof added === "string"
+            ? new Date(added)
+            : added.toDate
+            ? added.toDate()
+            : new Date(added);
+        return t > cutoff;
+      })
+      .map(
+        (d) =>
+          `- ${d.name}: ${d.summary || (d.content ? d.content.slice(0, 200) : "")}`
+      )
+      .join("\n");
+
+    const outstandingQuestionsArr = questions
+      .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
+      .map((q) => `- ${q.question}`);
+
+    const taskListArr = tasks.map(
+      (t) => `- ${t.message || ""} (${t.status || "open"})`
+    );
+
+    const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
+
+    const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
+    const formatContacts = (arr) =>
+      arr
+        .map((c) => (c.role ? `${c.name} (${c.role})` : c.name))
         .join("; ");
-      return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
-    })
-    .filter(Boolean)
-    .join("\n");
+    const projectBaseline = `Goal: ${
+      businessGoal || "Unknown"
+    }\nSponsor: ${
+      sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
+    }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
 
-  const newDocuments = documents
-    .filter((d) => {
-      if (!cutoff) return true;
-      const added = d.addedAt || d.createdAt || d.uploadedAt;
-      if (!added) return true;
-      const t =
-        typeof added === "string"
-          ? new Date(added)
-          : added.toDate
-          ? added.toDate()
-          : new Date(added);
-      return t > cutoff;
-    })
-    .map(
-      (d) =>
-        `- ${d.name}: ${d.summary || (d.content ? d.content.slice(0, 200) : "")}`
-    )
-    .join("\n");
+    const previous = lastUpdateFromState ? lastUpdateFromState.summary : "None";
+    const today = new Date().toDateString();
 
-  const outstandingQuestionsArr = questions
-    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
-    .map((q) => `- ${q.question}`);
+    // --- Prompt (This is correct, no changes needed) ---
+    const audiencePrompt =
+      audience === "client"
+        ? "Use a client-facing tone that is professional and strategically focused."
+        : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
 
-  const taskListArr = tasks.map(
-    (t) => `- ${t.message || ""} (${t.status || "open"})`
-  );
-
-  const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
-
-  const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
-  const formatContacts = (arr) =>
-    arr
-      .map((c) => (c.role ? `${c.name} (${c.role})` : c.name))
-      .join("; ");
-  const projectBaseline = `Goal: ${
-    businessGoal || "Unknown"
-  }\nSponsor: ${
-    sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
-  }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
-
-  const previous = lastUpdateFromState ? lastUpdateFromState.summary : "None";
-  const today = new Date().toDateString();
-
-  // --- Prompt (No changes needed, it's correct) ---
-  const audiencePrompt =
-    audience === "client"
-      ? "Use a client-facing tone that is professional and strategically focused."
-      : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
-
-  const prompt = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative. Your primary goal is to analyze the project's trajectory and provide a forward-looking strategic update, not a simple list of activities.
+    const prompt = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative. Your primary goal is to analyze the project's trajectory and provide a forward-looking strategic update, not a simple list of activities.
 
 ---
 ### Core Analytical Task: Delta Analysis
@@ -221,33 +221,33 @@ ${newDocuments || "None"}
 
 **All Outstanding Questions & Tasks:**
 ${allOutstanding || "None"}`;
-  
-  // --- API Call and State Update ---
-  try {
-    const { text } = await ai.generate(prompt);
-    const clean = text.trim();
-    setSummary(clean);
-    const now = new Date().toISOString();
-    const entry = { date: now, summary: clean, sent: false };
-    const colRef = collection(
-      db,
-      "users",
-      user.uid,
-      "initiatives",
-      initiativeId,
-      "statusUpdates"
-    );
-    // The write to the database still happens, but we no longer depend on its timing for the next run
-    const docRef = await addDoc(colRef, entry);
-    const entryWithId = { id: docRef.id, ...entry };
-    const updated = [entryWithId, ...history];
-    setHistory(updated);
-    onHistoryChange(updated);
-  } catch (err) {
-    console.error("generateSummary error", err);
-  }
-  setLoading(false);
-};
+    
+    // --- API Call and State Update ---
+    try {
+      const { text } = await ai.generate(prompt);
+      const clean = text.trim();
+      setSummary(clean);
+      const now = new Date().toISOString();
+      const entry = { date: now, summary: clean, sent: false };
+      const colRef = collection(
+        db,
+        "users",
+        user.uid,
+        "initiatives",
+        initiativeId,
+        "statusUpdates"
+      );
+      // The write to the database still happens, but we no longer depend on its timing for the next run
+      const docRef = await addDoc(colRef, entry);
+      const entryWithId = { id: docRef.id, ...entry };
+      const updated = [entryWithId, ...history];
+      setHistory(updated);
+      onHistoryChange(updated);
+    } catch (err) {
+      console.error("generateSummary error", err);
+    }
+    setLoading(false);
+  };
 
   const saveEdit = async () => {
     if (!user || !history.length) return;
@@ -524,7 +524,7 @@ ${allOutstanding || "None"}`;
                 className="generator-input"
                 value={newContact.role}
                 onChange={(e) =>
-                  setNewContact((c) => ({ ...c, role: e.target.value }))
+                  setNewContact((c) => ({ ...c, role: e.g.target.value }))
                 }
               />
             </label>
@@ -568,4 +568,3 @@ ProjectStatus.propTypes = {
 };
 
 export default ProjectStatus;
-
