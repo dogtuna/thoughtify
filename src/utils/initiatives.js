@@ -7,6 +7,7 @@ import {
   setDoc,
   deleteDoc,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 
 export async function loadInitiatives(uid) {
@@ -44,5 +45,10 @@ export async function saveContentAssets(
 
 export async function deleteInitiative(uid, initiativeId) {
   const ref = doc(db, "users", uid, "initiatives", initiativeId);
+  const statusRef = collection(ref, "statusUpdates");
+  const snap = await getDocs(statusRef);
+  const batch = writeBatch(db);
+  snap.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
   await deleteDoc(ref);
 }
