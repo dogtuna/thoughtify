@@ -7,6 +7,7 @@ import {
   getDocs,
   addDoc,
   orderBy,
+  limit,
   updateDoc,
   doc,
 } from "firebase/firestore";
@@ -36,7 +37,6 @@ const ProjectStatus = ({
   const [audience, setAudience] = useState("client");
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
   const [history, setHistory] = useState([]);
   const [editing, setEditing] = useState(false);
   const [recipientModal, setRecipientModal] = useState(null);
@@ -75,7 +75,6 @@ const ProjectStatus = ({
         const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         if (arr.length) {
           setHistory(arr);
-          setLastUpdate(arr[0]);
           setSummary(arr[0].summary);
           onHistoryChange(arr);
         }
@@ -90,19 +89,31 @@ const ProjectStatus = ({
   if (!user || !initiativeId) return;
   setLoading(true);
 
+  // Always fetch the latest update to avoid stale state
+  let recent = null;
+  try {
+    const colRef = collection(
+      db,
+      "users",
+      user.uid,
+      "initiatives",
+      initiativeId,
+      "statusUpdates"
+    );
+    const qLatest = query(colRef, orderBy("date", "desc"), limit(1));
+    const snapLatest = await getDocs(qLatest);
+    if (snapLatest.docs.length) {
+      recent = { id: snapLatest.docs[0].id, ...snapLatest.docs[0].data() };
+    }
+  } catch (err) {
+    console.error("fetch last update", err);
+  }
+
   // --- Data Aggregation ---
-  const cutoff = lastUpdate ? new Date(lastUpdate.date) : null;
+  const cutoff = recent ? new Date(recent.date) : null;
 
-  // Helper function to reliably get a timestamp from an answer object
-  const getAnswerTimestamp = (answer) => {
-    if (!answer || !answer.timestamp) return null;
-    const ts = answer.timestamp;
-    return ts.toDate ? ts.toDate() : new Date(ts);
-  };
-
-  // **FIXED LOGIC HERE**
-  // Filter for questions that have NEW answers since the last update
-  const newStakeholderAnswers = questions
+  const answeredArr = questions
+    .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
     .map((q) => {
       // Find new answers for this specific question
       const newAnswers = Object.entries(q.answers || {})
@@ -114,19 +125,15 @@ const ProjectStatus = ({
         })
         .map(([name, answer]) => `${name}: ${answer.text}`)
         .join("; ");
+      return `- ${q.question} | ${ans}`;
+    });
+  const answered = answeredArr.join("\n");
 
-      return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
-    })
-    .filter(Boolean) // Remove any questions that didn't have new answers
-    .join("\n");
-
-
-  // This document filtering logic is correct, no changes needed
-  const newDocuments = documents
+  const docSummaries = documents
     .filter((d) => {
       if (!cutoff) return true;
       const added = d.addedAt || d.createdAt || d.uploadedAt;
-      if (!added) return true; // Default to including if no timestamp
+      if (!added) return true;
       const t =
         typeof added === "string"
           ? new Date(added)
@@ -142,7 +149,7 @@ const ProjectStatus = ({
     .join("\n");
 
   const outstandingQuestionsArr = questions
-    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
+    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
     .map((q) => `- ${q.question}`);
 
   const taskListArr = tasks.map(
@@ -162,10 +169,10 @@ const ProjectStatus = ({
     sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
   }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
 
-  const previous = lastUpdate ? lastUpdate.summary : "None";
+  const previous = recent ? recent.summary : "None";
   const today = new Date().toDateString();
 
-  // --- Prompt (This is correct, no changes needed) ---
+  // --- Prompt ---
   const audiencePrompt =
     audience === "client"
       ? "Use a client-facing tone that is professional and strategically focused."
@@ -215,14 +222,13 @@ ${previous}
 ${projectBaseline}
 
 **New Stakeholder Answers (since last update):**
-${newStakeholderAnswers || "None"}
+${answered || "None"}
 
 **New Documents (since last update):**
-${newDocuments || "None"}
+${docSummaries || "None"}
 
 **All Outstanding Questions & Tasks:**
 ${allOutstanding || "None"}`;
-  
   // --- API Call and State Update (No changes needed here) ---
   try {
     const { text } = await ai.generate(prompt);
@@ -242,7 +248,6 @@ ${allOutstanding || "None"}`;
     const entryWithId = { id: docRef.id, ...entry };
     const updated = [entryWithId, ...history];
     setHistory(updated);
-    setLastUpdate(entryWithId);
     onHistoryChange(updated);
   } catch (err) {
     console.error("generateSummary error", err);
@@ -267,7 +272,6 @@ ${allOutstanding || "None"}`;
       const updatedFirst = { ...first, summary };
       const updated = [updatedFirst, ...history.slice(1)];
       setHistory(updated);
-      setLastUpdate(updatedFirst);
       onHistoryChange(updated);
     } catch (err) {
       console.error("saveEdit error", err);
@@ -292,7 +296,6 @@ ${allOutstanding || "None"}`;
       const updatedFirst = { ...first, sent: true };
       const updated = [updatedFirst, ...history.slice(1)];
       setHistory(updated);
-      setLastUpdate(updatedFirst);
       onHistoryChange(updated);
     } catch (err) {
       console.error("markSent error", err);
