@@ -7,7 +7,6 @@ import {
   getDocs,
   addDoc,
   orderBy,
-  limit,
   updateDoc,
   doc,
 } from "firebase/firestore";
