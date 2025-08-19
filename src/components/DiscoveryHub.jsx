@@ -60,8 +60,6 @@ const DiscoveryHub = () => {
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
-  const [statusHistory, setStatusHistory] = useState([]);
-  const [viewingStatus, setViewingStatus] = useState(null);
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -208,7 +206,7 @@ const DiscoveryHub = () => {
     }
   };
 
-  const analyzeAnswer = async (question, text, responder) => {
+  const analyzeAnswer = async (question, text) => {
     try {
       const contextPieces = [];
       if (projectName) contextPieces.push(`Project Name: ${projectName}`);
@@ -223,11 +221,6 @@ const DiscoveryHub = () => {
             .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
             .join(", ")}`
         );
-      }
-      if (responder) {
-        const contact = contacts.find((c) => c.name === responder);
-        const role = contact?.role ? ` (${contact.role})` : "";
-        contextPieces.push(`Answer Provided By: ${responder}${role}`);
       }
       if (questions.length) {
         const qa = questions
@@ -351,7 +344,7 @@ Respond ONLY in this JSON format:
       return next;
     });
     setAnalyzing(true);
-    const result = await analyzeAnswer(questionText, text, name);
+    const result = await analyzeAnswer(questions[idx]?.question || "", text);
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
