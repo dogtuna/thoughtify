@@ -155,6 +155,8 @@ const CustomDashboard = () => {
     try {
       await deleteInitiative(uid, id);
       setInitiatives((prev) => prev.filter((p) => p.id !== id));
+      localStorage.removeItem(`projectStatusHistory:${id}`);
+      localStorage.removeItem(`projectStatusLast:${id}`);
     } catch (err) {
       console.error("Failed to delete initiative", err);
     }

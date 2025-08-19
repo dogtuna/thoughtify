@@ -7,6 +7,8 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai from "../ai";
+import ProjectStatus from "./ProjectStatus.jsx";
+import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -58,6 +60,8 @@ const DiscoveryHub = () => {
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
+  const [statusHistory, setStatusHistory] = useState([]);
+  const [viewingStatus, setViewingStatus] = useState(null);
   const navigate = useNavigate();
 
   const generateDraft = (recipients, questionObjs) => {
@@ -113,6 +117,17 @@ const DiscoveryHub = () => {
       setDraftIndex(0);
     }
   };
+
+  useEffect(() => {
+    try {
+      const hist = JSON.parse(
+        localStorage.getItem(`projectStatusHistory:${initiativeId}`) || "[]"
+      );
+      setStatusHistory(hist);
+    } catch (err) {
+      console.error("load status history", err);
+    }
+  }, [initiativeId]);
 
   useEffect(() => {
     document.body.classList.toggle("pulsing", analyzing);
@@ -193,7 +208,7 @@ const DiscoveryHub = () => {
     }
   };
 
-  const analyzeAnswer = async (question, text) => {
+  const analyzeAnswer = async (question, text, responder) => {
     try {
       const contextPieces = [];
       if (projectName) contextPieces.push(`Project Name: ${projectName}`);
@@ -208,6 +223,11 @@ const DiscoveryHub = () => {
             .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
             .join(", ")}`
         );
+      }
+      if (responder) {
+        const contact = contacts.find((c) => c.name === responder);
+        const role = contact?.role ? ` (${contact.role})` : "";
+        contextPieces.push(`Answer Provided By: ${responder}${role}`);
       }
       if (questions.length) {
         const qa = questions
@@ -323,10 +343,15 @@ Respond ONLY in this JSON format:
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
     if (!text) return;
+    const questionText = questions[idx]?.question || "";
     updateAnswer(idx, name, text);
-    setAnswerDrafts((prev) => ({ ...prev, [key]: "" }));
+    setAnswerDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     setAnalyzing(true);
-    const result = await analyzeAnswer(questions[idx]?.question || "", text);
+    const result = await analyzeAnswer(questionText, text, name);
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
@@ -829,6 +854,31 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
+          <li
+            className={active === "status" && !viewingStatus ? "active" : ""}
+            onClick={() => {
+              setActive("status");
+              setViewingStatus(null);
+            }}
+          >
+            Project Status
+          </li>
+          {active === "status" && statusHistory.filter((u) => u.sent).length > 0 && (
+            <ul className="sub-menu">
+              <li className="subheading">Past Updates</li>
+              {statusHistory
+                .filter((u) => u.sent)
+                .map((u, i) => (
+                  <li
+                    key={i}
+                    className={viewingStatus === u ? "active" : ""}
+                    onClick={() => setViewingStatus(u)}
+                  >
+                    {new Date(u.date).toDateString()}
+                  </li>
+                ))}
+            </ul>
+          )}
         </ul>
       </aside>
       <div className="main-content">
@@ -864,6 +914,20 @@ Respond ONLY in this JSON format:
               <input type="file" multiple onChange={handleDocInput} />
             </div>
           </div>
+         ) : active === "status" ? (
+          viewingStatus ? (
+            <PastUpdateView update={viewingStatus} />
+          ) : (
+            <ProjectStatus
+              questions={questions}
+              documents={documents}
+              contacts={contacts}
+              setContacts={setContacts}
+              emailConnected={emailConnected}
+              onHistoryChange={setStatusHistory}
+              initiativeId={initiativeId}
+            />
+          )
         ) : (
           <>
             <div className="filter-bar">
@@ -1054,10 +1118,7 @@ Respond ONLY in this JSON format:
           </li>
           <li
             onClick={async () => {
-              const text = await markAsked(menu.idx, [menu.name]);
-              if (navigator.clipboard && text) {
-                navigator.clipboard.writeText(text);
-              }
+              await markAsked(menu.idx, [menu.name]);
               setMenu(null);
             }}
           >
