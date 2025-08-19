@@ -615,14 +615,15 @@ Source Material: ${sourceMaterial}${contactsInfo}${clarificationsBlock}`;
 export const generateStatusUpdate = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
   async (request) => {
-    const {
-      audience = "",
-      sinceDate = "",
-      today = "",
-      answeredQuestionsWithAnswers = "",
-      documentSummaries = "",
-      outstandingTasks = "",
-    } = request.data || {};
+      const {
+        audience = "",
+        today = "",
+        previousUpdateSummary = "None",
+        newStakeholderAnswers = "",
+        newDocuments = "",
+        projectBaseline = "",
+        allOutstandingTasks = "",
+      } = request.data || {};
 
     const key = process.env.GOOGLE_GENAI_API_KEY;
     if (!key) {
@@ -634,25 +635,32 @@ export const generateStatusUpdate = onCall(
       model: gemini("gemini-1.5-pro"),
     });
 
-    const promptTemplate = `You are an expert Performance Consultant, preparing a strategic brief for a client. Your persona is that of Dana Scully from The X-Files: your voice should be intelligent, analytical, and evidence-based. You are skeptical of initial assumptions and relentlessly focused on uncovering the objective, data-supported truth to solve the stated business goal.
+      const promptTemplate = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative. Your primary goal is to analyze the project's trajectory and provide a forward-looking strategic update, not a simple list of activities.
 
-Step 1: Factual Grounding (Internal Thought Process)
-First, review all the provided information below (Project Data). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete, observable data points. For example:
+---
+### Core Analytical Task: Delta Analysis
 
-"The Project Sponsor stated the budget is firm at $50k."
+Your most important task is to analyze the project's evolution since the last update.
 
-"The Q2 Sales Report shows a 15% drop in lead conversion."
+**IF \`Previous Update\` is "None":**
+This is the **initial project brief**. Your task is to establish the baseline. Synthesize the \`Project Baseline\` data with any initial documents or answers to define the business problem, state the initial working hypothesis, and outline the clear next actions for the discovery phase.
 
-"User survey feedback repeatedly mentions a 'confusing user interface'."
+**IF \`Previous Update\` exists:**
+This is a **follow-up brief**. Do not re-summarize old information from the previous update. Your analysis must focus **exclusively** on the strategic impact of the \`New Stakeholder Answers\` and \`New Documents\`.
+1.  In the \`Situation Analysis\`, explicitly state how this new information **confirms, challenges, or changes** the previous working hypothesis.
+2.  In the \`Key Findings\`, detail the specific new evidence and its implications.
+3.  In the \`Strategic Recommendations\`, your actions must be a direct consequence of the new findings, showing a clear evolution of the project plan.
 
-"The provided 'Onboarding Manual' was last updated in 2018."
+---
+### Step-by-Step Instructions
 
-"An outstanding task is to interview the Head of IT about system capabilities."
+**Step 1: Factual Grounding (Internal Thought Process)**
+First, review all \`Project Data\`. Create a private, internal list of only the most critical facts from the **new** information provided.
 
-Step 2: Strategic Synthesis & Drafting (The Final Output)
-Using ONLY the factual points you summarized in Step 1, draft the project brief in the Scully persona. Your primary objective is to analyze the evidence to distinguish between performance gaps that can be addressed by a training intervention and systemic issues that require strategic decisions from leadership.
+**Step 2: Strategic Synthesis & Drafting (The Final Output)**
+Now, using ONLY the facts you summarized in Step 1 and your \`Core Analytical Task\` above, draft the project brief. Frame your findings as a diagnosis and your recommendations as a clear, expert-guided path forward.
 
-CRITICAL RULE: Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every conclusion must be a logical deduction from the provided evidence. If a piece of information is unknown, it should be identified as a gap in the data that requires further investigation.
+**CRITICAL RULE:** Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the \`Project Data\`. Every conclusion must be a logical deduction from the provided evidence.
 
 Begin the response with "Date: ${today}" and structure it under the following headings:
 
@@ -660,7 +668,7 @@ Situation Analysis & Working Hypothesis
 
 Key Findings & Evidence
 
-Recommendations & Required Actions
+Strategic Recommendations & Next Actions
 
 Return a valid JSON object with the structure:
 {
@@ -670,10 +678,12 @@ Do not include any code fences or additional formatting.
 
 Project Data
 Audience: ${audience}
-Date Range: ${sinceDate} to ${today}
-Stakeholder Answers: ${answeredQuestionsWithAnswers}
-Document Summaries: ${documentSummaries}
-Outstanding Questions & Tasks: ${outstandingTasks}`;
+Previous Update: ${previousUpdateSummary}
+Project Baseline: ${projectBaseline}
+New Stakeholder Answers: ${newStakeholderAnswers}
+New Documents: ${newDocuments}
+All Outstanding Questions & Tasks: ${allOutstandingTasks}
+`;
 
     try {
       const { text } = await ai.generate(promptTemplate);
