@@ -225,14 +225,14 @@ const DiscoveryHub = () => {
         );
       }
       if (questions.length) {
-        const qa = questions
-          .map((q) => {
-            const answers = Object.entries(q.answers || {})
-              .map(([name, ans]) => `${name}: ${ans}`)
-              .join("; ");
-            return answers ? `${q.question} | ${answers}` : `${q.question}`;
-          })
-          .join("\n");
+          const qa = questions
+            .map((q) => {
+              const answers = Object.entries(q.answers || {})
+                .map(([name, value]) => `${name}: ${value}`)
+                .join("; ");
+              return answers ? `${q.question} | ${answers}` : `${q.question}`;
+            })
+            .join("\n");
         contextPieces.push(`Existing Q&A:\n${qa}`);
       }
       if (documents.length) {
@@ -338,8 +338,7 @@ Respond ONLY in this JSON format:
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
     if (!text) return;
-    const questionText = questions[idx]?.question || "";
-    updateAnswer(idx, name, text);
+      updateAnswer(idx, name, text);
     setAnswerDrafts((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -401,6 +400,7 @@ Respond ONLY in this JSON format:
               question: typeof q === "string" ? q : q.question,
               contacts: names,
               answers: init?.clarifyingAnswers?.[idx] || {},
+              answerDates: init?.clarifyingAnswerDates?.[idx] || {},
               asked,
               id: idx,
             };
@@ -421,12 +421,17 @@ Respond ONLY in this JSON format:
       const updated = [...prev];
       const q = updated[idx];
       q.answers = { ...q.answers, [name]: value };
+      q.answerDates = {
+        ...q.answerDates,
+        [name]: new Date().toISOString(),
+      };
       if (value && !q.asked[name]) {
         q.asked[name] = true;
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
           clarifyingAnswers: updated.map((qq) => qq.answers),
+          clarifyingAnswerDates: updated.map((qq) => qq.answerDates || {}),
           clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
@@ -483,6 +488,9 @@ Respond ONLY in this JSON format:
       if (q.answers[name]) {
         delete q.answers[name];
       }
+      if (q.answerDates && q.answerDates[name]) {
+        delete q.answerDates[name];
+      }
       if (q.asked[name] !== undefined) {
         delete q.asked[name];
       }
@@ -492,6 +500,7 @@ Respond ONLY in this JSON format:
             updated.map((qq, i) => [i, qq.contacts])
           ),
           clarifyingAnswers: updated.map((qq) => qq.answers),
+          clarifyingAnswerDates: updated.map((qq) => qq.answerDates || {}),
           clarifyingAsked: updated.map((qq) => qq.asked),
         });
       }
@@ -536,7 +545,7 @@ Respond ONLY in this JSON format:
     const newDocs = [];
     for (const file of Array.from(files)) {
       const content = await file.text();
-      newDocs.push({ name: file.name, content });
+      newDocs.push({ name: file.name, content, addedAt: new Date().toISOString() });
     }
     setDocuments((prev) => {
       const updated = [...prev, ...newDocs];
@@ -677,11 +686,21 @@ Respond ONLY in this JSON format:
       Object.entries(q.answers).forEach(([n, v]) => {
         newAnswers[n === original ? name : n] = v;
       });
+      const newAnswerDates = {};
+      Object.entries(q.answerDates || {}).forEach(([n, d]) => {
+        newAnswerDates[n === original ? name : n] = d;
+      });
       const newAsked = {};
       Object.entries(q.asked).forEach(([n, v]) => {
         newAsked[n === original ? name : n] = v;
       });
-      return { ...q, contacts: newContacts, answers: newAnswers, asked: newAsked };
+      return {
+        ...q,
+        contacts: newContacts,
+        answers: newAnswers,
+        answerDates: newAnswerDates,
+        asked: newAsked,
+      };
     });
     setContacts(updatedContacts);
     setQuestions(updatedQuestions);
@@ -696,6 +715,9 @@ Respond ONLY in this JSON format:
           updatedQuestions.map((qq, i) => [i, qq.contacts])
         ),
         clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
+        clarifyingAnswerDates: updatedQuestions.map(
+          (qq) => qq.answerDates || {}
+        ),
         clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
       });
     }
@@ -921,6 +943,7 @@ Respond ONLY in this JSON format:
               emailConnected={emailConnected}
               onHistoryChange={setStatusHistory}
               initiativeId={initiativeId}
+              businessGoal={businessGoal}
             />
           )
         ) : (
@@ -1282,7 +1305,16 @@ Respond ONLY in this JSON format:
               {generatingEmail ? (
                 <p>Generating...</p>
                ) : active === "status" ? (
-          <ProjectStatus questions={questions} />
+          <ProjectStatus
+            questions={questions}
+            documents={documents}
+            contacts={contacts}
+            setContacts={setContacts}
+            emailConnected={emailConnected}
+            onHistoryChange={setStatusHistory}
+            initiativeId={initiativeId}
+            businessGoal={businessGoal}
+          />
         ) : (
           <>
                   {draftQueue.length > 1 && (
@@ -1315,7 +1347,16 @@ Respond ONLY in this JSON format:
                       />
                     </>
                    ) : active === "status" ? (
-          <ProjectStatus questions={questions} />
+          <ProjectStatus
+            questions={questions}
+            documents={documents}
+            contacts={contacts}
+            setContacts={setContacts}
+            emailConnected={emailConnected}
+            onHistoryChange={setStatusHistory}
+            initiativeId={initiativeId}
+            businessGoal={businessGoal}
+          />
         ) : (
           <>
                       <h3>{emailDraft.subject}</h3>

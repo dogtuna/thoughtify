@@ -5,9 +5,9 @@ import {
   query,
   where,
   getDocs,
-  Timestamp,
   addDoc,
   orderBy,
+  limit,
   updateDoc,
   doc,
 } from "firebase/firestore";
@@ -30,19 +30,13 @@ const ProjectStatus = ({
   emailConnected = false,
   onHistoryChange = () => {},
   initiativeId = "",
+  businessGoal = "",
 }) => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [audience, setAudience] = useState("client");
-  const defaultSince = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
-  };
-  const [since, setSince] = useState(defaultSince);
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
   const [history, setHistory] = useState([]);
   const [editing, setEditing] = useState(false);
   const [recipientModal, setRecipientModal] = useState(null);
@@ -55,15 +49,14 @@ const ProjectStatus = ({
 
   useEffect(() => {
     if (!user) return;
-    const sinceDate = new Date(since);
     const q = query(
       collection(db, "profiles", user.uid, "taskQueue"),
-      where("createdAt", ">=", Timestamp.fromDate(sinceDate))
+      where("status", "!=", "done")
     );
     getDocs(q).then((snap) => {
       setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-  }, [user, since]);
+  }, [user]);
 
   useEffect(() => {
     if (!user || !initiativeId) return;
@@ -82,7 +75,6 @@ const ProjectStatus = ({
         const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         if (arr.length) {
           setHistory(arr);
-          setLastUpdate(arr[0]);
           setSummary(arr[0].summary);
           onHistoryChange(arr);
         }
@@ -97,100 +89,148 @@ const ProjectStatus = ({
   if (!user || !initiativeId) return;
   setLoading(true);
 
-  // --- Data Aggregation (No changes needed here, this is correct) ---
-  const answered = questions
-    .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
+  // Always fetch the latest update to avoid stale state
+  let recent = null;
+  try {
+    const colRef = collection(
+      db,
+      "users",
+      user.uid,
+      "initiatives",
+      initiativeId,
+      "statusUpdates"
+    );
+    const qLatest = query(colRef, orderBy("date", "desc"), limit(1));
+    const snapLatest = await getDocs(qLatest);
+    if (snapLatest.docs.length) {
+      recent = { id: snapLatest.docs[0].id, ...snapLatest.docs[0].data() };
+    }
+  } catch (err) {
+    console.error("fetch last update", err);
+  }
+
+  // --- Data Aggregation ---
+  const cutoff = recent ? new Date(recent.date) : null;
+
+  const answeredArr = questions
     .map((q) => {
-      const ans = Object.entries(q.answers || {})
-        .filter(([, a]) => a && a.trim())
-        .map(([name, a]) => `${name}: ${a}`)
+      const entries = Object.entries(q.answers || {}).filter(
+        ([name, value]) => {
+          if (!value || !value.trim()) return false;
+          if (!cutoff) return true;
+          const dateStr = q.answerDates?.[name];
+          return dateStr && new Date(dateStr) > cutoff;
+        }
+      );
+      if (!entries.length) return null;
+      const answerText = entries
+        .map(([name, value]) => `${name}: ${value}`)
         .join("; ");
-      return `- ${q.question} | ${ans}`;
+      return `- ${q.question} | ${answerText}`;
     })
-    .join("\n");
-
-  const outstandingQuestions = questions
-    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
-    .map((q) => `- ${q.question}`)
-    .join("\n");
-
-  const outstandingTaskList = tasks
-    .filter((t) => t.status !== "done")
-    .map((t) => `- ${t.message || ""} (${t.status})`)
-    .join("\n");
+    .filter(Boolean);
+  const answered = answeredArr.join("\n");
 
   const docSummaries = documents
-    .map((d) => `- ${d.name}: ${d.content ? d.content.slice(0, 200) : ""}`)
+    .filter((d) => {
+      if (!cutoff) return true;
+      const added = d.addedAt || d.createdAt || d.uploadedAt;
+      if (!added) return true;
+      const t =
+        typeof added === "string"
+          ? new Date(added)
+          : added.toDate
+          ? added.toDate()
+          : new Date(added);
+      return t > cutoff;
+    })
+    .map(
+      (d) =>
+        `- ${d.name}: ${d.summary || (d.content ? d.content.slice(0, 200) : "")}`
+    )
     .join("\n");
 
-  const sinceDate = new Date(since).toDateString();
+  const outstandingQuestionsArr = questions
+    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.trim()))
+    .map((q) => `- ${q.question}`);
+
+  const taskListArr = tasks.map(
+    (t) => `- ${t.message || ""} (${t.status || "open"})`
+  );
+
+  const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
+
+  const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
+  const formatContacts = (arr) =>
+    arr
+      .map((c) => (c.role ? `${c.name} (${c.role})` : c.name))
+      .join("; ");
+  const projectBaseline = `Goal: ${
+    businessGoal || "Unknown"
+  }\nSponsor: ${
+    sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
+  }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
+
+  const previous = recent ? recent.summary : "None";
   const today = new Date().toDateString();
 
-  const outstandingCombined = [outstandingQuestions, outstandingTaskList]
-    .filter(Boolean)
-    .join("\n");
-
-  const previous = lastUpdate
-    ? `Previous update on ${new Date(lastUpdate.date).toDateString()}:\n${lastUpdate.summary}\n\n`
-    : "There is no previous update; this is the first project status.\n\n";
-
-  // --- REVISED PROMPT SECTION ---
-
+  // --- Prompt ---
   const audiencePrompt =
     audience === "client"
       ? "Use a client-facing tone that is professional and strategically focused."
       : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
 
-const prompt = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative.
+  const prompt = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative. Your primary goal is to analyze the project's trajectory and provide a forward-looking strategic update, not a simple list of activities.
 
-Adopt a skeptical and objective lens. Do not simply report what stakeholders say. Instead, synthesize their statements with the available data and challenge any assumptions that are not supported by evidence.
+---
+### Core Analytical Task: Delta Analysis
 
-Focus on the "so what?" For every piece of data you present, explain its strategic implication for the project. Your primary goal is to distinguish between surface-level symptoms and the true, underlying root causes of the business problem.
+Your most important task is to analyze the project's evolution since the last update.
 
-Write with an authoritative and confident voice. Frame your findings as a diagnosis and your recommendations as a clear, expert-guided path forward. Your analysis should guide the client toward making sound, data-driven decisions.
+**IF \`Previous Update\` is "None":**
+This is the **initial project brief**. Your task is to establish the baseline. Synthesize the \`Project Baseline\` data with any initial documents or answers to define the business problem, state the initial working hypothesis, and outline the clear next actions for the discovery phase.
 
-Core Analytical Task: Situational Analysis
-Before drafting the brief, your most important task is to analyze the project's current state.
+**IF \`Previous Update\` exists:**
+This is a **follow-up brief**. Do not re-summarize old information from the previous update. Your analysis must focus **exclusively** on the strategic impact of the \`New Stakeholder Answers\` and \`New Documents\`.
+1.  In the \`Situation Analysis\`, explicitly state how this new information **confirms, challenges, or changes** the previous working hypothesis.
+2.  In the \`Key Findings\`, detail the specific new evidence and its implications.
+3.  In the \`Strategic Recommendations\`, your actions must be a direct consequence of the new findings, showing a clear evolution of the project plan.
 
-If this is the first project status update, your analysis should establish the initial baseline. Clearly define the business problem, the initial stakeholder hypotheses, and the primary data points that will guide the discovery phase.
+---
+### Step-by-Step Instructions
 
-If there is a Previous Update, compare it to the new Project Data. Identify all significant new information, decisions, or changes since the last update. In the Situation Analysis & Working Hypothesis section, you must explicitly address these key changes. Analyze their impact on the project's strategy, trajectory, and our previous assumptions.
+**Step 1: Factual Grounding (Internal Thought Process)**
+First, review all \`Project Data\`. Create a private, internal list of only the most critical facts from the **new** information provided.
 
-Step 1: Factual Grounding (Internal Thought Process)
-First, review all the provided information below (Project Data). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete, observable data points.
+**Step 2: Strategic Synthesis & Drafting (The Final Output)**
+Now, using ONLY the facts you summarized in Step 1 and your \`Core Analytical Task\` above, draft the project brief. Frame your findings as a diagnosis and your recommendations as a clear, expert-guided path forward.
 
-Step 2: Strategic Synthesis & Drafting (The Final Output)
-Now, using ONLY the factual points you summarized in Step 1 and your Core Analytical Task above, draft the project brief. Your primary objective is to analyze the evidence to distinguish between performance gaps that can be addressed by a training intervention and systemic issues that require strategic decisions from leadership.
+**CRITICAL RULE:** Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the \`Project Data\`. Every conclusion must be a logical deduction from the provided evidence.
 
-CRITICAL RULE: Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every conclusion must be a logical deduction from the provided evidence. If a piece of information is unknown, it should be identified as a gap in the data that requires further investigation.
 ${audiencePrompt}
 
 Begin the response with \`Date: ${today}\` and structure it under the following headings:
 * Situation Analysis & Working Hypothesis
 * Key Findings & Evidence
-* Recommendations & Required Actions
+* Strategic Recommendations & Next Actions
 
 ---
-## Project Data
+### Project Data
 
 **Previous Update:**
 ${previous}
 
-**Audience:**
-${audience === "client" ? "Client-Facing" : "Internal"}
+**Project Baseline:**
+${projectBaseline}
 
-**Date Range:**
-${sinceDate} to ${today}
-
-**Stakeholder Answers:**
+**New Stakeholder Answers (since last update):**
 ${answered || "None"}
 
-**Document Summaries:**
+**New Documents (since last update):**
 ${docSummaries || "None"}
 
-**Outstanding Questions & Tasks:**
-${outstandingCombined || "None"}`;
-
+**All Outstanding Questions & Tasks:**
+${allOutstanding || "None"}`;
   // --- API Call and State Update (No changes needed here) ---
   try {
     const { text } = await ai.generate(prompt);
@@ -210,7 +250,6 @@ ${outstandingCombined || "None"}`;
     const entryWithId = { id: docRef.id, ...entry };
     const updated = [entryWithId, ...history];
     setHistory(updated);
-    setLastUpdate(entryWithId);
     onHistoryChange(updated);
   } catch (err) {
     console.error("generateSummary error", err);
@@ -235,7 +274,6 @@ ${outstandingCombined || "None"}`;
       const updatedFirst = { ...first, summary };
       const updated = [updatedFirst, ...history.slice(1)];
       setHistory(updated);
-      setLastUpdate(updatedFirst);
       onHistoryChange(updated);
     } catch (err) {
       console.error("saveEdit error", err);
@@ -260,7 +298,6 @@ ${outstandingCombined || "None"}`;
       const updatedFirst = { ...first, sent: true };
       const updated = [updatedFirst, ...history.slice(1)];
       setHistory(updated);
-      setLastUpdate(updatedFirst);
       onHistoryChange(updated);
     } catch (err) {
       console.error("markSent error", err);
@@ -342,14 +379,6 @@ ${outstandingCombined || "None"}`;
             <option value="client">Client-Facing</option>
             <option value="internal">Internal</option>
           </select>
-        </label>
-        <label>
-          Since:
-          <input
-            type="date"
-            value={since}
-            onChange={(e) => setSince(e.target.value)}
-          />
         </label>
         <button
           className="generator-button"
@@ -543,6 +572,7 @@ ProjectStatus.propTypes = {
   emailConnected: PropTypes.bool,
   onHistoryChange: PropTypes.func,
   initiativeId: PropTypes.string,
+  businessGoal: PropTypes.string,
 };
 
 export default ProjectStatus;
