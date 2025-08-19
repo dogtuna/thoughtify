@@ -225,14 +225,14 @@ const DiscoveryHub = () => {
         );
       }
       if (questions.length) {
-        const qa = questions
-          .map((q) => {
-            const answers = Object.entries(q.answers || {})
-              .map(([name, ans]) => `${name}: ${ans}`)
-              .join("; ");
-            return answers ? `${q.question} | ${answers}` : `${q.question}`;
-          })
-          .join("\n");
+          const qa = questions
+            .map((q) => {
+              const answers = Object.entries(q.answers || {})
+                .map(([name, value]) => `${name}: ${value}`)
+                .join("; ");
+              return answers ? `${q.question} | ${answers}` : `${q.question}`;
+            })
+            .join("\n");
         contextPieces.push(`Existing Q&A:\n${qa}`);
       }
       if (documents.length) {

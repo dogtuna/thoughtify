@@ -115,17 +115,11 @@ const ProjectStatus = ({
   const answeredArr = questions
     .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
     .map((q) => {
-      // Find new answers for this specific question
-      const newAnswers = Object.entries(q.answers || {})
-        .filter(([, answer]) => {
-          if (!answer || !answer.text || !answer.text.trim()) return false;
-          if (!cutoff) return true; // If it's the first run, all answers are new
-          const answerTimestamp = getAnswerTimestamp(answer);
-          return answerTimestamp && answerTimestamp > cutoff;
-        })
-        .map(([name, answer]) => `${name}: ${answer.text}`)
+      const answerText = Object.entries(q.answers || {})
+        .filter(([, value]) => value && value.trim())
+        .map(([name, value]) => `${name}: ${value}`)
         .join("; ");
-      return `- ${q.question} | ${ans}`;
+      return `- ${q.question} | ${answerText}`;
     });
   const answered = answeredArr.join("\n");
 
