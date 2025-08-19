@@ -6,6 +6,10 @@ import {
   where,
   getDocs,
   Timestamp,
+  addDoc,
+  orderBy,
+  updateDoc,
+  doc,
 } from "firebase/firestore";
 import {
   auth,
@@ -43,8 +47,6 @@ const ProjectStatus = ({
   const [editing, setEditing] = useState(false);
   const [recipientModal, setRecipientModal] = useState(null);
   const [newContact, setNewContact] = useState(null);
-  const historyKey = `projectStatusHistory:${initiativeId}`;
-  const lastKey = `projectStatusLast:${initiativeId}`;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
@@ -64,30 +66,35 @@ const ProjectStatus = ({
   }, [user, since]);
 
   useEffect(() => {
-    try {
-      const hist = JSON.parse(localStorage.getItem(historyKey) || "[]");
-      if (hist.length) {
-        setHistory(hist);
-        setLastUpdate(hist[0]);
-        setSummary(hist[0].summary);
-        onHistoryChange(hist);
-      } else {
-        const stored = localStorage.getItem(lastKey);
-        if (stored) {
-          const last = JSON.parse(stored);
-          const arr = [last];
+    if (!user || !initiativeId) return;
+    const loadHistory = async () => {
+      try {
+        const colRef = collection(
+          db,
+          "users",
+          user.uid,
+          "initiatives",
+          initiativeId,
+          "statusUpdates"
+        );
+        const qHist = query(colRef, orderBy("date", "desc"));
+        const snap = await getDocs(qHist);
+        const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (arr.length) {
           setHistory(arr);
-          setLastUpdate(last);
-          setSummary(last.summary);
+          setLastUpdate(arr[0]);
+          setSummary(arr[0].summary);
           onHistoryChange(arr);
         }
+      } catch (err) {
+        console.error("load project status", err);
       }
-    } catch (err) {
-      console.error("load project status", err);
-    }
-  }, [onHistoryChange, historyKey, lastKey]);
+    };
+    loadHistory();
+  }, [user, initiativeId, onHistoryChange]);
 
   const generateSummary = async () => {
+    if (!user || !initiativeId) return;
     setLoading(true);
     const answered = questions
       .filter((q) => Object.values(q.answers || {}).some((a) => a && a.trim()))
@@ -163,45 +170,73 @@ Outstanding Questions & Tasks: ${outstandingCombined || "None"}`;
       setSummary(clean);
       const now = new Date().toISOString();
       const entry = { date: now, summary: clean, sent: false };
-      setHistory((h) => {
-        const updated = [entry, ...h];
-        localStorage.setItem(historyKey, JSON.stringify(updated));
-        localStorage.setItem(lastKey, JSON.stringify(entry));
-        setLastUpdate(entry);
-        onHistoryChange(updated);
-        return updated;
-      });
+      const colRef = collection(
+        db,
+        "users",
+        user.uid,
+        "initiatives",
+        initiativeId,
+        "statusUpdates"
+      );
+      const docRef = await addDoc(colRef, entry);
+      const entryWithId = { id: docRef.id, ...entry };
+      const updated = [entryWithId, ...history];
+      setHistory(updated);
+      setLastUpdate(entryWithId);
+      onHistoryChange(updated);
     } catch (err) {
       console.error("generateSummary error", err);
     }
     setLoading(false);
   };
 
-  const saveEdit = () => {
-    setHistory((h) => {
-      if (!h.length) return h;
-      const updatedFirst = { ...h[0], summary };
-      const updated = [updatedFirst, ...h.slice(1)];
-      localStorage.setItem(historyKey, JSON.stringify(updated));
-      localStorage.setItem(lastKey, JSON.stringify(updatedFirst));
+  const saveEdit = async () => {
+    if (!user || !history.length) return;
+    const first = history[0];
+    try {
+      const ref = doc(
+        db,
+        "users",
+        user.uid,
+        "initiatives",
+        initiativeId,
+        "statusUpdates",
+        first.id
+      );
+      await updateDoc(ref, { summary });
+      const updatedFirst = { ...first, summary };
+      const updated = [updatedFirst, ...history.slice(1)];
+      setHistory(updated);
       setLastUpdate(updatedFirst);
       onHistoryChange(updated);
-      return updated;
-    });
+    } catch (err) {
+      console.error("saveEdit error", err);
+    }
     setEditing(false);
   };
 
-  const markSent = () => {
-    setHistory((h) => {
-      if (!h.length) return h;
-      const updatedFirst = { ...h[0], sent: true };
-      const updated = [updatedFirst, ...h.slice(1)];
-      localStorage.setItem(historyKey, JSON.stringify(updated));
-      localStorage.setItem(lastKey, JSON.stringify(updatedFirst));
+  const markSent = async () => {
+    if (!user || !history.length) return;
+    const first = history[0];
+    try {
+      const ref = doc(
+        db,
+        "users",
+        user.uid,
+        "initiatives",
+        initiativeId,
+        "statusUpdates",
+        first.id
+      );
+      await updateDoc(ref, { sent: true });
+      const updatedFirst = { ...first, sent: true };
+      const updated = [updatedFirst, ...history.slice(1)];
+      setHistory(updated);
       setLastUpdate(updatedFirst);
       onHistoryChange(updated);
-      return updated;
-    });
+    } catch (err) {
+      console.error("markSent error", err);
+    }
     setSummary("");
     setEditing(false);
   };

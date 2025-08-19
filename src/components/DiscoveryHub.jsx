@@ -208,7 +208,7 @@ const DiscoveryHub = () => {
     }
   };
 
-  const analyzeAnswer = async (question, text) => {
+  const analyzeAnswer = async (question, text, responder) => {
     try {
       const contextPieces = [];
       if (projectName) contextPieces.push(`Project Name: ${projectName}`);
@@ -223,6 +223,11 @@ const DiscoveryHub = () => {
             .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
             .join(", ")}`
         );
+      }
+      if (responder) {
+        const contact = contacts.find((c) => c.name === responder);
+        const role = contact?.role ? ` (${contact.role})` : "";
+        contextPieces.push(`Answer Provided By: ${responder}${role}`);
       }
       if (questions.length) {
         const qa = questions
@@ -346,7 +351,7 @@ Respond ONLY in this JSON format:
       return next;
     });
     setAnalyzing(true);
-    const result = await analyzeAnswer(questionText, text);
+    const result = await analyzeAnswer(questionText, text, name);
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
