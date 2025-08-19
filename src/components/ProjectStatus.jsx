@@ -149,14 +149,20 @@ Focus on the "so what?" For every piece of data you present, explain its strateg
 
 Write with an authoritative and confident voice. Frame your findings as a diagnosis and your recommendations as a clear, expert-guided path forward. Your analysis should guide the client toward making sound, data-driven decisions.
 
-**Step 1: Factual Grounding (Internal Thought Process)**
+Core Analytical Task: Situational Analysis
+Before drafting the brief, your most important task is to analyze the project's current state.
+
+If this is the first project status update, your analysis should establish the initial baseline. Clearly define the business problem, the initial stakeholder hypotheses, and the primary data points that will guide the discovery phase.
+
+If there is a Previous Update, compare it to the new Project Data. Identify all significant new information, decisions, or changes since the last update. In the Situation Analysis & Working Hypothesis section, you must explicitly address these key changes. Analyze their impact on the project's strategy, trajectory, and our previous assumptions.
+
+Step 1: Factual Grounding (Internal Thought Process)
 First, review all the provided information below (Project Data). Before writing the update, create a private, internal summary of the key facts. Do not interpret or add any information yet. Simply list the concrete, observable data points.
 
-**Step 2: Strategic Synthesis & Drafting (The Final Output)**
-Now, using ONLY the factual points you summarized in Step 1, draft the project brief. Your primary objective is to analyze the evidence to distinguish between performance gaps that can be addressed by a training intervention and systemic issues that require strategic decisions from leadership.
+Step 2: Strategic Synthesis & Drafting (The Final Output)
+Now, using ONLY the factual points you summarized in Step 1 and your Core Analytical Task above, draft the project brief. Your primary objective is to analyze the evidence to distinguish between performance gaps that can be addressed by a training intervention and systemic issues that require strategic decisions from leadership.
 
-**CRITICAL RULE:** Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every conclusion must be a logical deduction from the provided evidence. If a piece of information is unknown, it should be identified as a gap in the data that requires further investigation.
-
+CRITICAL RULE: Do not invent any meetings, conversations, stakeholder names, or data points that are not explicitly present in the Project Data below. Every conclusion must be a logical deduction from the provided evidence. If a piece of information is unknown, it should be identified as a gap in the data that requires further investigation.
 ${audiencePrompt}
 
 Begin the response with \`Date: ${today}\` and structure it under the following headings:
