@@ -634,6 +634,40 @@ Respond ONLY in this JSON format:
     });
   };
 
+  const editQuestion = (idx) => {
+    const current = questions[idx]?.question || "";
+    const revised = prompt("Edit question", current);
+    if (!revised || revised === current) return;
+    setQuestions((prev) => {
+      const updated = [...prev];
+      updated[idx].question = revised;
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingQuestions: updated.map((q) => ({ question: q.question })),
+        });
+      }
+      return updated;
+    });
+  };
+
+  const deleteQuestion = (idx) => {
+    if (!window.confirm("Delete this question?")) return;
+    setQuestions((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          clarifyingQuestions: updated.map((q) => ({ question: q.question })),
+          clarifyingContacts: Object.fromEntries(
+            updated.map((qq, i) => [i, qq.contacts])
+          ),
+          clarifyingAnswers: updated.map((qq) => qq.answers),
+          clarifyingAsked: updated.map((qq) => qq.asked),
+        });
+      }
+      return updated;
+    });
+  };
+
   const handleContactSelect = (idx, value) => {
     if (value === "__add__") {
       const newName = addContact();
@@ -1246,110 +1280,124 @@ Respond ONLY in this JSON format:
                 {items.map((q) => {
                   const selKey = `${q.idx}|${q.status}|${q.contacts.join(',')}`;
                   return (
-                  <div
-                    key={selKey}
-                    className={`initiative-card question-card ${q.status}`}
-                  >
-                    <div className="contact-row">
-                      {q.contacts.map((name) => (
-                        <span
-                          key={name}
-                          className="contact-tag"
-                          style={{ backgroundColor: getColor(name) }}
-                          onClick={(e) => openContextMenu(e, name, q.idx)}
+                    <div
+                      key={selKey}
+                      className={`initiative-card question-card ${q.status}`}
+                    >
+                      <span className="status-tag">{statusLabel(q.status)}</span>
+                      <div className="contact-row">
+                        {q.contacts.map((name) => (
+                          <span
+                            key={name}
+                            className="contact-tag"
+                            style={{ backgroundColor: getColor(name) }}
+                            onClick={(e) => openContextMenu(e, name, q.idx)}
+                          >
+                            {name}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeContactFromQuestion(q.idx, name);
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <button
+                          className="add-contact-btn"
+                          onClick={() =>
+                            setOpenDropdown((d) => (d === q.idx ? null : q.idx))
+                          }
                         >
-                          {name}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeContactFromQuestion(q.idx, name);
+                          +
+                        </button>
+                        {openDropdown === q.idx && (
+                          <select
+                            className="contact-select"
+                            value=""
+                            onChange={(e) => {
+                              handleContactSelect(q.idx, e.target.value);
+                              setOpenDropdown(null);
                             }}
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                      <button
-                        className="add-contact-btn"
-                        onClick={() =>
-                          setOpenDropdown((d) => (d === q.idx ? null : q.idx))
-                        }
-                      >
-                        +
-                      </button>
-                      {openDropdown === q.idx && (
-                        <select
-                          className="contact-select"
-                          value=""
-                          onChange={(e) => {
-                            handleContactSelect(q.idx, e.target.value);
-                            setOpenDropdown(null);
-                          }}
+                            <option value="">Select Contact</option>
+                            {contacts
+                              .filter((c) => !q.contacts.includes(c.name))
+                              .map((c) => (
+                                <option key={c.name} value={c.name}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            <option value="__add__">Add New Contact</option>
+                          </select>
+                        )}
+                      </div>
+                      <div className="question-header">
+                        {selectMode && (
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(selKey)}
+                            onChange={() => toggleSelect(selKey)}
+                          />
+                        )}
+                        <p>{q.question}</p>
+                      </div>
+                      <div className="question-actions">
+                        <button
+                          className="generator-button"
+                          onClick={() => draftEmail(q)}
                         >
-                          <option value="">Select Contact</option>
-                          {contacts
-                            .filter((c) => !q.contacts.includes(c.name))
-                            .map((c) => (
-                              <option key={c.name} value={c.name}>
-                                {c.name}
-                              </option>
-                            ))}
-                          <option value="__add__">Add New Contact</option>
-                        </select>
-                      )}
+                          Draft Email
+                        </button>
+                        <button
+                          className="generator-button"
+                          onClick={() => editQuestion(q.idx)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="generator-button"
+                          onClick={() => deleteQuestion(q.idx)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      {q.status !== "toask" &&
+                        q.contacts.map((name) => {
+                          const key = `${q.idx}-${name}`;
+                          const draft = answerDrafts[key];
+                          return (
+                            <div key={name} className="answer-block">
+                              <strong>{name}:</strong>
+                              <textarea
+                                className="generator-input"
+                                placeholder="Enter answer or notes here"
+                                value={
+                                  draft !== undefined
+                                    ? draft
+                                    : q.answers[name]?.text || ""
+                                }
+                                onChange={(e) =>
+                                  setAnswerDrafts((prev) => ({
+                                    ...prev,
+                                    [key]: e.target.value,
+                                  }))
+                                }
+                                rows={3}
+                              />
+                              <button
+                                className="generator-button"
+                                disabled={!answerDrafts[key]?.trim()}
+                                onClick={() => handleAnswerSubmit(q.idx, name)}
+                              >
+                                Submit
+                              </button>
+                            </div>
+                          );
+                        })}
                     </div>
-                    <div className="question-header">
-                      {selectMode && (
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(selKey)}
-                          onChange={() => toggleSelect(selKey)}
-                        />
-                      )}
-                      <p>{q.question}</p>
-                      <span className="status-tag">{statusLabel(q.status)}</span>
-                      <button
-                        className="draft-email-btn"
-                        onClick={() => draftEmail(q)}
-                      >
-                        Draft Email
-                      </button>
-                    </div>
-                    {q.status !== "toask" &&
-                      q.contacts.map((name) => {
-                        const key = `${q.idx}-${name}`;
-                        const draft = answerDrafts[key];
-                        return (
-                          <div key={name} className="answer-block">
-                            <strong>{name}:</strong>
-                            <textarea
-                              className="generator-input"
-                              placeholder="Enter answer or notes here"
-                              value={
-                                draft !== undefined
-                                  ? draft
-                                  : q.answers[name]?.text || ""
-                              }
-                              onChange={(e) =>
-                                setAnswerDrafts((prev) => ({
-                                  ...prev,
-                                  [key]: e.target.value,
-                                }))
-                              }
-                              rows={3}
-                            />
-                            <button
-                              className="generator-button"
-                              disabled={!answerDrafts[key]?.trim()}
-                              onClick={() => handleAnswerSubmit(q.idx, name)}
-                            >
-                              Submit
-                            </button>
-                          </div>
-                        );
-                      })}
-                  </div>
-                );
+                  );
                 })}
               </div>
             ))}
