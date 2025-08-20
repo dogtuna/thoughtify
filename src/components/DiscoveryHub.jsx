@@ -272,7 +272,14 @@ Respond ONLY in this JSON format:
         const suggestions = Array.isArray(parsed.suggestions)
           ? parsed.suggestions.filter((s) => typeof s === "string")
           : [];
-        return { analysis, suggestions };
+        const normalized = suggestions
+          .flatMap((s) =>
+            s
+              .split(/\n+/)
+              .map((line) => line.replace(/^[*-]\s*/, "").trim())
+              .filter(Boolean),
+          );
+        return { analysis, suggestions: normalized };
       };
 
       if (typeof res === "string") {
@@ -358,10 +365,15 @@ Respond ONLY in this JSON format:
     if (!uid || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
     const project = projectName || "General";
+    const items = suggestions
+      .flatMap((raw) =>
+        String(raw)
+          .split(/\n+/)
+          .map((line) => line.replace(/^[*-]\s*/, "").trim())
+          .filter(Boolean),
+      );
     try {
-      for (const raw of suggestions) {
-        const s = (raw || "").trim();
-        if (!s) continue;
+      for (const s of items) {
         const isQuestion = await isQuestionTask(s);
         if (isQuestion) {
           const { question, contact: qContact } = extractQuestionInfo(s);
