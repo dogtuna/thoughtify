@@ -370,6 +370,7 @@ Respond ONLY in this JSON format:
     return { question: question || text, contact: contact || null };
   };
 
+  // --- MODIFIED FUNCTION ---
   const createTasksFromAnalysis = async (name, suggestions) => {
     if (!uid || !initiativeId || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
@@ -378,28 +379,69 @@ Respond ONLY in this JSON format:
         String(raw)
           .split(/\n+/)
           .map((line) => line.replace(/^[*-]\s*/, "").trim())
-          .filter(Boolean),
+          .filter(Boolean)
       );
+
+    const questionsToAdd = [];
+    const tasksToAdd = [];
+
     try {
-      for (const s of items) {
-        const isQuestion = await isQuestionTask(s);
-        if (isQuestion) {
-          const { question, contact: qContact } = extractQuestionInfo(s);
-          await addQuestionToBank(question, qContact || name);
-          continue;
-        }
-        const tag = await classifyTask(s);
-        await addDoc(
-          collection(db, "users", uid, "initiatives", initiativeId, "tasks"),
-          {
-            name,
-            email,
-            message: s,
-            status: "open",
-            createdAt: serverTimestamp(),
-            tag,
-          },
+      // First, categorize all selected suggestions into questions or tasks
+      await Promise.all(
+        items.map(async (s) => {
+          const isQuestion = await isQuestionTask(s);
+          if (isQuestion) {
+            const { question, contact: qContact } = extractQuestionInfo(s);
+            const assignedContact = qContact || name;
+            questionsToAdd.push({
+              question: question,
+              contacts: assignedContact ? [assignedContact] : [],
+              answers: {},
+              asked: assignedContact ? { [assignedContact]: false } : {},
+            });
+          } else {
+            const tag = await classifyTask(s);
+            tasksToAdd.push({
+              name, // Name of the person who provided the answer
+              email,
+              message: s, // The actual task description
+              status: "open",
+              createdAt: serverTimestamp(),
+              tag,
+            });
+          }
+        })
+      );
+
+      // Batch write all new tasks to Firestore
+      if (tasksToAdd.length > 0) {
+        const tasksCollection = collection(
+          db, "users", uid, "initiatives", initiativeId, "tasks"
         );
+        await Promise.all(
+          tasksToAdd.map((taskData) => addDoc(tasksCollection, taskData))
+        );
+      }
+
+      // Batch update questions in state and then save the entire list
+      if (questionsToAdd.length > 0) {
+        setQuestions((prevQuestions) => {
+          const updatedQuestions = [...prevQuestions, ...questionsToAdd];
+          // Save the new complete list to Firestore
+          if (uid) {
+            saveInitiative(uid, initiativeId, {
+              clarifyingQuestions: updatedQuestions.map((q) => ({
+                question: q.question,
+              })),
+              clarifyingContacts: Object.fromEntries(
+                updatedQuestions.map((qq, i) => [i, qq.contacts])
+              ),
+              clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
+              clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
+            });
+          }
+          return updatedQuestions;
+        });
       }
     } catch (err) {
       console.error("createTasksFromAnalysis error", err);
@@ -411,7 +453,7 @@ Respond ONLY in this JSON format:
     try {
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
-        { status: "completed" },
+        { status: "completed" }
       );
     } catch (err) {
       console.error("completeTask error", err);
@@ -970,6 +1012,7 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
+          {/* --- NEW SIDEBAR ITEM --- */}
           <li
             className={active === "tasks" ? "active" : ""}
             onClick={() => setActive("tasks")}
@@ -1036,7 +1079,7 @@ Respond ONLY in this JSON format:
               <input type="file" multiple onChange={handleDocInput} />
             </div>
           </div>
-         ) : active === "status" ? (
+        ) : active === "status" ? (
           viewingStatus ? (
             <PastUpdateView update={viewingStatus} />
           ) : (
@@ -1051,6 +1094,7 @@ Respond ONLY in this JSON format:
               businessGoal={businessGoal}
             />
           )
+        // --- NEW TASKS VIEW ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
             <ul className="task-list">
@@ -1583,4 +1627,3 @@ Respond ONLY in this JSON format:
 };
 
 export default DiscoveryHub;
-
