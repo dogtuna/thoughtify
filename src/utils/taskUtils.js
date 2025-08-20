@@ -29,6 +29,21 @@ export async function classifyTask(message) {
  * @returns {Promise<boolean>}
  */
 export async function isQuestionTask(message) {
+  const lower = (message || "").toLowerCase().trim();
+  if (!lower) return false;
+  const questionPrefixes = [
+    "ask",
+    "who",
+    "what",
+    "when",
+    "where",
+    "why",
+    "how",
+    "should",
+  ];
+  if (lower.includes("?") || questionPrefixes.some((p) => lower.startsWith(p))) {
+    return true;
+  }
   const prompt = `Does the following text represent a question that is asking someone for information? Answer yes or no.\nText: ${message}`;
   try {
     const { text } = await generate(prompt);

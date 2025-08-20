@@ -342,15 +342,30 @@ Respond ONLY in this JSON format:
     }
   };
 
+  const extractQuestionInfo = (text) => {
+    const lower = text.toLowerCase();
+    const contact =
+      contacts.find((c) => lower.includes(c.name.toLowerCase()))?.name || "";
+    let question = text.trim();
+    if (contact) {
+      const re = new RegExp(String.raw`^\s*ask\s+${contact}\s*(to\s*)?`, "i");
+      question = question.replace(re, "").trim();
+    }
+    return { question: question || text, contact: contact || null };
+  };
+
   const createTasksFromAnalysis = async (name, suggestions) => {
     if (!uid || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
     const project = projectName || "General";
     try {
-      for (const s of suggestions) {
+      for (const raw of suggestions) {
+        const s = (raw || "").trim();
+        if (!s) continue;
         const isQuestion = await isQuestionTask(s);
         if (isQuestion) {
-          await addQuestionToBank(s, name);
+          const { question, contact: qContact } = extractQuestionInfo(s);
+          await addQuestionToBank(question, qContact || name);
           continue;
         }
         const tag = await classifyTask(s);
