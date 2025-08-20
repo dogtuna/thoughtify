@@ -10,6 +10,7 @@ import "../pages/admin.css";
 export default function TaskQueue({
   tasks,
   inquiries,
+  statusFilter = "all",
   onComplete,
   onReplyTask,
   onDelete,
@@ -18,20 +19,12 @@ export default function TaskQueue({
 }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [replyText, setReplyText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
   const [synergyQueue, setSynergyQueue] = useState([]);
   const [synergyIndex, setSynergyIndex] = useState(0);
   const [synergyText, setSynergyText] = useState("");
   const [prioritized, setPrioritized] = useState(null);
-
-  const statuses = [
-    { key: "all", label: "All Tasks" },
-    { key: "open", label: "Open Tasks" },
-    { key: "scheduled", label: "Scheduled Tasks" },
-    { key: "completed", label: "Completed Tasks" },
-  ];
 
   const projects = useMemo(() => {
     const set = new Set();
@@ -242,22 +235,6 @@ export default function TaskQueue({
 
   return (
     <>
-      <div className="tasks-view">
-      <div className="tasks-sidebar">
-        <ul>
-          {statuses.map(({ key, label }) => (
-            <li key={key}>
-              <button
-                type="button"
-                className={statusFilter === key ? "active" : ""}
-                onClick={() => setStatusFilter(key)}
-              >
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
       <div className="tasks-main card glass-card">
         <h2>Task Queue</h2>
 
@@ -356,7 +333,6 @@ export default function TaskQueue({
           )}
         </ul>
       </div>
-    </div>
 
       {selectedItem &&
         ReactDOM.createPortal(
@@ -507,6 +483,7 @@ export default function TaskQueue({
 TaskQueue.propTypes = {
   tasks: PropTypes.array.isRequired,
   inquiries: PropTypes.array.isRequired,
+  statusFilter: PropTypes.string,
   onComplete: PropTypes.func,
   onReplyTask: PropTypes.func,
   onDelete: PropTypes.func,
