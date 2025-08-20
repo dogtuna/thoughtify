@@ -218,6 +218,7 @@ const DiscoveryHub = () => {
     }
   };
 
+  // --- MODIFIED FUNCTION ---
   const analyzeAnswer = async (question, text) => {
     try {
       const contextPieces = [];
@@ -254,7 +255,8 @@ const DiscoveryHub = () => {
       }
       const projectContext = contextPieces.join("\n\n");
 
-      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine if any further clarification is needed for this question only.
+      // --- MODIFIED PROMPT ---
+      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 
 Project Context:
 ${projectContext}
@@ -267,28 +269,32 @@ ${text}
 
 Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
-- "suggestions": follow-up discovery actions strictly for clarifying or verifying this question. Avoid design, development, or implementation tasks. Do not propose actions that duplicate existing clarifying questions unless recommending that a different stakeholder be asked to confirm the information. If the answer fully addresses the question, return an empty array.
+- "suggestions": An array of objects for follow-up actions. Each object must have three string fields: "text" (the follow-up action), "type" (either "question" for direct follow-ups or "task" for internal actions like verification or analysis), and "assignee" (the name of the person or team to address, or "Project Manager" for internal tasks). For example: [{"text": "Clarify the term 'synergy'", "type": "question", "assignee": "Jessica Bell"}, {"text": "Verify the 60% figure with a data report", "type": "task", "assignee": "Project Manager"}]. If the answer is complete, return an empty array.
 
 Respond ONLY in this JSON format:
-{"analysis": "...", "suggestions": ["..."]}`;
+{"analysis": "...", "suggestions": [{"text": "...", "type": "...", "assignee": "..."}, ...]}`;
+
       const { text: res } = await ai.generate(prompt);
+      
+      // --- MODIFIED PARSER ---
       const parseResponse = (str) => {
         const parsed = JSON.parse(str);
         const analysis =
           typeof parsed.analysis === "string"
             ? parsed.analysis
             : JSON.stringify(parsed.analysis);
+        
         const suggestions = Array.isArray(parsed.suggestions)
-          ? parsed.suggestions.filter((s) => typeof s === "string")
+          ? parsed.suggestions.filter(
+              (s) =>
+                s &&
+                typeof s.text === "string" &&
+                typeof s.type === "string" &&
+                typeof s.assignee === "string"
+            )
           : [];
-        const normalized = suggestions
-          .flatMap((s) =>
-            s
-              .split(/\n+/)
-              .map((line) => line.replace(/^[*-]\s*/, "").trim())
-              .filter(Boolean),
-          );
-        return { analysis, suggestions: normalized };
+        
+        return { analysis, suggestions };
       };
 
       if (typeof res === "string") {
@@ -322,7 +328,9 @@ Respond ONLY in this JSON format:
     const toNames = name;
     let body = `Hi ${toNames},\n\nThank you for the information.\n`;
     if (suggestions.length) {
-      body += `Could you also provide the following: ${suggestions.join(", ")}?\n\n`;
+      // Suggestions are now objects, so we need to get the text property
+      const suggestionTexts = suggestions.map(s => s.text);
+      body += `Could you also provide the following: ${suggestionTexts.join(", ")}?\n\n`;
     }
     body += `Best regards,\n${userName}`;
     const draft = {
@@ -358,6 +366,9 @@ Respond ONLY in this JSON format:
     }
   };
 
+  // --- MODIFIED FUNCTION ---
+  // This function is no longer needed with the new AI response structure, 
+  // but we keep it in case it's used elsewhere or for manual entry later.
   const extractQuestionInfo = (text) => {
     const lower = text.toLowerCase();
     const contact =
@@ -372,52 +383,42 @@ Respond ONLY in this JSON format:
 
   // --- MODIFIED FUNCTION ---
   const createTasksFromAnalysis = async (name, suggestions) => {
+    // 'name' is the original answerer, used as a fallback.
+    // 'suggestions' is now an array of objects: {text, type, assignee}.
     if (!uid || !initiativeId || !suggestions.length) return;
-    const email = contacts.find((c) => c.name === name)?.email || "";
-    const items = suggestions
-      .flatMap((raw) =>
-        String(raw)
-          .split(/\n+/)
-          .map((line) => line.replace(/^[*-]\s*/, "").trim())
-          .filter(Boolean)
-      );
-
+    
     const questionsToAdd = [];
     const tasksToAdd = [];
 
     try {
-      // First, categorize all selected suggestions into questions or tasks
-      await Promise.all(
-        items.map(async (s) => {
-          const isQuestion = await isQuestionTask(s);
-          if (isQuestion) {
-            const { question, contact: qContact } = extractQuestionInfo(s);
-            const assignedContact = qContact || name;
-            questionsToAdd.push({
-              question: question,
-              contacts: assignedContact ? [assignedContact] : [],
-              answers: {},
-              asked: assignedContact ? { [assignedContact]: false } : {},
-            });
-          } else {
-            const tag = await classifyTask(s);
-            tasksToAdd.push({
-              name, // Name of the person who provided the answer
-              email,
-              message: s, // The actual task description
-              status: "open",
-              createdAt: serverTimestamp(),
-              tag,
-            });
-          }
-        })
-      );
+      // Categorize based on the 'type' field from the AI response
+      for (const s of suggestions) {
+        if (s.type === 'question') {
+          // Find the contact mentioned by the AI. Fallback to original answerer.
+          const contactExists = contacts.some(c => c.name === s.assignee);
+          const assignedContact = contactExists ? s.assignee : name;
+          
+          questionsToAdd.push({
+            question: s.text,
+            contacts: assignedContact ? [assignedContact] : [],
+            answers: {},
+            asked: assignedContact ? { [assignedContact]: false } : {},
+          });
+        } else { // It's a 'task'
+          const tag = await classifyTask(s.text);
+          tasksToAdd.push({
+            name, // Name of the person whose answer generated the task
+            message: s.text, // The actual task description
+            status: "open",
+            createdAt: serverTimestamp(),
+            tag,
+          });
+        }
+      }
 
       // Batch write all new tasks to Firestore
       if (tasksToAdd.length > 0) {
-        const tasksCollection = collection(
-          db, "users", uid, "initiatives", initiativeId, "tasks"
-        );
+        const tasksCollection = collection(db, "users", uid, "initiatives", initiativeId, "tasks");
         await Promise.all(
           tasksToAdd.map((taskData) => addDoc(tasksCollection, taskData))
         );
@@ -427,15 +428,10 @@ Respond ONLY in this JSON format:
       if (questionsToAdd.length > 0) {
         setQuestions((prevQuestions) => {
           const updatedQuestions = [...prevQuestions, ...questionsToAdd];
-          // Save the new complete list to Firestore
           if (uid) {
             saveInitiative(uid, initiativeId, {
-              clarifyingQuestions: updatedQuestions.map((q) => ({
-                question: q.question,
-              })),
-              clarifyingContacts: Object.fromEntries(
-                updatedQuestions.map((qq, i) => [i, qq.contacts])
-              ),
+              clarifyingQuestions: updatedQuestions.map((q) => ({ question: q.question })),
+              clarifyingContacts: Object.fromEntries(updatedQuestions.map((qq, i) => [i, qq.contacts])),
               clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
               clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
             });
@@ -473,15 +469,24 @@ Respond ONLY in this JSON format:
     setAnalyzing(true);
     const result = await analyzeAnswer(questions[idx]?.question || "", text);
     setAnalyzing(false);
+    // The 'selected' items are now the full suggestion objects
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
 
-  const toggleSuggestion = (s) => {
+  // --- MODIFIED FUNCTION ---
+  const toggleSuggestion = (suggestionObject) => {
     setAnalysisModal((prev) => {
-      const selected = prev.selected.includes(s)
-        ? prev.selected.filter((t) => t !== s)
-        : [...prev.selected, s];
-      return { ...prev, selected };
+      // Check for existence based on the 'text' property
+      const isSelected = prev.selected.some(item => item.text === suggestionObject.text);
+      let newSelected;
+      if (isSelected) {
+        // Remove the object if it's already selected
+        newSelected = prev.selected.filter((item) => item.text !== suggestionObject.text);
+      } else {
+        // Add the object if it's not selected
+        newSelected = [...prev.selected, suggestionObject];
+      }
+      return { ...prev, selected: newSelected };
     });
   };
 
@@ -1012,7 +1017,6 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
-          {/* --- NEW SIDEBAR ITEM --- */}
           <li
             className={active === "tasks" ? "active" : ""}
             onClick={() => setActive("tasks")}
@@ -1094,7 +1098,6 @@ Respond ONLY in this JSON format:
               businessGoal={businessGoal}
             />
           )
-        // --- NEW TASKS VIEW ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
             <ul className="task-list">
@@ -1357,15 +1360,16 @@ Respond ONLY in this JSON format:
               <>
                 <p>Suggested tasks:</p>
                 <ul>
+                  {/* --- MODIFIED JSX --- */}
                   {analysisModal.suggestions.map((s, i) => (
                     <li key={i}>
                       <label>
                         <input
                           type="checkbox"
-                          checked={analysisModal.selected.includes(s)}
+                          checked={analysisModal.selected.some(item => item.text === s.text)}
                           onChange={() => toggleSuggestion(s)}
                         />
-                        {s}
+                         {`[${s.type}] ${s.text} (${s.assignee})`}
                       </label>
                     </li>
                   ))}
