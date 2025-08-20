@@ -361,29 +361,6 @@ Respond ONLY in this JSON format:
     startDraftQueue([draft]);
   };
 
-  const addQuestionToBank = async (text, contact) => {
-    let updated;
-    setQuestions((prev) => {
-      const newQ = {
-        question: text,
-        contacts: contact ? [contact] : [],
-        answers: {},
-        asked: contact ? { [contact]: false } : {},
-      };
-      updated = [...prev, newQ];
-      return updated;
-    });
-    if (uid) {
-      await saveInitiative(uid, initiativeId, {
-        clarifyingQuestions: updated.map((q) => ({ question: q.question })),
-        clarifyingContacts: Object.fromEntries(
-          updated.map((qq, i) => [i, qq.contacts])
-        ),
-        clarifyingAnswers: updated.map((qq) => qq.answers),
-        clarifyingAsked: updated.map((qq) => qq.asked),
-      });
-    }
-  };
 
   const createTasksFromAnalysis = async (name, suggestions) => {
     if (!uid || !initiativeId || !suggestions.length) return;
@@ -728,19 +705,34 @@ Respond ONLY in this JSON format:
     });
   };
 
-  const summarizeText = (text) => {
-    const words = text.trim().split(/\s+/);
-    return words.slice(0, 50).join(" ") + (words.length > 50 ? "..." : "");
+  const summarizeText = async (text) => {
+    const context = `Project Name: ${projectName || "Unknown"}\nBusiness Goal: ${
+      businessGoal || "Unknown"
+    }`;
+    const prompt = `${context}\n\nProvide a concise summary of the following document, describing how it impacts the project and highlighting any key or useful data points.\n\n${text}`;
+    const { text: result } = await ai.generate(prompt);
+    return result.trim();
   };
 
-  const handleSummarize = (text) => {
-    setSummary(summarizeText(text));
-    setShowSummary(true);
+  const handleSummarize = async (text) => {
+    setAnalyzing(true);
+    try {
+      const s = await summarizeText(text);
+      setSummary(s);
+    } catch (err) {
+      console.error("Error summarizing document", err);
+      setSummary("Failed to generate summary.");
+    } finally {
+      setShowSummary(true);
+      setAnalyzing(false);
+    }
   };
 
-  const handleSummarizeAll = () => {
-    const combined = documents.map((d) => d.content).join(" ");
-    handleSummarize(combined);
+  const handleSummarizeAll = async () => {
+    const combined = documents
+      .map((d) => `Title: ${d.name}\n\n${d.content}`)
+      .join("\n\n");
+    await handleSummarize(combined);
   };
 
   const toggleSelect = (key) => {
