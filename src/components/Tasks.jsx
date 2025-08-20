@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import TaskQueue from "./TaskQueue";
+import TaskSidebar from "./TaskSidebar";
 import "../pages/admin.css";
 
 const Tasks = () => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [inquiries, setInquiries] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, setUser);
