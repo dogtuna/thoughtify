@@ -15,7 +15,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai from "../ai";
-import { classifyTask, isQuestionTask } from "../utils/taskUtils";
+import { classifyTask } from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -45,6 +45,9 @@ const DiscoveryHub = () => {
   const [contactFilter, setContactFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
+  // --- MODIFICATION: State for task filtering ---
+  const [taskContactFilter, setTaskContactFilter] = useState("");
+  const [taskGroupBy, setTaskGroupBy] = useState("");
   const [selected, setSelected] = useState([]);
   const [selectMode, setSelectMode] = useState(false);
   const [uid, setUid] = useState(null);
@@ -73,6 +76,20 @@ const DiscoveryHub = () => {
   const [projectConstraints, setProjectConstraints] = useState("");
   const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
+
+  // --- MODIFICATION: Helper for task icons ---
+  const taskSubTypeIcon = (subType) => {
+    switch (subType) {
+      case "meeting":
+        return "🗓️";
+      case "communication":
+        return "📨";
+      case "research":
+        return "🔎";
+      default:
+        return "📝";
+    }
+  };
 
   const generateDraft = (recipients, questionObjs) => {
     const userName =
@@ -218,7 +235,6 @@ const DiscoveryHub = () => {
     }
   };
 
-  // --- MODIFIED FUNCTION ---
   const analyzeAnswer = async (question, text) => {
     try {
       const contextPieces = [];
@@ -255,7 +271,7 @@ const DiscoveryHub = () => {
       }
       const projectContext = contextPieces.join("\n\n");
 
-      // --- MODIFIED PROMPT ---
+      // --- MODIFICATION: Updated prompt for sub-task classification ---
       const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 
 Project Context:
@@ -269,14 +285,17 @@ ${text}
 
 Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
-- "suggestions": An array of objects for follow-up actions. Each object must have three string fields: "text" (the follow-up action), "type" (either "question" for direct follow-ups or "task" for internal actions like verification or analysis), and "assignee" (the name of the person or team to address, or "Project Manager" for internal tasks). For example: [{"text": "Clarify the term 'synergy'", "type": "question", "assignee": "Jessica Bell"}, {"text": "Verify the 60% figure with a data report", "type": "task", "assignee": "Project Manager"}]. If the answer is complete, return an empty array.
+- "suggestions": An array of objects for follow-up actions. Each object must have four string fields:
+    1. "text": The follow-up action.
+    2. "type": Either "question" for direct follow-ups or "task" for internal actions.
+    3. "assignee": The name of the person or team to address (e.g., "Jessica Bell", "Engineering Team"), or "Project Manager" for internal tasks.
+    4. "subType": For tasks, classify their nature. Use "meeting" for scheduling discussions, "communication" for sending emails/chats, or "research" for verification, data analysis, or finding documents. For questions, this can be "communication".
 
 Respond ONLY in this JSON format:
-{"analysis": "...", "suggestions": [{"text": "...", "type": "...", "assignee": "..."}, ...]}`;
+{"analysis": "...", "suggestions": [{"text": "...", "type": "...", "assignee": "...", "subType": "..."}, ...]}`;
 
       const { text: res } = await ai.generate(prompt);
       
-      // --- MODIFIED PARSER ---
       const parseResponse = (str) => {
         const parsed = JSON.parse(str);
         const analysis =
@@ -290,7 +309,8 @@ Respond ONLY in this JSON format:
                 s &&
                 typeof s.text === "string" &&
                 typeof s.type === "string" &&
-                typeof s.assignee === "string"
+                typeof s.assignee === "string" &&
+                typeof s.subType === "string"
             )
           : [];
         
@@ -328,7 +348,6 @@ Respond ONLY in this JSON format:
     const toNames = name;
     let body = `Hi ${toNames},\n\nThank you for the information.\n`;
     if (suggestions.length) {
-      // Suggestions are now objects, so we need to get the text property
       const suggestionTexts = suggestions.map(s => s.text);
       body += `Could you also provide the following: ${suggestionTexts.join(", ")}?\n\n`;
     }
@@ -366,35 +385,15 @@ Respond ONLY in this JSON format:
     }
   };
 
-  // --- MODIFIED FUNCTION ---
-  // This function is no longer needed with the new AI response structure, 
-  // but we keep it in case it's used elsewhere or for manual entry later.
-  const extractQuestionInfo = (text) => {
-    const lower = text.toLowerCase();
-    const contact =
-      contacts.find((c) => lower.includes(c.name.toLowerCase()))?.name || "";
-    let question = text.trim();
-    if (contact) {
-      const re = new RegExp(String.raw`^\s*ask\s+${contact}\s*(to\s*)?`, "i");
-      question = question.replace(re, "").trim();
-    }
-    return { question: question || text, contact: contact || null };
-  };
-
-  // --- MODIFIED FUNCTION ---
   const createTasksFromAnalysis = async (name, suggestions) => {
-    // 'name' is the original answerer, used as a fallback.
-    // 'suggestions' is now an array of objects: {text, type, assignee}.
     if (!uid || !initiativeId || !suggestions.length) return;
     
     const questionsToAdd = [];
     const tasksToAdd = [];
 
     try {
-      // Categorize based on the 'type' field from the AI response
       for (const s of suggestions) {
         if (s.type === 'question') {
-          // Find the contact mentioned by the AI. Fallback to original answerer.
           const contactExists = contacts.some(c => c.name === s.assignee);
           const assignedContact = contactExists ? s.assignee : name;
           
@@ -404,11 +403,14 @@ Respond ONLY in this JSON format:
             answers: {},
             asked: assignedContact ? { [assignedContact]: false } : {},
           });
-        } else { // It's a 'task'
+        } else {
           const tag = await classifyTask(s.text);
+          // --- MODIFICATION: Save assignee and subType with the task ---
           tasksToAdd.push({
-            name, // Name of the person whose answer generated the task
-            message: s.text, // The actual task description
+            name,
+            message: s.text,
+            assignee: s.assignee || "Unassigned",
+            subType: s.subType || "task",
             status: "open",
             createdAt: serverTimestamp(),
             tag,
@@ -416,7 +418,6 @@ Respond ONLY in this JSON format:
         }
       }
 
-      // Batch write all new tasks to Firestore
       if (tasksToAdd.length > 0) {
         const tasksCollection = collection(db, "users", uid, "initiatives", initiativeId, "tasks");
         await Promise.all(
@@ -424,7 +425,6 @@ Respond ONLY in this JSON format:
         );
       }
 
-      // Batch update questions in state and then save the entire list
       if (questionsToAdd.length > 0) {
         setQuestions((prevQuestions) => {
           const updatedQuestions = [...prevQuestions, ...questionsToAdd];
@@ -469,21 +469,16 @@ Respond ONLY in this JSON format:
     setAnalyzing(true);
     const result = await analyzeAnswer(questions[idx]?.question || "", text);
     setAnalyzing(false);
-    // The 'selected' items are now the full suggestion objects
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
 
-  // --- MODIFIED FUNCTION ---
   const toggleSuggestion = (suggestionObject) => {
     setAnalysisModal((prev) => {
-      // Check for existence based on the 'text' property
       const isSelected = prev.selected.some(item => item.text === suggestionObject.text);
       let newSelected;
       if (isSelected) {
-        // Remove the object if it's already selected
         newSelected = prev.selected.filter((item) => item.text !== suggestionObject.text);
       } else {
-        // Add the object if it's not selected
         newSelected = [...prev.selected, suggestionObject];
       }
       return { ...prev, selected: newSelected };
@@ -879,6 +874,30 @@ Respond ONLY in this JSON format:
   }
   const statusLabel = (s) =>
     s === "toask" ? "To Ask" : s === "asked" ? "Asked" : "Answered";
+  
+  // --- MODIFICATION: Logic for filtering and grouping tasks ---
+  const getDisplayedTasks = () => {
+    let tasks = projectTasks.filter((t) => t.status !== "completed");
+  
+    if (taskContactFilter) {
+      tasks = tasks.filter((t) => t.assignee === taskContactFilter);
+    }
+  
+    if (taskGroupBy === "contact") {
+      const grouped = tasks.reduce((acc, task) => {
+        const key = task.assignee || "Unassigned";
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(task);
+        return acc;
+      }, {});
+      return grouped;
+    }
+  
+    return { All: tasks };
+  };
+  const displayedTaskGroups = getDisplayedTasks();
 
   const items = [];
   questions.forEach((q, idx) => {
@@ -1098,24 +1117,74 @@ Respond ONLY in this JSON format:
               businessGoal={businessGoal}
             />
           )
+        // --- MODIFICATION: Revamped tasks view with filtering and grouping ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
-            <ul className="task-list">
-              {projectTasks.filter((t) => t.status !== "completed").map((t) => (
-                <li key={t.id} className="task-item">
-                  <p>{t.message}</p>
-                  <button
-                    className="generator-button"
-                    onClick={() => completeTask(t.id)}
-                  >
-                    Complete
-                  </button>
-                </li>
-              ))}
-              {projectTasks.filter((t) => t.status !== "completed").length === 0 && (
+            <div className="filter-bar">
+              <label>
+                Contact:
+                <select
+                  value={taskContactFilter}
+                  onChange={(e) => setTaskContactFilter(e.target.value)}
+                >
+                  <option value="">All</option>
+                  {contacts.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                   <option value="Project Manager">Project Manager</option>
+                   <option value="Unassigned">Unassigned</option>
+                </select>
+              </label>
+              <label>
+                Group by:
+                <select
+                  value={taskGroupBy}
+                  onChange={(e) => setTaskGroupBy(e.target.value)}
+                >
+                  <option value="">None</option>
+                  <option value="contact">Contact</option>
+                </select>
+              </label>
+            </div>
+
+            {Object.entries(displayedTaskGroups).map(([groupName, tasks]) => (
+              <div key={groupName} className="group-section">
+                {taskGroupBy && <h3>{groupName}</h3>}
+                {tasks.length > 0 ? (
+                  <ul className="task-list">
+                    {tasks.map((t) => (
+                      <li key={t.id} className="task-item">
+                        <div className="task-header">
+                           <span className="task-icon">{taskSubTypeIcon(t.subType)}</span>
+                           {t.assignee && t.assignee !== "Unassigned" && (
+                             <span
+                              className="contact-tag"
+                              style={{ backgroundColor: getColor(t.assignee) }}
+                             >
+                              {t.assignee}
+                             </span>
+                           )}
+                        </div>
+                        <p>{t.message}</p>
+                        <button
+                          className="generator-button"
+                          onClick={() => completeTask(t.id)}
+                        >
+                          Complete
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No pending tasks for this group.</p>
+                )}
+              </div>
+            ))}
+            {projectTasks.filter((t) => t.status !== "completed").length === 0 && (
                 <p>No pending tasks.</p>
               )}
-            </ul>
           </div>
         ) : (
           <>
@@ -1360,7 +1429,6 @@ Respond ONLY in this JSON format:
               <>
                 <p>Suggested tasks:</p>
                 <ul>
-                  {/* --- MODIFIED JSX --- */}
                   {analysisModal.suggestions.map((s, i) => (
                     <li key={i}>
                       <label>
@@ -1369,7 +1437,7 @@ Respond ONLY in this JSON format:
                           checked={analysisModal.selected.some(item => item.text === s.text)}
                           onChange={() => toggleSuggestion(s)}
                         />
-                         {`[${s.type}] ${s.text} (${s.assignee})`}
+                         {taskSubTypeIcon(s.subType)} {`[${s.type}] ${s.text} (${s.assignee})`}
                       </label>
                     </li>
                   ))}
