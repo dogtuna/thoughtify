@@ -85,108 +85,113 @@ const ProjectStatus = ({
   }, [user, initiativeId, onHistoryChange]);
 
   const generateSummary = async () => {
-    if (!user || !initiativeId) return;
-    setLoading(true);
+  if (!user || !initiativeId) return;
+  setLoading(true);
 
-    // **FIXED LOGIC**
-    // Use the local 'history' state as the single source of truth for the last update.
-    // This avoids any potential race conditions with Firestore.
-    const lastUpdateFromState = history.length > 0 ? history[0] : null;
+  // Use the local 'history' state as the single source of truth.
+  const lastUpdateFromState = history.length > 0 ? history[0] : null;
 
-    // --- Data Aggregation ---
-    const cutoff = lastUpdateFromState ? new Date(lastUpdateFromState.date) : null;
+  // --- Data Aggregation ---
+  const cutoff = lastUpdateFromState ? new Date(lastUpdateFromState.date) : null;
 
-    // Helper function to reliably get a timestamp from an answer object
-    // NOTE: This assumes your answer object has a `timestamp` field. Adjust if necessary.
-    const getAnswerTimestamp = (answer) => {
-      if (!answer || !answer.timestamp) return null;
-      const ts = answer.timestamp;
-      return ts.toDate ? ts.toDate() : new Date(ts);
-    };
+  // Helper functions for timestamps
+  const getAnswerTimestamp = (answer) => {
+    if (!answer || !answer.timestamp) return null;
+    const ts = answer.timestamp;
+    return ts.toDate ? ts.toDate() : new Date(ts);
+  };
 
-    // Helper to normalize document timestamps
-    const getDocumentTimestamp = (doc) => {
-      const ts = doc.updatedAt || doc.addedAt || doc.createdAt || doc.uploadedAt;
-      if (!ts) return null;
-      return ts.toDate ? ts.toDate() : new Date(ts);
-    };
+  const getDocumentTimestamp = (doc) => {
+    const ts = doc.updatedAt || doc.addedAt || doc.createdAt || doc.uploadedAt;
+    if (!ts) return null;
+    return ts.toDate ? ts.toDate() : new Date(ts);
+  };
 
-    // This logic now correctly uses the cutoff date from the local state.
-    const newStakeholderAnswers = questions
-      .map((q) => {
-        const newAnswers = Object.entries(q.answers || {})
-          .filter(([, answer]) => {
-            if (!answer || !answer.text || !answer.text.trim()) return false;
-            if (!cutoff) return true; // If it's the first run, all answers are new
-            const answerTimestamp = getAnswerTimestamp(answer);
-            return answerTimestamp && answerTimestamp > cutoff;
-          })
-          .map(([name, answer]) => `${name}: ${answer.text}`)
-          .join("; ");
-        return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
-      })
-      .filter(Boolean)
-      .join("\n");
-
-    const newDocuments = documents
-      .filter((d) => {
-        const t = getDocumentTimestamp(d);
-        if (!t) {
-          // Documents without timestamps should only be considered "new" on the first run
-          return !cutoff;
-        }
-        return !cutoff || t > cutoff;
-      })
-      .map(
-        (d) =>
-          `- ${d.name}: ${d.summary || (d.content ? d.content.slice(0, 200) : "")}`
-      )
-      .join("\n");
-
-    const outstandingQuestionsArr = questions
-      .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
-      .map((q) => `- ${q.question}`);
-
-    const taskListArr = tasks.map(
-      (t) => `- ${t.message || ""} (${t.status || "open"})`
-    );
-
-    const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
-
-    const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
-    const formatContacts = (arr) =>
-      arr
-        .map((c) => (c.role ? `${c.name} (${c.role})` : c.name))
+  // This logic is now correct and time-aware.
+  const newStakeholderAnswers = questions
+    .map((q) => {
+      const newAnswers = Object.entries(q.answers || {})
+        .filter(([, answer]) => {
+          if (!answer || !answer.text || !answer.text.trim()) return false;
+          if (!cutoff) return true;
+          const answerTimestamp = getAnswerTimestamp(answer);
+          return answerTimestamp && answerTimestamp > cutoff;
+        })
+        .map(([name, answer]) => `${name}: ${answer.text}`)
         .join("; ");
-    const projectBaseline = `Goal: ${
-      businessGoal || "Unknown"
-    }\nSponsor: ${
-      sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
-    }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
+      return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
+    })
+    .filter(Boolean)
+    .join("\n");
 
-    const previous = lastUpdateFromState ? lastUpdateFromState.summary : "None";
-    const today = new Date().toDateString();
+  const newDocuments = documents
+    .filter((d) => {
+      const t = getDocumentTimestamp(d);
+      if (!t) {
+        // Only include docs without timestamps on the very first run
+        return !cutoff;
+      }
+      return !cutoff || t > cutoff;
+    })
+    .map(
+      (d) =>
+        `- ${d.name}: ${d.summary || (d.content ? d.content.slice(0, 200) : "")}`
+    )
+    .join("\n");
 
-    // --- Prompt (This is correct, no changes needed) ---
-    const audiencePrompt =
-      audience === "client"
-        ? "Use a client-facing tone that is professional and strategically focused."
-        : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
+  const outstandingQuestionsArr = questions
+    .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
+    .map((q) => `- ${q.question}`);
 
-    const prompt = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative. Your primary goal is to analyze the project's trajectory and provide a forward-looking strategic update, not a simple list of activities.
+  const taskListArr = tasks.map(
+    (t) => `- ${t.message || ""} (${t.status || "open"})`
+  );
+
+  const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
+
+  const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
+  const formatContacts = (arr) =>
+    arr
+      .map((c) => (c.role ? `${c.name} (${c.role})` : c.name))
+      .join("; ");
+  const projectBaseline = `Goal: ${
+    businessGoal || "Unknown"
+  }\nSponsor: ${
+    sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"
+  }\nKey Contacts: ${formatContacts(contacts) || "None"}`;
+
+  const today = new Date().toDateString();
+
+  // **CRITICAL FIX #1: Extract ONLY the previous hypothesis**
+  // This gives the AI the essential context without the noise of the full report.
+  const getPreviousHypothesis = (summary) => {
+    if (!summary) return "None";
+    const match = summary.match(/\*\*Situation Analysis & Working Hypothesis\*\*\s*([\s\S]*?)\s*\*\*Key Findings & Evidence\*\*/);
+    return match && match[1] ? match[1].trim() : summary; // Fallback to full summary if parsing fails
+  };
+
+  const previousHypothesis = lastUpdateFromState ? getPreviousHypothesis(lastUpdateFromState.summary) : "None";
+
+  // --- Prompt ---
+  const audiencePrompt =
+    audience === "client"
+      ? "Use a client-facing tone that is professional and strategically focused."
+      : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
+
+  const prompt = `Your role is an expert Performance Consultant delivering a strategic brief to a client. Your writing style must be analytical, evidence-based, and consultative. Your primary goal is to analyze the project's trajectory and provide a forward-looking strategic update, not a simple list of activities.
 
 ---
 ### Core Analytical Task: Delta Analysis
 
 Your most important task is to analyze the project's evolution since the last update.
 
-**IF \`Previous Update\` is "None":**
+**IF \`Previous Hypothesis\` is "None":**
 This is the **initial project brief**. Your task is to establish the baseline. Synthesize the \`Project Baseline\` data with any initial documents or answers to define the business problem, state the initial working hypothesis, and outline the clear next actions for the discovery phase.
 
-**IF \`Previous Update\` exists:**
-This is a **follow-up brief**. Do not re-summarize old information from the previous update. Your analysis must focus **exclusively** on the strategic impact of the \`New Stakeholder Answers\` and \`New Documents\`.
-1.  In the \`Situation Analysis\`, explicitly state how this new information **confirms, challenges, or changes** the previous working hypothesis.
-2.  In the \`Key Findings\`, detail the specific new evidence and its implications.
+**IF \`Previous Hypothesis\` exists:**
+This is a **follow-up brief**. Your analysis must focus **exclusively** on the strategic impact of the \`New Stakeholder Answers\` and \`New Documents\` and how they relate to the \`Previous Hypothesis\`.
+1.  In the \`Situation Analysis\`, you MUST explicitly state how this new information **confirms, challenges, or changes** the \`Previous Hypothesis\`. This is the most important part of your response.
+2.  In the \`Key Findings\`, detail ONLY the specific new evidence and its implications. Do not repeat old findings.
 3.  In the \`Strategic Recommendations\`, your actions must be a direct consequence of the new findings, showing a clear evolution of the project plan.
 
 ---
@@ -210,8 +215,8 @@ Begin the response with \`Date: ${today}\` and structure it under the following 
 ---
 ### Project Data
 
-**Previous Update:**
-${previous}
+**Previous Hypothesis:**
+${previousHypothesis}
 
 **Project Baseline:**
 ${projectBaseline}
@@ -224,33 +229,32 @@ ${newDocuments || "None"}
 
 **All Outstanding Questions & Tasks:**
 ${allOutstanding || "None"}`;
-    
-    // --- API Call and State Update ---
-    try {
-      const { text } = await ai.generate(prompt);
-      const clean = text.trim();
-      setSummary(clean);
-      const now = new Date().toISOString();
-      const entry = { date: now, summary: clean, sent: false };
-      const colRef = collection(
-        db,
-        "users",
-        user.uid,
-        "initiatives",
-        initiativeId,
-        "statusUpdates"
-      );
-      // The write to the database still happens, but we no longer depend on its timing for the next run
-      const docRef = await addDoc(colRef, entry);
-      const entryWithId = { id: docRef.id, ...entry };
-      const updated = [entryWithId, ...history];
-      setHistory(updated);
-      onHistoryChange(updated);
-    } catch (err) {
-      console.error("generateSummary error", err);
-    }
-    setLoading(false);
-  };
+  
+  // --- API Call and State Update ---
+  try {
+    const { text } = await ai.generate(prompt);
+    const clean = text.trim();
+    setSummary(clean);
+    const now = new Date().toISOString();
+    const entry = { date: now, summary: clean, sent: false };
+    const colRef = collection(
+      db,
+      "users",
+      user.uid,
+      "initiatives",
+      initiativeId,
+      "statusUpdates"
+    );
+    const docRef = await addDoc(colRef, entry);
+    const entryWithId = { id: docRef.id, ...entry };
+    const updated = [entryWithId, ...history];
+    setHistory(updated);
+    onHistoryChange(updated);
+  } catch (err) {
+    console.error("generateSummary error", err);
+  }
+  setLoading(false);
+};
 
   const saveEdit = async () => {
     if (!user || !history.length) return;
