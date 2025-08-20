@@ -7,6 +7,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai from "../ai";
+import { classifyTask, isQuestionTask } from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -320,14 +321,28 @@ Respond ONLY in this JSON format:
   const createTasksFromAnalysis = async (name, suggestions) => {
     if (!uid || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
+    const project = projectName || "General";
     try {
       for (const s of suggestions) {
+        const isQuestion = await isQuestionTask(s);
+        if (isQuestion) {
+          await addDoc(collection(db, "profiles", uid, "questions"), {
+            name,
+            question: s,
+            project,
+            createdAt: serverTimestamp(),
+          });
+          continue;
+        }
+        const tag = await classifyTask(s);
         await addDoc(collection(db, "profiles", uid, "taskQueue"), {
           name,
           email,
           message: `Locate: ${s}`,
           status: "open",
           createdAt: serverTimestamp(),
+          project,
+          tag,
         });
       }
     } catch (err) {

@@ -4,9 +4,15 @@ import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import "../pages/admin.css";
 import {
-  collection, deleteDoc, doc, getDocs, addDoc, serverTimestamp,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { classifyTask, isQuestionTask } from "../utils/taskUtils";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
 
@@ -89,10 +95,26 @@ export default function NewInquiries({ user, openReplyModal }) {
   const handleMoveToTaskQueue = async (inquiry) => {
     try {
       console.log(`Moving inquiry to task queue: ${inquiry.id}`);
+      const questionCheck = await isQuestionTask(inquiry.message || "");
+      const project = inquiry.project || "General";
+      if (questionCheck) {
+        await addDoc(collection(db, "profiles", user.uid, "questions"), {
+          name: inquiry.name,
+          question: inquiry.message,
+          project,
+          createdAt: serverTimestamp(),
+        });
+        await deleteDoc(doc(db, "inquiries", inquiry.id));
+        setAllInquiries((prev) => prev.filter((item) => item.id !== inquiry.id));
+        return;
+      }
+      const tag = await classifyTask(inquiry.message || "");
       // Remove the 'id' field from inquiry data
       const { id, ...inquiryData } = inquiry;
       inquiryData.status = "claimed";
       inquiryData.movedAt = serverTimestamp();
+      inquiryData.project = project;
+      inquiryData.tag = tag;
 
       const userTaskQueueRef = collection(db, "profiles", user.uid, "taskQueue");
       const docRef = await addDoc(userTaskQueueRef, inquiryData);

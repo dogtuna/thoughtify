@@ -126,6 +126,46 @@
   .task-item button:hover {
     background-color: #e66f20;
   }
+
+  .filter-row {
+    margin-bottom: 10px;
+  }
+
+  .filter-row select {
+    margin-right: 10px;
+    padding: 4px;
+  }
+
+  .tag-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 6px;
+    color: #fff;
+  }
+
+  .tag-email {
+    background-color: #4a90e2;
+  }
+
+  .tag-call {
+    background-color: #7b61ff;
+  }
+
+  .tag-meeting {
+    background-color: #2d9c6f;
+  }
+
+  .tag-research {
+    background-color: #f5a623;
+  }
+
+  .bundle-group {
+    border: 1px dashed #8C259E;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
   
 /* Full-screen overlay */
 .modal-overlay {
