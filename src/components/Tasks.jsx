@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, where, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import TaskQueue from "./TaskQueue";
 import "../pages/admin.css";
@@ -18,8 +18,7 @@ const Tasks = () => {
   useEffect(() => {
     if (!user) return;
     const tasksRef = collection(db, "profiles", user.uid, "taskQueue");
-    const q = query(tasksRef, where("status", "!=", "completed"));
-    const unsubTasks = onSnapshot(q, (snap) => {
+    const unsubTasks = onSnapshot(tasksRef, (snap) => {
       setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     const inquiriesRef = collection(db, "profiles", user.uid, "inquiries");
@@ -32,35 +31,7 @@ const Tasks = () => {
     };
   }, [user]);
 
-  const handleComplete = async (task) => {
-    if (!user) return;
-    await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), {
-      status: "completed",
-    });
-  };
-
-  const handleReplyTask = async (task, replyText) => {
-    if (!user) return;
-    await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), {
-      reply: replyText,
-      status: "open",
-    });
-  };
-
-  const handleDelete = async (id) => {
-    if (!user) return;
-    await deleteDoc(doc(db, "profiles", user.uid, "taskQueue", id));
-  };
-
-  return (
-    <TaskQueue
-      tasks={tasks}
-      inquiries={inquiries}
-      onComplete={handleComplete}
-      onReplyTask={handleReplyTask}
-      onDelete={handleDelete}
-    />
-  );
+  return <TaskQueue tasks={tasks} inquiries={inquiries} />;
 };
 
 export default Tasks;
