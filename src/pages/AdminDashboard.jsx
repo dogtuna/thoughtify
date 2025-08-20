@@ -591,7 +591,6 @@ Thoughtify Training Team`;
           <TaskQueue
             inquiries={inquiries}
             tasks={tasks}
-            setTasks={setTasks}
             onComplete={(task) => handleCompleteTask(task)}
             onReplyTask={(task, replyText) => handleReplyTask(task, replyText)}
             onDelete={(taskId) => handleDeleteTask(taskId)}
