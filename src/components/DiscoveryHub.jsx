@@ -511,9 +511,161 @@ Respond ONLY in this JSON format:
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
         { status, statusChangedAt: serverTimestamp(), ...extra }
       );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
     } catch (err) {
       console.error("updateTaskStatus error", err);
     }
+    setPrioritized(null);
+  };
+
+  const completeTask = (id) => updateTaskStatus(id, "completed");
+  const scheduleTask = (id) => updateTaskStatus(id, "scheduled");
+  const deleteTask = async (id) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await deleteDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", id)
+      );
+    } catch (err) {
+      console.error("deleteTask error", err);
+    }
+  };
+
+  const computeBundles = () => {
+    const map = {};
+    displayedTasks.forEach((t) => {
+      const key = `${t.project || "General"}-${t.subType || "other"}-${t.assignee || ""}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    });
+    return Object.values(map).filter((b) => b.length > 1);
+  };
+
+  const startSynergy = async () => {
+    const bundles = computeBundles();
+    const proposals = [];
+    for (const b of bundles) {
+      try {
+        const { text } = await generate(
+          `Combine the following tasks into one task description:\n${b
+            .map((t) => `- ${t.message}`)
+            .join("\n")}`
+        );
+        proposals.push({ bundle: b, text: text.trim() });
+      } catch (err) {
+        console.error("synergize", err);
+        proposals.push({ bundle: b, text: b.map((t) => t.message).join(" ") });
+      }
+    }
+    if (proposals.length) {
+      setSynergyQueue(proposals);
+      setSynergyIndex(0);
+      setSynergyText(proposals[0].text);
+    }
+  };
+
+  const nextSynergy = () => {
+    const next = synergyIndex + 1;
+    if (next < synergyQueue.length) {
+      setSynergyIndex(next);
+      setSynergyText(synergyQueue[next].text);
+    } else {
+      setSynergyQueue([]);
+      setSynergyIndex(0);
+      setSynergyText("");
+    }
+  };
+
+  const handleSynergize = async (bundle, message) => {
+    if (!uid || !initiativeId || !bundle.length) return;
+    const [first, ...rest] = bundle;
+    await updateDoc(
+      doc(db, "users", uid, "initiatives", initiativeId, "tasks", first.id),
+      { message }
+    );
+    for (const t of rest) {
+      await deleteDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", t.id)
+      );
+    }
+    nextSynergy();
+  };
+
+  const startPrioritize = async () => {
+    setIsPrioritizing(true);
+    try {
+      const { text } = await generate(
+        `Order the following tasks by priority and return a JSON array of ids in order:\n${displayedTasks
+          .map((t) => `${t.id}: ${t.message}`)
+          .join("\n")}`
+      );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
+    } catch (err) {
+      console.error("prioritize", err);
+      setPrioritized([...displayedTasks]);
+    } finally {
+      setIsPrioritizing(false);
+    }
+  };
+
+  const movePriority = (index, delta) => {
+    setPrioritized((prev) => {
+      const arr = [...prev];
+      const next = index + delta;
+      if (next < 0 || next >= arr.length) return arr;
+      const tmp = arr[index];
+      arr[index] = arr[next];
+      arr[next] = tmp;
+      return arr;
+    });
+  };
+
+  const savePrioritized = async () => {
+    if (!uid || !initiativeId || !prioritized) return;
+    for (let i = 0; i < prioritized.length; i++) {
+      await updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", prioritized[i].id),
+        { order: i }
+      );
+    }
+    setPrioritized(null);
+  };
+
+  const renderTaskCard = (t, actionButtons) => {
+    const contact = t.assignee || t.name || "Unassigned";
+    const project = t.project || projectName || "General";
+    return (
+      <div
+        key={t.id}
+        className="bg-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-xl p-4 space-y-3"
+      >
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <span className="font-semibold">{contact}</span>
+            <span className="text-sm text-gray-400">{project}</span>
+          </div>
+          {t.tag && (
+            <span
+              className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                tagStyles[t.tag] || tagStyles.default
+              }`}
+            >
+              {t.tag}
+            </span>
+          )}
+        </div>
+        <p className="text-gray-200">{t.message}</p>
+        <div className="flex gap-2">{actionButtons}</div>
+      </div>
+    );
   };
 
   const completeTask = (id) => updateTaskStatus(id, "completed");
@@ -1391,6 +1543,7 @@ Respond ONLY in this JSON format:
                 </button>
                 <button
                   className="flex w-32 items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg"
+
                   onClick={startSynergy}
                 >
                   <Layers className="w-5 h-5" />
