@@ -511,9 +511,15 @@ Respond ONLY in this JSON format:
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
         { status, statusChangedAt: serverTimestamp(), ...extra }
       );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
     } catch (err) {
       console.error("updateTaskStatus error", err);
     }
+    setPrioritized(null);
   };
 
   const completeTask = (id) => updateTaskStatus(id, "completed");
