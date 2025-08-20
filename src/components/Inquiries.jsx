@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { classifyTask, isQuestionTask } from "../utils/taskUtils";
+import { loadInitiative, saveInitiative } from "../utils/initiatives";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
 
@@ -98,11 +99,25 @@ export default function NewInquiries({ user, openReplyModal }) {
       const questionCheck = await isQuestionTask(inquiry.message || "");
       const project = inquiry.project || "General";
       if (questionCheck) {
-        await addDoc(collection(db, "profiles", user.uid, "questions"), {
-          name: inquiry.name,
+        const init = await loadInitiative(user.uid, project);
+        const clarifyingQuestions = init?.clarifyingQuestions || [];
+        const clarifyingContacts = init?.clarifyingContacts || {};
+        const clarifyingAnswers = init?.clarifyingAnswers || [];
+        const clarifyingAsked = init?.clarifyingAsked || [];
+        const idx = clarifyingQuestions.length;
+        clarifyingQuestions.push({
           question: inquiry.message,
-          project,
-          createdAt: serverTimestamp(),
+          stakeholders: [],
+          phase: "General",
+        });
+        clarifyingContacts[idx] = [inquiry.name];
+        clarifyingAnswers.push({});
+        clarifyingAsked.push({ [inquiry.name]: false });
+        await saveInitiative(user.uid, project, {
+          clarifyingQuestions,
+          clarifyingContacts,
+          clarifyingAnswers,
+          clarifyingAsked,
         });
         await deleteDoc(doc(db, "inquiries", inquiry.id));
         setAllInquiries((prev) => prev.filter((item) => item.id !== inquiry.id));
