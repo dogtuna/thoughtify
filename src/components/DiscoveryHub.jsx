@@ -7,6 +7,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai from "../ai";
+import { classifyTask, isQuestionTask } from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -271,7 +272,14 @@ Respond ONLY in this JSON format:
         const suggestions = Array.isArray(parsed.suggestions)
           ? parsed.suggestions.filter((s) => typeof s === "string")
           : [];
-        return { analysis, suggestions };
+        const normalized = suggestions
+          .flatMap((s) =>
+            s
+              .split(/\n+/)
+              .map((line) => line.replace(/^[*-]\s*/, "").trim())
+              .filter(Boolean),
+          );
+        return { analysis, suggestions: normalized };
       };
 
       if (typeof res === "string") {
@@ -317,17 +325,70 @@ Respond ONLY in this JSON format:
     startDraftQueue([draft]);
   };
 
+  const addQuestionToBank = async (text, contact) => {
+    let updated;
+    setQuestions((prev) => {
+      const newQ = {
+        question: text,
+        contacts: contact ? [contact] : [],
+        answers: {},
+        asked: contact ? { [contact]: false } : {},
+      };
+      updated = [...prev, newQ];
+      return updated;
+    });
+    if (uid) {
+      await saveInitiative(uid, initiativeId, {
+        clarifyingQuestions: updated.map((q) => ({ question: q.question })),
+        clarifyingContacts: Object.fromEntries(
+          updated.map((qq, i) => [i, qq.contacts])
+        ),
+        clarifyingAnswers: updated.map((qq) => qq.answers),
+        clarifyingAsked: updated.map((qq) => qq.asked),
+      });
+    }
+  };
+
+  const extractQuestionInfo = (text) => {
+    const lower = text.toLowerCase();
+    const contact =
+      contacts.find((c) => lower.includes(c.name.toLowerCase()))?.name || "";
+    let question = text.trim();
+    if (contact) {
+      const re = new RegExp(String.raw`^\s*ask\s+${contact}\s*(to\s*)?`, "i");
+      question = question.replace(re, "").trim();
+    }
+    return { question: question || text, contact: contact || null };
+  };
+
   const createTasksFromAnalysis = async (name, suggestions) => {
     if (!uid || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
+    const project = projectName || "General";
+    const items = suggestions
+      .flatMap((raw) =>
+        String(raw)
+          .split(/\n+/)
+          .map((line) => line.replace(/^[*-]\s*/, "").trim())
+          .filter(Boolean),
+      );
     try {
-      for (const s of suggestions) {
+      for (const s of items) {
+        const isQuestion = await isQuestionTask(s);
+        if (isQuestion) {
+          const { question, contact: qContact } = extractQuestionInfo(s);
+          await addQuestionToBank(question, qContact || name);
+          continue;
+        }
+        const tag = await classifyTask(s);
         await addDoc(collection(db, "profiles", uid, "taskQueue"), {
           name,
           email,
-          message: `Locate: ${s}`,
+          message: s,
           status: "open",
           createdAt: serverTimestamp(),
+          project,
+          tag,
         });
       }
     } catch (err) {
