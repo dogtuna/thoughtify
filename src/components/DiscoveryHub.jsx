@@ -23,6 +23,42 @@ import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
+const Zap = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+const Layers = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+
 const colorPalette = [
   "#f8d7da",
   "#d1ecf1",
@@ -49,6 +85,7 @@ const DiscoveryHub = () => {
   const [groupBy, setGroupBy] = useState("");
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
   const [taskProjectFilter, setTaskProjectFilter] = useState("all");
+  const [taskContactFilter, setTaskContactFilter] = useState("all");
   const [synergyQueue, setSynergyQueue] = useState([]);
   const [synergyIndex, setSynergyIndex] = useState(0);
   const [synergyText, setSynergyText] = useState("");
@@ -99,6 +136,14 @@ const DiscoveryHub = () => {
     return Array.from(set);
   }, [projectTasks]);
 
+  const taskContacts = useMemo(() => {
+    const set = new Set();
+    projectTasks.forEach((t) => {
+      set.add(t.assignee || t.name || "Unassigned");
+    });
+    return Array.from(set);
+  }, [projectTasks]);
+
   const displayedTasks = useMemo(() => {
     let tasks = projectTasks.filter(
       (t) => taskStatusFilter === "all" || (t.status || "open") === taskStatusFilter
@@ -108,10 +153,14 @@ const DiscoveryHub = () => {
         (t) => (t.project || "General") === taskProjectFilter
       );
     }
+    if (taskContactFilter !== "all") {
+      tasks = tasks.filter(
+        (t) => (t.assignee || t.name || "Unassigned") === taskContactFilter
+      );
+    }
     return tasks;
-  }, [projectTasks, taskStatusFilter, taskProjectFilter]);
+  }, [projectTasks, taskStatusFilter, taskProjectFilter, taskContactFilter]);
 
-  // --- MODIFICATION: Helper for task icons ---
   const taskSubTypeIcon = (subType) => {
     switch (subType) {
       case "meeting":
@@ -462,13 +511,29 @@ Respond ONLY in this JSON format:
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
         { status, statusChangedAt: serverTimestamp(), ...extra }
       );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
     } catch (err) {
       console.error("updateTaskStatus error", err);
     }
+    setPrioritized(null);
   };
 
   const completeTask = (id) => updateTaskStatus(id, "completed");
   const scheduleTask = (id) => updateTaskStatus(id, "scheduled");
+  const deleteTask = async (id) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await deleteDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", id)
+      );
+    } catch (err) {
+      console.error("deleteTask error", err);
+    }
+  };
 
   const computeBundles = () => {
     const map = {};
@@ -572,6 +637,35 @@ Respond ONLY in this JSON format:
       );
     }
     setPrioritized(null);
+  };
+
+  const renderTaskCard = (t, actionButtons) => {
+    const contact = t.assignee || t.name || "Unassigned";
+    const project = t.project || projectName || "General";
+    return (
+      <div
+        key={t.id}
+        className="bg-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-xl p-4 space-y-3"
+      >
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <span className="font-semibold">{contact}</span>
+            <span className="text-sm text-gray-400">{project}</span>
+          </div>
+          {t.tag && (
+            <span
+              className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                tagStyles[t.tag] || tagStyles.default
+              }`}
+            >
+              {t.tag}
+            </span>
+          )}
+        </div>
+        <p className="text-gray-200">{t.message}</p>
+        <div className="flex gap-2">{actionButtons}</div>
+      </div>
+    );
   };
 
   const handleAnswerSubmit = async (idx, name) => {
@@ -1293,55 +1387,60 @@ Respond ONLY in this JSON format:
         // --- MODIFICATION: Revamped project tasks view with AI features ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
-            <div className="flex gap-2 mb-4">
-              <button
-                className="generator-button"
-                disabled={isPrioritizing}
-                onClick={startPrioritize}
-              >
-                {isPrioritizing ? "Prioritizing..." : "Prioritize"}
-              </button>
-              <button className="generator-button" onClick={startSynergy}>
-                Synergize
-              </button>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
+              <h2 className="text-2xl font-bold text-white">Project Tasks</h2>
+              <div className="flex gap-2">
+                <button
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg disabled:bg-indigo-800 disabled:cursor-not-allowed"
+                  disabled={isPrioritizing}
+                  onClick={startPrioritize}
+                >
+                  <Zap className="w-5 h-5" />
+                  {isPrioritizing ? "Prioritizing..." : "Prioritize"}
+                </button>
+                <button
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg"
+                  onClick={startSynergy}
+                >
+                  <Layers className="w-5 h-5" />
+                  Synergize
+                </button>
+              </div>
             </div>
 
             <div className="mb-4 flex flex-wrap gap-2">
-              {["all", ...taskProjects].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setTaskProjectFilter(p)}
-                  className={`px-4 py-1 text-sm rounded-full transition-colors duration-200 ${
-                    taskProjectFilter === p
-                      ? "bg-cyan-500 text-white"
-                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                  }`}
-                >
-                  {p === "all" ? "All Projects" : p}
-                </button>
-              ))}
+              <select
+                value={taskProjectFilter}
+                onChange={(e) => setTaskProjectFilter(e.target.value)}
+                className="bg-gray-700 text-gray-300 rounded-md px-3 py-1"
+              >
+                <option value="all">All Projects</option>
+                {taskProjects.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={taskContactFilter}
+                onChange={(e) => setTaskContactFilter(e.target.value)}
+                className="bg-gray-700 text-gray-300 rounded-md px-3 py-1"
+              >
+                <option value="all">All Contacts</option>
+                {taskContacts.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {prioritized ? (
               <div className="space-y-4">
-                {prioritized.map((t, i) => (
-                  <div
-                    key={t.id}
-                    className="p-4 rounded-lg border border-gray-700 flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="text-white">{t.message}</p>
-                      {t.subType && (
-                        <span
-                          className={`mt-1 inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${
-                            tagStyles[t.subType] || tagStyles.default
-                          }`}
-                        >
-                          {t.subType}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                {prioritized.map((t, i) =>
+                  renderTaskCard(
+                    t,
+                    <>
                       <button
                         className="generator-button"
                         onClick={() => movePriority(i, -1)}
@@ -1366,45 +1465,49 @@ Respond ONLY in this JSON format:
                       >
                         Complete
                       </button>
-                    </div>
-                  </div>
-                ))}
-                <button
-                  className="generator-button"
-                  onClick={savePrioritized}
-                >
+                      <button
+                        className="generator-button"
+                        onClick={() => deleteTask(t.id)}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )
+                )}
+                <button className="generator-button" onClick={savePrioritized}>
                   Save Order
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                {displayedTasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-4 rounded-lg border border-gray-700 flex justify-between items-center"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="task-icon">{taskSubTypeIcon(t.subType)}</span>
-                      <p className="text-white">{t.message}</p>
-                      {t.subType && (
-                        <span
-                          className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
-                            tagStyles[t.subType] || tagStyles.default
-                          }`}
-                        >
-                          {t.subType}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      className="generator-button"
-                      onClick={() => completeTask(t.id)}
-                    >
-                      Complete
-                    </button>
-                  </div>
-                ))}
-                {displayedTasks.length === 0 && <p>No tasks.</p>}
+                {displayedTasks.map((t) =>
+                  renderTaskCard(
+                    t,
+                    <>
+                      <button
+                        className="generator-button"
+                        onClick={() => completeTask(t.id)}
+                      >
+                        Complete
+                      </button>
+                      <button
+                        className="generator-button"
+                        onClick={() => scheduleTask(t.id)}
+                      >
+                        Schedule
+                      </button>
+                      <button
+                        className="generator-button"
+                        onClick={() => deleteTask(t.id)}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )
+                )}
+                {displayedTasks.length === 0 && (
+                  <p className="text-gray-400">No tasks.</p>
+                )}
               </div>
             )}
 
