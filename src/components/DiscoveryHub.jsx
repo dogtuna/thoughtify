@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
-import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+  onSnapshot,
+  updateDoc,
+} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
@@ -33,6 +41,7 @@ const DiscoveryHub = () => {
   const [questions, setQuestions] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [projectTasks, setProjectTasks] = useState([]);
   const [contactFilter, setContactFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
@@ -362,9 +371,8 @@ Respond ONLY in this JSON format:
   };
 
   const createTasksFromAnalysis = async (name, suggestions) => {
-    if (!uid || !suggestions.length) return;
+    if (!uid || !initiativeId || !suggestions.length) return;
     const email = contacts.find((c) => c.name === name)?.email || "";
-    const project = projectName || "General";
     const items = suggestions
       .flatMap((raw) =>
         String(raw)
@@ -381,18 +389,32 @@ Respond ONLY in this JSON format:
           continue;
         }
         const tag = await classifyTask(s);
-        await addDoc(collection(db, "profiles", uid, "taskQueue"), {
-          name,
-          email,
-          message: s,
-          status: "open",
-          createdAt: serverTimestamp(),
-          project,
-          tag,
-        });
+        await addDoc(
+          collection(db, "users", uid, "initiatives", initiativeId, "tasks"),
+          {
+            name,
+            email,
+            message: s,
+            status: "open",
+            createdAt: serverTimestamp(),
+            tag,
+          },
+        );
       }
     } catch (err) {
       console.error("createTasksFromAnalysis error", err);
+    }
+  };
+
+  const completeTask = async (id) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
+        { status: "completed" },
+      );
+    } catch (err) {
+      console.error("completeTask error", err);
     }
   };
 
@@ -489,6 +511,23 @@ Respond ONLY in this JSON format:
     });
     return () => unsubscribe();
   }, [initiativeId]);
+
+  useEffect(() => {
+    if (!uid || !initiativeId) return;
+    const tasksRef = collection(
+      db,
+      "users",
+      uid,
+      "initiatives",
+      initiativeId,
+      "tasks",
+    );
+    const unsub = onSnapshot(tasksRef, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setProjectTasks(list);
+    });
+    return () => unsub();
+  }, [uid, initiativeId]);
 
   const updateAnswer = (idx, name, value) => {
     setQuestions((prev) => {
@@ -932,6 +971,12 @@ Respond ONLY in this JSON format:
             )}
           </li>
           <li
+            className={active === "tasks" ? "active" : ""}
+            onClick={() => setActive("tasks")}
+          >
+            Tasks
+          </li>
+          <li
             className={active === "status" && !viewingStatus ? "active" : ""}
             onClick={() => {
               setActive("status");
@@ -1006,6 +1051,25 @@ Respond ONLY in this JSON format:
               businessGoal={businessGoal}
             />
           )
+        ) : active === "tasks" ? (
+          <div className="tasks-section">
+            <ul className="task-list">
+              {projectTasks.filter((t) => t.status !== "completed").map((t) => (
+                <li key={t.id} className="task-item">
+                  <p>{t.message}</p>
+                  <button
+                    className="generator-button"
+                    onClick={() => completeTask(t.id)}
+                  >
+                    Complete
+                  </button>
+                </li>
+              ))}
+              {projectTasks.filter((t) => t.status !== "completed").length === 0 && (
+                <p>No pending tasks.</p>
+              )}
+            </ul>
+          </div>
         ) : (
           <>
             <div className="filter-bar">
