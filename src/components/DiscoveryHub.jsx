@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import ReactDOM from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
@@ -10,11 +11,12 @@ import {
   serverTimestamp,
   onSnapshot,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
-import ai from "../ai";
+import ai, { generate } from "../ai";
 import { classifyTask } from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
@@ -45,9 +47,13 @@ const DiscoveryHub = () => {
   const [contactFilter, setContactFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
-  // --- MODIFICATION: State for task filtering ---
-  const [taskContactFilter, setTaskContactFilter] = useState("");
-  const [taskGroupBy, setTaskGroupBy] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState("all");
+  const [taskProjectFilter, setTaskProjectFilter] = useState("all");
+  const [synergyQueue, setSynergyQueue] = useState([]);
+  const [synergyIndex, setSynergyIndex] = useState(0);
+  const [synergyText, setSynergyText] = useState("");
+  const [prioritized, setPrioritized] = useState(null);
+  const [isPrioritizing, setIsPrioritizing] = useState(false);
   const [selected, setSelected] = useState([]);
   const [selectMode, setSelectMode] = useState(false);
   const [uid, setUid] = useState(null);
@@ -76,6 +82,34 @@ const DiscoveryHub = () => {
   const [projectConstraints, setProjectConstraints] = useState("");
   const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
+
+  const tagStyles = {
+    email: "bg-green-500/20 text-green-300",
+    call: "bg-sky-500/20 text-sky-300",
+    meeting: "bg-orange-500/20 text-orange-300",
+    research: "bg-fuchsia-500/20 text-fuchsia-300",
+    default: "bg-gray-500/20 text-gray-300",
+  };
+
+  const taskProjects = useMemo(() => {
+    const set = new Set();
+    projectTasks.forEach((t) => {
+      set.add(t.project || "General");
+    });
+    return Array.from(set);
+  }, [projectTasks]);
+
+  const displayedTasks = useMemo(() => {
+    let tasks = projectTasks.filter(
+      (t) => taskStatusFilter === "all" || (t.status || "open") === taskStatusFilter
+    );
+    if (taskProjectFilter !== "all") {
+      tasks = tasks.filter(
+        (t) => (t.project || "General") === taskProjectFilter
+      );
+    }
+    return tasks;
+  }, [projectTasks, taskStatusFilter, taskProjectFilter]);
 
   // --- MODIFICATION: Helper for task icons ---
   const taskSubTypeIcon = (subType) => {
@@ -421,16 +455,123 @@ Respond ONLY in this JSON format:
     }
   };
 
-  const completeTask = async (id) => {
+  const updateTaskStatus = async (id, status, extra = {}) => {
     if (!uid || !initiativeId) return;
     try {
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
-        { status: "completed" }
+        { status, statusChangedAt: serverTimestamp(), ...extra }
       );
     } catch (err) {
-      console.error("completeTask error", err);
+      console.error("updateTaskStatus error", err);
     }
+  };
+
+  const completeTask = (id) => updateTaskStatus(id, "completed");
+  const scheduleTask = (id) => updateTaskStatus(id, "scheduled");
+
+  const computeBundles = () => {
+    const map = {};
+    displayedTasks.forEach((t) => {
+      const key = `${t.project || "General"}-${t.subType || "other"}-${t.assignee || ""}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    });
+    return Object.values(map).filter((b) => b.length > 1);
+  };
+
+  const startSynergy = async () => {
+    const bundles = computeBundles();
+    const proposals = [];
+    for (const b of bundles) {
+      try {
+        const { text } = await generate(
+          `Combine the following tasks into one task description:\n${b
+            .map((t) => `- ${t.message}`)
+            .join("\n")}`
+        );
+        proposals.push({ bundle: b, text: text.trim() });
+      } catch (err) {
+        console.error("synergize", err);
+        proposals.push({ bundle: b, text: b.map((t) => t.message).join(" ") });
+      }
+    }
+    if (proposals.length) {
+      setSynergyQueue(proposals);
+      setSynergyIndex(0);
+      setSynergyText(proposals[0].text);
+    }
+  };
+
+  const nextSynergy = () => {
+    const next = synergyIndex + 1;
+    if (next < synergyQueue.length) {
+      setSynergyIndex(next);
+      setSynergyText(synergyQueue[next].text);
+    } else {
+      setSynergyQueue([]);
+      setSynergyIndex(0);
+      setSynergyText("");
+    }
+  };
+
+  const handleSynergize = async (bundle, message) => {
+    if (!uid || !initiativeId || !bundle.length) return;
+    const [first, ...rest] = bundle;
+    await updateDoc(
+      doc(db, "users", uid, "initiatives", initiativeId, "tasks", first.id),
+      { message }
+    );
+    for (const t of rest) {
+      await deleteDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", t.id)
+      );
+    }
+    nextSynergy();
+  };
+
+  const startPrioritize = async () => {
+    setIsPrioritizing(true);
+    try {
+      const { text } = await generate(
+        `Order the following tasks by priority and return a JSON array of ids in order:\n${displayedTasks
+          .map((t) => `${t.id}: ${t.message}`)
+          .join("\n")}`
+      );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
+    } catch (err) {
+      console.error("prioritize", err);
+      setPrioritized([...displayedTasks]);
+    } finally {
+      setIsPrioritizing(false);
+    }
+  };
+
+  const movePriority = (index, delta) => {
+    setPrioritized((prev) => {
+      const arr = [...prev];
+      const next = index + delta;
+      if (next < 0 || next >= arr.length) return arr;
+      const tmp = arr[index];
+      arr[index] = arr[next];
+      arr[next] = tmp;
+      return arr;
+    });
+  };
+
+  const savePrioritized = async () => {
+    if (!uid || !initiativeId || !prioritized) return;
+    for (let i = 0; i < prioritized.length; i++) {
+      await updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", prioritized[i].id),
+        { order: i }
+      );
+    }
+    setPrioritized(null);
   };
 
   const handleAnswerSubmit = async (idx, name) => {
@@ -901,30 +1042,6 @@ Respond ONLY in this JSON format:
   const statusLabel = (s) =>
     s === "toask" ? "To Ask" : s === "asked" ? "Asked" : "Answered";
   
-  // --- MODIFICATION: Logic for filtering and grouping tasks ---
-  const getDisplayedTasks = () => {
-    let tasks = projectTasks.filter((t) => t.status !== "completed");
-  
-    if (taskContactFilter) {
-      tasks = tasks.filter((t) => t.assignee === taskContactFilter);
-    }
-  
-    if (taskGroupBy === "contact") {
-      const grouped = tasks.reduce((acc, task) => {
-        const key = task.assignee || "Unassigned";
-        if (!acc[key]) {
-          acc[key] = [];
-        }
-        acc[key].push(task);
-        return acc;
-      }, {});
-      return grouped;
-    }
-  
-    return { All: tasks };
-  };
-  const displayedTaskGroups = getDisplayedTasks();
-
   const items = [];
   questions.forEach((q, idx) => {
     const toAskNames = q.contacts.filter((n) => !q.asked[n]);
@@ -1062,11 +1179,41 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
-          <li
-            className={active === "tasks" ? "active" : ""}
-            onClick={() => setActive("tasks")}
-          >
-            Tasks
+          <li className={active === "tasks" ? "active" : ""}>
+            <span
+              onClick={() => setActive("tasks")}
+              className="cursor-pointer"
+            >
+              Tasks
+            </span>
+            {active === "tasks" && (
+              <ul className="sub-menu">
+                <li
+                  className={taskStatusFilter === "all" ? "active" : ""}
+                  onClick={() => setTaskStatusFilter("all")}
+                >
+                  All Tasks
+                </li>
+                <li
+                  className={taskStatusFilter === "open" ? "active" : ""}
+                  onClick={() => setTaskStatusFilter("open")}
+                >
+                  Open Tasks
+                </li>
+                <li
+                  className={taskStatusFilter === "scheduled" ? "active" : ""}
+                  onClick={() => setTaskStatusFilter("scheduled")}
+                >
+                  Scheduled Tasks
+                </li>
+                <li
+                  className={taskStatusFilter === "completed" ? "active" : ""}
+                  onClick={() => setTaskStatusFilter("completed")}
+                >
+                  Completed Tasks
+                </li>
+              </ul>
+            )}
           </li>
           <li
             className={active === "status" && !viewingStatus ? "active" : ""}
@@ -1143,73 +1290,156 @@ Respond ONLY in this JSON format:
               businessGoal={businessGoal}
             />
           )
-        // --- MODIFICATION: Revamped tasks view with filtering and grouping ---
+        // --- MODIFICATION: Revamped project tasks view with AI features ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
-            <div className="filter-bar">
-              <label>
-                Contact:
-                <select
-                  value={taskContactFilter}
-                  onChange={(e) => setTaskContactFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  {contacts.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                   <option value="Project Manager">Project Manager</option>
-                   <option value="Unassigned">Unassigned</option>
-                </select>
-              </label>
-              <label>
-                Group by:
-                <select
-                  value={taskGroupBy}
-                  onChange={(e) => setTaskGroupBy(e.target.value)}
-                >
-                  <option value="">None</option>
-                  <option value="contact">Contact</option>
-                </select>
-              </label>
+            <div className="flex gap-2 mb-4">
+              <button
+                className="generator-button"
+                disabled={isPrioritizing}
+                onClick={startPrioritize}
+              >
+                {isPrioritizing ? "Prioritizing..." : "Prioritize"}
+              </button>
+              <button className="generator-button" onClick={startSynergy}>
+                Synergize
+              </button>
             </div>
 
-            {Object.entries(displayedTaskGroups).map(([groupName, tasks]) => (
-              <div key={groupName} className="group-section">
-                {taskGroupBy && <h3>{groupName}</h3>}
-                {tasks.length > 0 ? (
-                  <ul className="task-list">
-                    {tasks.map((t) => (
-                      <li key={t.id} className="task-item">
-                        <div className="task-header">
-                           <span className="task-icon">{taskSubTypeIcon(t.subType)}</span>
-                           {t.assignee && t.assignee !== "Unassigned" && (
-                             <span
-                              className="contact-tag"
-                              style={{ backgroundColor: getColor(t.assignee) }}
-                             >
-                              {t.assignee}
-                             </span>
-                           )}
-                        </div>
-                        <p>{t.message}</p>
-                        <button
-                          className="generator-button"
-                          onClick={() => completeTask(t.id)}
+            <div className="mb-4 flex flex-wrap gap-2">
+              {["all", ...taskProjects].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setTaskProjectFilter(p)}
+                  className={`px-4 py-1 text-sm rounded-full transition-colors duration-200 ${
+                    taskProjectFilter === p
+                      ? "bg-cyan-500 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  {p === "all" ? "All Projects" : p}
+                </button>
+              ))}
+            </div>
+
+            {prioritized ? (
+              <div className="space-y-4">
+                {prioritized.map((t, i) => (
+                  <div
+                    key={t.id}
+                    className="p-4 rounded-lg border border-gray-700 flex justify-between items-center"
+                  >
+                    <div>
+                      <p className="text-white">{t.message}</p>
+                      {t.subType && (
+                        <span
+                          className={`mt-1 inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            tagStyles[t.subType] || tagStyles.default
+                          }`}
                         >
-                          Complete
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No pending tasks for this group.</p>
-                )}
+                          {t.subType}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        className="generator-button"
+                        onClick={() => movePriority(i, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        className="generator-button"
+                        onClick={() => movePriority(i, 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        className="generator-button"
+                        onClick={() => scheduleTask(t.id)}
+                      >
+                        Schedule
+                      </button>
+                      <button
+                        className="generator-button"
+                        onClick={() => completeTask(t.id)}
+                      >
+                        Complete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  className="generator-button"
+                  onClick={savePrioritized}
+                >
+                  Save Order
+                </button>
               </div>
-            ))}
-            {projectTasks.filter((t) => t.status !== "completed").length === 0 && (
-                <p>No pending tasks.</p>
+            ) : (
+              <div className="space-y-4">
+                {displayedTasks.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-4 rounded-lg border border-gray-700 flex justify-between items-center"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="task-icon">{taskSubTypeIcon(t.subType)}</span>
+                      <p className="text-white">{t.message}</p>
+                      {t.subType && (
+                        <span
+                          className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            tagStyles[t.subType] || tagStyles.default
+                          }`}
+                        >
+                          {t.subType}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      className="generator-button"
+                      onClick={() => completeTask(t.id)}
+                    >
+                      Complete
+                    </button>
+                  </div>
+                ))}
+                {displayedTasks.length === 0 && <p>No tasks.</p>}
+              </div>
+            )}
+
+            {synergyQueue.length > 0 &&
+              ReactDOM.createPortal(
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+                  <div className="bg-white text-black rounded-lg p-6 w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-2">Synergize Tasks</h3>
+                    <ul className="list-disc list-inside mb-4 text-sm">
+                      {synergyQueue[synergyIndex].bundle.map((t) => (
+                        <li key={t.id}>{t.message}</li>
+                      ))}
+                    </ul>
+                    <textarea
+                      className="w-full border p-2 mb-4"
+                      value={synergyText}
+                      onChange={(e) => setSynergyText(e.target.value)}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        className="generator-button"
+                        onClick={nextSynergy}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        className="generator-button"
+                        onClick={() => handleSynergize(synergyQueue[synergyIndex].bundle, synergyText)}
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body
               )}
           </div>
         ) : (
