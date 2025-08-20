@@ -2,13 +2,26 @@
 import { useState, useMemo } from "react";
 import ReactDOM from "react-dom";
 import PropTypes from "prop-types";
+import { generate } from "../ai";
 import "../pages/admin.css";
 
-export default function TaskQueue({ tasks, inquiries, onComplete, onReplyTask, onDelete }) {
+export default function TaskQueue({
+  tasks,
+  inquiries,
+  onComplete,
+  onReplyTask,
+  onDelete,
+  onSchedule,
+  onSynergize,
+}) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
+  const [synergyQueue, setSynergyQueue] = useState([]);
+  const [synergyIndex, setSynergyIndex] = useState(0);
+  const [synergyText, setSynergyText] = useState("");
+  const [prioritized, setPrioritized] = useState(null);
 
   const projects = useMemo(() => {
     const set = new Set();
@@ -37,6 +50,82 @@ export default function TaskQueue({ tasks, inquiries, onComplete, onReplyTask, o
     }, {});
   }, [filteredTasks]);
 
+  const computeBundles = () => {
+    const map = {};
+    tasks.forEach((t) => {
+      const key = `${t.project || "General"}-${t.tag || "other"}-${t.name || ""}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    });
+    return Object.values(map).filter((b) => b.length > 1);
+  };
+
+  const startSynergy = async () => {
+    const bundles = computeBundles();
+    const proposals = [];
+    for (const b of bundles) {
+      try {
+        const { text } = await generate(
+          `Combine the following tasks into one task description:\n${b
+            .map((t) => `- ${t.message}`)
+            .join("\n")}`
+        );
+        proposals.push({ bundle: b, text: text.trim() });
+      } catch (err) {
+        console.error("synergize", err);
+        proposals.push({ bundle: b, text: b.map((t) => t.message).join(" ") });
+      }
+    }
+    if (proposals.length) {
+      setSynergyQueue(proposals);
+      setSynergyIndex(0);
+      setSynergyText(proposals[0].text);
+    }
+  };
+
+  const nextSynergy = () => {
+    const next = synergyIndex + 1;
+    if (next < synergyQueue.length) {
+      setSynergyIndex(next);
+      setSynergyText(synergyQueue[next].text);
+    } else {
+      setSynergyQueue([]);
+      setSynergyIndex(0);
+      setSynergyText("");
+    }
+  };
+
+  const startPrioritize = async () => {
+    try {
+      const { text } = await generate(
+        `Order the following tasks by priority and return a JSON array of ids in order:\n${tasks
+          .map((t) => `${t.id}: ${t.message}`)
+          .join("\n")}`
+      );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => tasks.find((t) => t.id === id))
+        .filter(Boolean);
+      if (ordered.length) {
+        setPrioritized(ordered);
+        return;
+      }
+    } catch (err) {
+      console.error("prioritize", err);
+    }
+    setPrioritized([...tasks]);
+  };
+
+  const movePriority = (index, delta) => {
+    setPrioritized((prev) => {
+      const arr = [...prev];
+      const next = index + delta;
+      if (next < 0 || next >= arr.length) return arr;
+      [arr[index], arr[next]] = [arr[next], arr[index]];
+      return arr;
+    });
+  };
+
   const renderTask = (task) => (
     <li key={task.id} className="task-item">
       <strong>
@@ -48,6 +137,11 @@ export default function TaskQueue({ tasks, inquiries, onComplete, onReplyTask, o
         <button className="complete-button" onClick={() => onComplete(task)}>
           Complete
         </button>
+        {onSchedule && (
+          <button className="task-button" onClick={() => onSchedule(task)}>
+            Schedule
+          </button>
+        )}
         <button
           className="reply-button"
           onClick={() => {
@@ -67,6 +161,15 @@ export default function TaskQueue({ tasks, inquiries, onComplete, onReplyTask, o
   return (
     <div className="card glass-card">
       <h2>Task Queue</h2>
+
+      <div className="task-global-actions">
+        <button className="reply-button" onClick={startSynergy}>
+          Synergize Tasks
+        </button>
+        <button className="task-button" onClick={startPrioritize}>
+          Prioritize Tasks
+        </button>
+      </div>
 
       <div className="filter-row">
         <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
@@ -184,6 +287,116 @@ export default function TaskQueue({ tasks, inquiries, onComplete, onReplyTask, o
           </div>,
           document.body
         )}
+
+      {synergyQueue.length > 0 &&
+        ReactDOM.createPortal(
+          <div className="modal-overlay">
+            <div className="task-modal">
+              <h3>Synergize Tasks</h3>
+              <ul className="task-list">
+                {synergyQueue[synergyIndex].bundle.map((t) => (
+                  <li key={t.id}>{t.message}</li>
+                ))}
+              </ul>
+              <textarea
+                value={synergyText}
+                onChange={(e) => setSynergyText(e.target.value)}
+                style={{ width: "100%", height: "80px", marginBottom: "10px" }}
+              />
+              <div className="modal-buttons">
+                <button
+                  className="reply-button"
+                  onClick={() => {
+                    onSynergize(
+                      synergyQueue[synergyIndex].bundle,
+                      synergyText
+                    );
+                    nextSynergy();
+                  }}
+                >
+                  Approve
+                </button>
+                <button className="complete-button" onClick={nextSynergy}>
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {prioritized &&
+        ReactDOM.createPortal(
+          <div className="modal-overlay">
+            <div className="task-modal">
+              <h3>Prioritized Tasks</h3>
+              <ul className="task-list">
+                {prioritized.map((task, idx) => (
+                  <li key={task.id} className="task-item">
+                    <strong>
+                      {task.name} ({task.email})
+                    </strong>
+                    {task.tag && (
+                      <span className={`tag-badge tag-${task.tag}`}>{task.tag}</span>
+                    )}
+                    <p>{task.message}</p>
+                    <div className="task-actions">
+                      <button
+                        className="task-button"
+                        disabled={idx === 0}
+                        onClick={() => movePriority(idx, -1)}
+                      >
+                        Up
+                      </button>
+                      <button
+                        className="task-button"
+                        disabled={idx === prioritized.length - 1}
+                        onClick={() => movePriority(idx, 1)}
+                      >
+                        Down
+                      </button>
+                      {onSchedule && (
+                        <button
+                          className="task-button"
+                          onClick={() => onSchedule(task)}
+                        >
+                          Schedule
+                        </button>
+                      )}
+                      <button
+                        className="complete-button"
+                        onClick={() => onComplete(task)}
+                      >
+                        Complete
+                      </button>
+                      <button
+                        className="reply-button"
+                        onClick={() => {
+                          setSelectedItem(task);
+                          setReplyText("");
+                        }}
+                      >
+                        Reply
+                      </button>
+                      <button
+                        className="delete-button"
+                        onClick={() => onDelete(task.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="modal-buttons">
+                <button className="close-button" onClick={() => setPrioritized(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
@@ -194,4 +407,6 @@ TaskQueue.propTypes = {
   onComplete: PropTypes.func.isRequired,
   onReplyTask: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
+  onSchedule: PropTypes.func,
+  onSynergize: PropTypes.func,
 };

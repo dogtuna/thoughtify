@@ -2,8 +2,15 @@ import { useEffect, useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import PropTypes from "prop-types";
 import { signOut, getAuth } from "firebase/auth";
-import { 
-  collection, getDocs, deleteDoc, doc, addDoc, updateDoc, serverTimestamp, onSnapshot, query, where 
+import {
+  collection,
+  getDocs,
+  deleteDoc,
+  doc,
+  addDoc,
+  updateDoc,
+  serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import TaskQueue from "../components/TaskQueue";
@@ -80,10 +87,8 @@ export default function AdminDashboard({ user }) {
       );
   
 // Fetch tasks from the current user's profile subcollection "taskQueue"
-// that are not completed
 const profileTasksRef = collection(db, "profiles", user.uid, "taskQueue");
-const tasksQuery = query(profileTasksRef, where("status", "!=", "completed"));
-const taskSnap = await getDocs(tasksQuery);
+const taskSnap = await getDocs(profileTasksRef);
 console.log("Fetched tasks from user profile:", taskSnap);
 setTasks(taskSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   
@@ -284,7 +289,11 @@ Thoughtify Training Team`;
   const handleReplyTask = async (task, replyText) => {
     try {
       // Update the task with the reply text in Firestore
-      await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), { reply: replyText, status: "open" });
+      await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), {
+        reply: replyText,
+        status: "open",
+        statusChangedAt: serverTimestamp(),
+      });
 
   
       // Call the Cloud Function to send the email reply
@@ -342,7 +351,11 @@ Thoughtify Training Team`;
 
   const handleCompleteTask = async (task) => {
     try {
-      await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), { completed: true, status: "completed" });
+      await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), {
+        completed: true,
+        status: "completed",
+        statusChangedAt: serverTimestamp(),
+      });
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
   
       const xAPICompleteTask = {

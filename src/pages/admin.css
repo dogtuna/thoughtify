@@ -321,3 +321,44 @@
   .reply-button:hover {
     background-color: #FB852A;
   }
+
+  /* Tasks view layout */
+  .tasks-view {
+    display: flex;
+    gap: 20px;
+  }
+
+  .tasks-sidebar {
+    width: 180px;
+  }
+
+  .tasks-sidebar ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .tasks-sidebar li {
+    margin-bottom: 10px;
+  }
+
+  .tasks-sidebar button {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: white;
+    text-align: left;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .tasks-sidebar button.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    font-weight: bold;
+  }
+
+  .task-global-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }

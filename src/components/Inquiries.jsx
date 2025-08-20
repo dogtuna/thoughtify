@@ -128,6 +128,7 @@ export default function NewInquiries({ user, openReplyModal }) {
       const { id, ...inquiryData } = inquiry;
       inquiryData.status = "claimed";
       inquiryData.movedAt = serverTimestamp();
+      inquiryData.statusChangedAt = serverTimestamp();
       inquiryData.project = project;
       inquiryData.tag = tag;
 
