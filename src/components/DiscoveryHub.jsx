@@ -668,6 +668,149 @@ Respond ONLY in this JSON format:
     );
   };
 
+  const completeTask = (id) => updateTaskStatus(id, "completed");
+  const scheduleTask = (id) => updateTaskStatus(id, "scheduled");
+  const deleteTask = async (id) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await deleteDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", id)
+      );
+    } catch (err) {
+      console.error("deleteTask error", err);
+    }
+  };
+
+  const computeBundles = () => {
+    const map = {};
+    displayedTasks.forEach((t) => {
+      const key = `${t.project || "General"}-${t.subType || "other"}-${t.assignee || ""}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    });
+    return Object.values(map).filter((b) => b.length > 1);
+  };
+
+  const startSynergy = async () => {
+    const bundles = computeBundles();
+    const proposals = [];
+    for (const b of bundles) {
+      try {
+        const { text } = await generate(
+          `Combine the following tasks into one task description:\n${b
+            .map((t) => `- ${t.message}`)
+            .join("\n")}`
+        );
+        proposals.push({ bundle: b, text: text.trim() });
+      } catch (err) {
+        console.error("synergize", err);
+        proposals.push({ bundle: b, text: b.map((t) => t.message).join(" ") });
+      }
+    }
+    if (proposals.length) {
+      setSynergyQueue(proposals);
+      setSynergyIndex(0);
+      setSynergyText(proposals[0].text);
+    }
+  };
+
+  const nextSynergy = () => {
+    const next = synergyIndex + 1;
+    if (next < synergyQueue.length) {
+      setSynergyIndex(next);
+      setSynergyText(synergyQueue[next].text);
+    } else {
+      setSynergyQueue([]);
+      setSynergyIndex(0);
+      setSynergyText("");
+    }
+  };
+
+  const handleSynergize = async (bundle, message) => {
+    if (!uid || !initiativeId || !bundle.length) return;
+    const [first, ...rest] = bundle;
+    await updateDoc(
+      doc(db, "users", uid, "initiatives", initiativeId, "tasks", first.id),
+      { message }
+    );
+    for (const t of rest) {
+      await deleteDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", t.id)
+      );
+    }
+    nextSynergy();
+  };
+
+  const startPrioritize = async () => {
+    setIsPrioritizing(true);
+    try {
+      const { text } = await generate(
+        `Order the following tasks by priority and return a JSON array of ids in order:\n${displayedTasks
+          .map((t) => `${t.id}: ${t.message}`)
+          .join("\n")}`
+      );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
+    } catch (err) {
+      console.error("prioritize", err);
+      setPrioritized([...displayedTasks]);
+    } finally {
+      setIsPrioritizing(false);
+    }
+  };
+
+  const movePriority = (index, delta) => {
+    setPrioritized((prev) => {
+      const arr = [...prev];
+      const next = index + delta;
+      if (next < 0 || next >= arr.length) return arr;
+      const tmp = arr[index];
+      arr[index] = arr[next];
+      arr[next] = tmp;
+      return arr;
+    });
+  };
+
+  const savePrioritized = async () => {
+    if (!uid || !initiativeId || !prioritized) return;
+    for (let i = 0; i < prioritized.length; i++) {
+      await updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", prioritized[i].id),
+        { order: i }
+      );
+    }
+    setPrioritized(null);
+  };
+
+  const renderTaskCard = (t, actionButtons) => {
+    const contact = t.assignee || t.name || "Unassigned";
+    const project = t.project || projectName || "General";
+    return (
+      <div key={t.id} className="initiative-card space-y-3">
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <span className="font-semibold">{contact}</span>
+            <span className="text-sm opacity-75">{project}</span>
+          </div>
+          {t.tag && (
+            <span
+              className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                tagStyles[t.tag] || tagStyles.default
+              }`}
+            >
+              {t.tag}
+            </span>
+          )}
+        </div>
+        <p>{t.message}</p>
+        <div className="flex gap-2">{actionButtons}</div>
+      </div>
+    );
+  };
+
   const handleAnswerSubmit = async (idx, name) => {
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
@@ -1387,11 +1530,11 @@ Respond ONLY in this JSON format:
         // --- MODIFICATION: Revamped project tasks view with AI features ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-white">Project Tasks</h2>
               <div className="flex gap-2">
                 <button
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg disabled:bg-indigo-800 disabled:cursor-not-allowed"
+                  className="flex w-32 items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg disabled:bg-indigo-800 disabled:cursor-not-allowed"
                   disabled={isPrioritizing}
                   onClick={startPrioritize}
                 >
@@ -1399,7 +1542,8 @@ Respond ONLY in this JSON format:
                   {isPrioritizing ? "Prioritizing..." : "Prioritize"}
                 </button>
                 <button
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg"
+                  className="flex w-32 items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg"
+
                   onClick={startSynergy}
                 >
                   <Layers className="w-5 h-5" />
