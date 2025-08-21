@@ -444,18 +444,24 @@ Respond ONLY in this JSON format:
 
     try {
       for (const s of suggestions) {
-        const match = contacts.find(
-          (c) =>
-            c.name.toLowerCase() === (s.assignee || "").toLowerCase() ||
-            (c.role || "").toLowerCase() === (s.assignee || "").toLowerCase()
+        const lowerText = s.text.toLowerCase();
+        let match = contacts.find((c) =>
+          lowerText.includes(c.name.toLowerCase())
         );
+        if (!match) {
+          match = contacts.find(
+            (c) =>
+              c.name.toLowerCase() === (s.assignee || "").toLowerCase() ||
+              (c.role || "").toLowerCase() === (s.assignee || "").toLowerCase()
+          );
+        }
 
         if (s.type === "question") {
-          const assignedContact = s.assignee
-            ? match
-              ? match.name
-              : s.assignee
-            : name;
+          const assignedContact = match
+            ? match.name
+            : s.assignee
+              ? s.assignee
+              : name;
 
           questionsToAdd.push({
             question: s.text,
