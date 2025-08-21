@@ -23,7 +23,6 @@ export default function TaskQueue({
   const [tagFilter, setTagFilter] = useState("all");
   const [synergyQueue, setSynergyQueue] = useState([]);
   const [synergyIndex, setSynergyIndex] = useState(0);
-  const [synergyText, setSynergyText] = useState("");
   const [prioritized, setPrioritized] = useState(null);
 
   const projects = useMemo(() => {
@@ -130,33 +129,42 @@ export default function TaskQueue({
   const computeBundles = () => {
     const map = {};
     tasks.forEach((t) => {
-      const key = `${t.project || "General"}-${t.tag || "other"}-${t.name || ""}`;
+      const key = `${t.assignee || t.name || ""}-${
+        t.subType || t.tag || "other"
+      }`;
       if (!map[key]) map[key] = [];
       map[key].push(t);
     });
     return Object.values(map).filter((b) => b.length > 1);
   };
 
-  const startSynergy = async () => {
+  const startSynergy = () => {
     const bundles = computeBundles();
-    const proposals = [];
-    for (const b of bundles) {
-      try {
-        const { text } = await generate(
-          `Combine the following tasks into one task description:\n${b
-            .map((t) => `- ${t.message}`)
-            .join("\n")}`
-        );
-        proposals.push({ bundle: b, text: text.trim() });
-      } catch (err) {
-        console.error("synergize", err);
-        proposals.push({ bundle: b, text: b.map((t) => t.message).join(" ") });
+    const proposals = bundles.map((b) => {
+      const first = b[0];
+      const assignee = first.assignee || first.name || "";
+      const type = first.subType || first.tag || "";
+      let header;
+      switch (type) {
+        case "email":
+          header = `Send an email to ${assignee}`;
+          break;
+        case "meeting":
+          header = `Set up a meeting with ${assignee}`;
+          break;
+        case "call":
+          header = `Call ${assignee}`;
+          break;
+        default:
+          header = `Work with ${assignee}`;
       }
-    }
+      const bullets = b.map((t) => t.message);
+      const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
+      return { bundle: b, text, header, bullets };
+    });
     if (proposals.length) {
       setSynergyQueue(proposals);
       setSynergyIndex(0);
-      setSynergyText(proposals[0].text);
     }
   };
 
@@ -164,11 +172,9 @@ export default function TaskQueue({
     const next = synergyIndex + 1;
     if (next < synergyQueue.length) {
       setSynergyIndex(next);
-      setSynergyText(synergyQueue[next].text);
     } else {
       setSynergyQueue([]);
       setSynergyIndex(0);
-      setSynergyText("");
     }
   };
 
@@ -374,23 +380,19 @@ export default function TaskQueue({
           <div className="modal-overlay">
             <div className="task-modal">
               <h3>Synergize Tasks</h3>
+              <h4>{synergyQueue[synergyIndex].header}</h4>
               <ul className="task-list">
-                {synergyQueue[synergyIndex].bundle.map((t) => (
-                  <li key={t.id}>{t.message}</li>
+                {synergyQueue[synergyIndex].bullets.map((m, idx) => (
+                  <li key={idx}>{m}</li>
                 ))}
               </ul>
-              <textarea
-                value={synergyText}
-                onChange={(e) => setSynergyText(e.target.value)}
-                style={{ width: "100%", height: "80px", marginBottom: "10px" }}
-              />
               <div className="modal-buttons">
                 <button
                   className="reply-button"
-                  onClick={() => {
-                    handleSynergize(
+                  onClick={async () => {
+                    await handleSynergize(
                       synergyQueue[synergyIndex].bundle,
-                      synergyText
+                      synergyQueue[synergyIndex].text
                     );
                     nextSynergy();
                   }}
