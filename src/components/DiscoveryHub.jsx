@@ -121,11 +121,11 @@ const DiscoveryHub = () => {
   const navigate = useNavigate();
 
   const tagStyles = {
-    email: "bg-green-500/20 text-green-300",
-    call: "bg-sky-500/20 text-sky-300",
-    meeting: "bg-orange-500/20 text-orange-300",
-    research: "bg-fuchsia-500/20 text-fuchsia-300",
-    default: "bg-gray-500/20 text-gray-300",
+    email: "bg-green-800 text-green-200",
+    call: "bg-cyan-800 text-cyan-200",
+    meeting: "bg-amber-800 text-amber-200",
+    research: "bg-fuchsia-800 text-fuchsia-200",
+    default: "bg-gray-700 text-gray-300",
   };
 
   const taskProjects = useMemo(() => {
@@ -640,21 +640,19 @@ Respond ONLY in this JSON format:
     const contact = t.assignee || t.name || "Unassigned";
     const project = t.project || projectName || "General";
     return (
-      <div key={t.id} className="initiative-card space-y-3">
-        <div className="flex justify-between items-center">
-          <div className="flex gap-2">
-            <span className="font-semibold">{contact}</span>
-            <span className="text-sm opacity-75">{project}</span>
-          </div>
-          {t.tag && (
-            <span
-              className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                tagStyles[t.tag] || tagStyles.default
-              }`}
-            >
-              {t.tag}
-            </span>
-          )}
+      <div key={t.id} className="relative initiative-card space-y-3">
+        {t.tag && (
+          <span
+            className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold ${
+              tagStyles[t.tag] || tagStyles.default
+            }`}
+          >
+            {t.tag}
+          </span>
+        )}
+        <div className="flex flex-col">
+          <span className="text-lg font-semibold">{contact}</span>
+          <span className="text-sm opacity-75">{project}</span>
         </div>
         <p>{t.message}</p>
         <div className="flex gap-2">{actionButtons}</div>
@@ -1382,12 +1380,10 @@ Respond ONLY in this JSON format:
         ) : active === "tasks" ? (
   <div className="flex w-full flex-col gap-4">
     {/* Header: Title on the left, buttons on the right */}
-    <div className="w-full flex flex-nowrap items-center gap-4 min-w-0">
-  <h2 className="m-0 min-w-0 flex-1 truncate text-2xl font-bold text-white">
-    Project Tasks
-  </h2>
+    <div className="flex w-full items-center justify-between gap-4">
+      <h2 className="m-0 text-2xl font-bold text-white">Project Tasks</h2>
 
-  <div className="ml-auto flex shrink-0 items-center gap-3 whitespace-nowrap">
+      <div className="flex shrink-0 items-center gap-3">
     <button
       type="button"
       className="appearance-none flex w-36 items-center justify-center gap-2 rounded-lg px-4 py-2 font-semibold text-white shadow
