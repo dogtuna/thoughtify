@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -33,7 +33,16 @@ const Tasks = () => {
     };
   }, [user]);
 
-  return <TaskQueue tasks={tasks} inquiries={inquiries} />;
+  return (
+    <div className="tasks-view">
+      <TaskSidebar statusFilter={statusFilter} onChange={setStatusFilter} />
+      <TaskQueue
+        tasks={tasks}
+        inquiries={inquiries}
+        statusFilter={statusFilter}
+      />
+    </div>
+  );
 };
 
 export default Tasks;
