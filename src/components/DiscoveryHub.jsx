@@ -94,6 +94,7 @@ const DiscoveryHub = () => {
   const [selected, setSelected] = useState([]);
   const [selectMode, setSelectMode] = useState(false);
   const [uid, setUid] = useState(null);
+  const [currentUserName, setCurrentUserName] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [active, setActive] = useState("questions");
   const [summary, setSummary] = useState("");
@@ -102,6 +103,7 @@ const DiscoveryHub = () => {
   const [menu, setMenu] = useState(null);
   const [focusRole, setFocusRole] = useState("");
   const [editData, setEditData] = useState(null);
+  const [editTask, setEditTask] = useState(null);
   const [emailConnected, setEmailConnected] = useState(false);
   const [emailDraft, setEmailDraft] = useState(null);
   const [generatingEmail, setGeneratingEmail] = useState(false);
@@ -131,7 +133,16 @@ const DiscoveryHub = () => {
   const taskContacts = useMemo(() => {
     const set = new Set();
     projectTasks.forEach((t) => {
-      set.add(t.assignee || t.name || "Unassigned");
+      const assignee = t.assignee || currentUserName;
+      set.add(assignee === currentUserName ? "My Tasks" : assignee);
+    });
+    return Array.from(set);
+  }, [projectTasks, currentUserName]);
+
+  const taskTypes = useMemo(() => {
+    const set = new Set();
+    projectTasks.forEach((t) => {
+      set.add(t.subType || "other");
     });
     return Array.from(set);
   }, [projectTasks]);
@@ -154,9 +165,14 @@ const DiscoveryHub = () => {
       );
     }
     if (taskContactFilter !== "all") {
-      tasks = tasks.filter(
-        (t) => (t.assignee || t.name || "Unassigned") === taskContactFilter
-      );
+      tasks = tasks.filter((t) => {
+        const assignee = t.assignee || currentUserName;
+        const label = assignee === currentUserName ? "My Tasks" : assignee;
+        return label === taskContactFilter;
+      });
+    }
+    if (taskTypeFilter !== "all") {
+      tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
     }
     if (taskTypeFilter !== "all") {
       tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
@@ -168,7 +184,19 @@ const DiscoveryHub = () => {
     taskProjectFilter,
     taskContactFilter,
     taskTypeFilter,
+    currentUserName,
   ]);
+
+  const tasksByAssignee = useMemo(() => {
+    const map = {};
+    displayedTasks.forEach((t) => {
+      const assignee = t.assignee || currentUserName;
+      const label = assignee === currentUserName ? "My Tasks" : assignee;
+      if (!map[label]) map[label] = [];
+      map[label].push(t);
+    });
+    return map;
+  }, [displayedTasks, currentUserName]);
 
   const taskSubTypeIcon = (subType) => {
     switch (subType) {
@@ -494,11 +522,7 @@ Respond ONLY in this JSON format:
         }
 
         if (s.type === "question") {
-          const assignedContact = match
-            ? match.name
-            : s.assignee
-              ? s.assignee
-              : name;
+          const assignedContact = match ? match.name : name;
 
           questionsToAdd.push({
             question: s.text,
@@ -511,7 +535,7 @@ Respond ONLY in this JSON format:
           const tag = await classifyTask(s.text);
           const assignee = match
             ? match.name
-            : s.assignee || "Unassigned";
+            : currentUserName;
           // --- MODIFICATION: Save assignee and subType with the task ---
           tasksToAdd.push({
             name,
@@ -585,16 +609,79 @@ Respond ONLY in this JSON format:
 
   const handleSubTaskToggle = async (taskId, index, completed) => {
     if (!uid || !initiativeId) return;
+    const task = projectTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const updated = task.subTasks.map((st, i) =>
+      i === index
+        ? {
+            ...st,
+            completed,
+            completedAt: completed ? serverTimestamp() : null,
+          }
+        : st
+    );
     try {
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
-        {
-          [`subTasks.${index}.completed`]: completed,
-          [`subTasks.${index}.completedAt`]: completed ? serverTimestamp() : null,
-        }
+        { subTasks: updated }
       );
     } catch (err) {
       console.error("handleSubTaskToggle error", err);
+    }
+  };
+
+  const openEditModal = (task) => {
+    setEditTask({
+      id: task.id,
+      assignee: task.assignee || currentUserName,
+      subType: task.subType || "task",
+      subTasks: task.subTasks ? task.subTasks.map((st) => ({ ...st })) : [],
+    });
+  };
+
+  const updateEditTaskField = (field, value) => {
+    setEditTask((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const addEditSubTask = () => {
+    setEditTask((prev) => ({
+      ...prev,
+      subTasks: [...(prev.subTasks || []), { text: "", completed: false }],
+    }));
+  };
+
+  const updateEditSubTask = (idx, text) => {
+    setEditTask((prev) => ({
+      ...prev,
+      subTasks: prev.subTasks.map((st, i) =>
+        i === idx ? { ...st, text } : st
+      ),
+    }));
+  };
+
+  const removeEditSubTask = (idx) => {
+    setEditTask((prev) => ({
+      ...prev,
+      subTasks: prev.subTasks.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const saveEditTask = async () => {
+    if (!uid || !initiativeId || !editTask) return;
+    const assignee =
+      editTask.assignee === "My Tasks" ? currentUserName : editTask.assignee;
+    try {
+      await updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", editTask.id),
+        {
+          assignee,
+          subType: editTask.subType,
+          subTasks: editTask.subTasks,
+        }
+      );
+      setEditTask(null);
+    } catch (err) {
+      console.error("saveEditTask error", err);
     }
   };
 
@@ -724,13 +811,14 @@ Respond ONLY in this JSON format:
   };
 
   const renderTaskCard = (t, actionButtons) => {
-    const contact = t.assignee || t.name || "Unassigned";
+    const contact = t.assignee || currentUserName;
+    const contactLabel = contact === currentUserName ? "My Tasks" : contact;
     const project = t.project || projectName || "General";
     return (
       <div key={t.id} className="initiative-card task-card space-y-3">
         {t.tag && <span className={`task-tag ${t.tag}`}>{t.tag}</span>}
         <div className="task-card-header">
-          <span className="task-contact">{contact}</span>
+          <span className="task-contact">{contactLabel}</span>
           <span className="task-project">{project}</span>
         </div>
         <p>{t.message}</p>
@@ -790,6 +878,7 @@ Respond ONLY in this JSON format:
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUid(user.uid);
+        setCurrentUserName(user.displayName || user.email || "My Tasks");
         const tokenSnap = await getDoc(
           doc(db, "users", user.uid, "emailTokens", "gmail")
         );
@@ -1568,6 +1657,12 @@ Respond ONLY in this JSON format:
                 </button>
                 <button
                   className="generator-button"
+                  onClick={() => openEditModal(t)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="generator-button"
                   onClick={() => handleScheduleTask(t.id)}
                 >
                   Schedule
@@ -1594,31 +1689,42 @@ Respond ONLY in this JSON format:
       </div>
     ) : (
       <div className="space-y-4">
-        {displayedTasks.map((t) =>
-          renderTaskCard(
-            t,
-            <>
-              <button
-                className="generator-button"
-                onClick={() => handleCompleteTask(t.id)}
-              >
-                Complete
-              </button>
-              <button
-                className="generator-button"
-                onClick={() => handleScheduleTask(t.id)}
-              >
-                Schedule
-              </button>
-              <button
-                className="generator-button"
-                onClick={() => handleDeleteTask(t.id)}
-              >
-                Delete
-              </button>
-            </>
-          )
-        )}
+        {Object.entries(tasksByAssignee).map(([assignee, tasks]) => (
+          <div key={assignee} className="initiative-card space-y-2">
+            <h3 className="font-semibold">{assignee}</h3>
+            {tasks.map((t) =>
+              renderTaskCard(
+                t,
+                <>
+                  <button
+                    className="generator-button"
+                    onClick={() => openEditModal(t)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="generator-button"
+                    onClick={() => handleCompleteTask(t.id)}
+                  >
+                    Complete
+                  </button>
+                  <button
+                    className="generator-button"
+                    onClick={() => handleScheduleTask(t.id)}
+                  >
+                    Schedule
+                  </button>
+                  <button
+                    className="generator-button"
+                    onClick={() => handleDeleteTask(t.id)}
+                  >
+                    Delete
+                  </button>
+                </>
+              )
+            )}
+          </div>
+        ))}
         {displayedTasks.length === 0 && (
           <p className="text-gray-400">No tasks.</p>
         )}
@@ -1656,6 +1762,80 @@ Respond ONLY in this JSON format:
                 }
               >
                 Approve
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    {editTask &&
+      ReactDOM.createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 text-black">
+            <h3 className="text-lg font-semibold">Edit Task</h3>
+            <div>
+              <label className="block text-sm font-medium">Contact</label>
+              <select
+                value={
+                  editTask.assignee === currentUserName
+                    ? "My Tasks"
+                    : editTask.assignee
+                }
+                onChange={(e) => updateEditTaskField("assignee", e.target.value)}
+                className="w-full rounded-md border px-2 py-1"
+              >
+                <option value="My Tasks">My Tasks</option>
+                {contacts.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Type</label>
+              <select
+                value={editTask.subType}
+                onChange={(e) => updateEditTaskField("subType", e.target.value)}
+                className="w-full rounded-md border px-2 py-1"
+              >
+                <option value="task">task</option>
+                <option value="meeting">meeting</option>
+                <option value="communication">communication</option>
+                <option value="research">research</option>
+                <option value="other">other</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Subtasks</label>
+              {editTask.subTasks.map((st, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input
+                    className="flex-1 rounded-md border px-2 py-1"
+                    value={st.text}
+                    onChange={(e) => updateEditSubTask(idx, e.target.value)}
+                  />
+                  <button
+                    className="generator-button"
+                    onClick={() => removeEditSubTask(idx)}
+                  >
+                    X
+                  </button>
+                </div>
+              ))}
+              <button className="generator-button" onClick={addEditSubTask}>
+                Add Subtask
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="generator-button"
+                onClick={() => setEditTask(null)}
+              >
+                Cancel
+              </button>
+              <button className="generator-button" onClick={saveEditTask}>
+                Save
               </button>
             </div>
           </div>
