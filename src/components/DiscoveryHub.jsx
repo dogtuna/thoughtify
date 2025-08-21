@@ -139,15 +139,7 @@ const DiscoveryHub = () => {
     return Array.from(set);
   }, [projectTasks, currentUserName]);
 
-  const taskTypes = useMemo(() => {
-    const set = new Set();
-    projectTasks.forEach((t) => {
-      set.add(t.subType || "other");
-    });
-    return Array.from(set);
-  }, [projectTasks]);
-
-  const taskTypes = useMemo(() => {
+  const taskTypeOptions = useMemo(() => {
     const set = new Set();
     projectTasks.forEach((t) => {
       set.add(t.subType || "other");
@@ -170,9 +162,6 @@ const DiscoveryHub = () => {
         const label = assignee === currentUserName ? "My Tasks" : assignee;
         return label === taskContactFilter;
       });
-    }
-    if (taskTypeFilter !== "all") {
-      tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
     }
     if (taskTypeFilter !== "all") {
       tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
@@ -1626,7 +1615,7 @@ Respond ONLY in this JSON format:
         className="rounded-md bg-gray-700 px-3 py-1 text-gray-300"
       >
         <option value="all">All Types</option>
-        {taskTypes.map((t) => (
+        {taskTypeOptions.map((t) => (
           <option key={t} value={t}>
             {t}
           </option>
