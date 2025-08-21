@@ -511,6 +511,11 @@ Respond ONLY in this JSON format:
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
         { status, statusChangedAt: serverTimestamp(), ...extra }
       );
+      const ids = JSON.parse(text.trim());
+      const ordered = ids
+        .map((id) => displayedTasks.find((t) => t.id === id))
+        .filter(Boolean);
+      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
     } catch (err) {
       console.error("updateTaskStatus error", err);
     }
@@ -520,6 +525,7 @@ Respond ONLY in this JSON format:
   const handleCompleteTask = (id) => updateTaskStatus(id, "completed");
   const handleScheduleTask = (id) => updateTaskStatus(id, "scheduled");
   const handleDeleteTask = async (id) => {
+
     if (!uid || !initiativeId) return;
     try {
       await deleteDoc(
