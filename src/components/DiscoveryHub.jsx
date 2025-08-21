@@ -17,7 +17,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
-import { classifyTask } from "../utils/taskUtils";
+import { classifyTask, dedupeByMessage } from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -600,7 +600,7 @@ Respond ONLY in this JSON format:
         default:
           header = `Work with ${assignee}`;
       }
-      const bullets = b.map((t) => t.message);
+      const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
       return { bundle: b, text, header, bullets };
     });

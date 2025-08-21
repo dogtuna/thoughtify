@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import ReactDOM from "react-dom";
 import PropTypes from "prop-types";
 import { generate } from "../ai";
+import { dedupeByMessage } from "../utils/taskUtils";
 import { auth, db } from "../firebase";
 import { updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import "../pages/admin.css";
@@ -164,7 +165,7 @@ export default function TaskQueue({
         default:
           header = `Work with ${assignee}`;
       }
-      const bullets = b.map((t) => t.message);
+      const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
       return { bundle: b, text, header, bullets };
     });

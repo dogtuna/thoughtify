@@ -72,4 +72,26 @@ export async function isQuestionTask(message) {
   }
 }
 
-export default { classifyTask, isQuestionTask };
+/**
+ * Remove duplicate tasks based on their message text.
+ * Comparison is case-insensitive and ignores punctuation and extra spaces.
+ * Keeps the first occurrence of each unique message.
+ * @param {Array<{message: string}>} tasks
+ * @returns {Array}
+ */
+export function dedupeByMessage(tasks) {
+  const normalize = (s) =>
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const seen = new Set();
+  return tasks.filter((t) => {
+    const key = normalize(t.message);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export default { classifyTask, isQuestionTask, dedupeByMessage };
