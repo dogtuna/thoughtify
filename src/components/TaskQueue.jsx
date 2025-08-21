@@ -1,6 +1,6 @@
 // src/TaskQueue.jsx
 import { useState, useMemo } from "react";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
 import { generate } from "../ai";
 import { dedupeByMessage } from "../utils/taskUtils";
@@ -357,7 +357,7 @@ export default function TaskQueue({
       </div>
 
       {selectedItem &&
-        ReactDOM.createPortal(
+      createPortal(
           <div className="modal-overlay">
             <div className="task-modal">
               <h3>Reply to {selectedItem.name}</h3>
@@ -392,7 +392,7 @@ export default function TaskQueue({
         )}
 
       {synergyQueue.length > 0 &&
-        ReactDOM.createPortal(
+      createPortal(
           <div className="modal-overlay">
             <div className="task-modal">
               <h3>Synergize Tasks</h3>
@@ -425,7 +425,7 @@ export default function TaskQueue({
         )}
 
       {prioritized &&
-        ReactDOM.createPortal(
+      createPortal(
           <div className="modal-overlay">
             <div className="task-modal">
               <h3>Prioritized Tasks</h3>
