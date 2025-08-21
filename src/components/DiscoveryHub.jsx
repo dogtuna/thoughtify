@@ -507,15 +507,11 @@ Respond ONLY in this JSON format:
   const updateTaskStatus = async (id, status, extra = {}) => {
     if (!uid || !initiativeId) return;
     try {
+      // This is the only part needed to update the task status
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
         { status, statusChangedAt: serverTimestamp(), ...extra }
       );
-      const ids = JSON.parse(text.trim());
-      const ordered = ids
-        .map((id) => displayedTasks.find((t) => t.id === id))
-        .filter(Boolean);
-      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
     } catch (err) {
       console.error("updateTaskStatus error", err);
     }
@@ -1384,172 +1380,180 @@ Respond ONLY in this JSON format:
           )
         // --- MODIFICATION: Revamped project tasks view with AI features ---
         ) : active === "tasks" ? (
-          <div className="tasks-section">
-           <div className="mb-4 flex w-full items-center justify-between gap-4">
-  <h2 className="min-w-0 truncate text-2xl font-bold text-white">
-    Project Tasks
-  </h2>
+  <div className="flex w-full flex-col gap-4">
+    {/* Header: Title on the left, buttons on the right */}
+    <div className="flex w-full items-center justify-between">
+      <h2 className="min-w-0 truncate text-2xl font-bold text-white">
+        Project Tasks
+      </h2>
 
-  <div className="flex flex-shrink-0 items-center gap-2">
-    <button
-      type="button"
-      className="flex w-32 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-800"
-      disabled={isPrioritizing}
-      aria-busy={isPrioritizing}
-      onClick={startPrioritize}
-    >
-      <Zap className="h-5 w-5" />
-      {isPrioritizing ? "Prioritizing..." : "Prioritize"}
-    </button>
+      <div className="flex flex-shrink-0 items-center gap-2">
+        <button
+          type="button"
+          className="flex w-32 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-800"
+          disabled={isPrioritizing}
+          aria-busy={isPrioritizing}
+          onClick={startPrioritize}
+        >
+          <Zap className="h-5 w-5" />
+          {isPrioritizing ? "Prioritizing..." : "Prioritize"}
+        </button>
 
-    <button
-      type="button"
-      className="flex w-32 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white hover:bg-purple-500"
-      onClick={startSynergy}
-    >
-      <Layers className="h-5 w-5" />
-      Synergize
-    </button>
-  </div>
-</div>
+        <button
+          type="button"
+          className="flex w-32 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white hover:bg-purple-500"
+          onClick={startSynergy}
+        >
+          <Layers className="h-5 w-5" />
+          Synergize
+        </button>
+      </div>
+    </div>
 
-            <div className="mb-4 flex flex-wrap gap-2">
-              <select
-                value={taskProjectFilter}
-                onChange={(e) => setTaskProjectFilter(e.target.value)}
-                className="bg-gray-700 text-gray-300 rounded-md px-3 py-1"
+    {/* Filters */}
+    <div className="flex flex-wrap gap-2">
+      <select
+        value={taskProjectFilter}
+        onChange={(e) => setTaskProjectFilter(e.target.value)}
+        className="rounded-md bg-gray-700 px-3 py-1 text-gray-300"
+      >
+        <option value="all">All Projects</option>
+        {taskProjects.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+      <select
+        value={taskContactFilter}
+        onChange={(e) => setTaskContactFilter(e.target.value)}
+        className="rounded-md bg-gray-700 px-3 py-1 text-gray-300"
+      >
+        <option value="all">All Contacts</option>
+        {taskContacts.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Task List */}
+    {prioritized ? (
+      <div className="space-y-4">
+        {prioritized.map((t, i) =>
+          renderTaskCard(
+            t,
+            <>
+              <button
+                className="generator-button"
+                onClick={() => movePriority(i, -1)}
               >
-                <option value="all">All Projects</option>
-                {taskProjects.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={taskContactFilter}
-                onChange={(e) => setTaskContactFilter(e.target.value)}
-                className="bg-gray-700 text-gray-300 rounded-md px-3 py-1"
+                ↑
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => movePriority(i, 1)}
               >
-                <option value="all">All Contacts</option>
-                {taskContacts.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                ↓
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => handleScheduleTask(t.id)}
+              >
+                Schedule
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => handleCompleteTask(t.id)}
+              >
+                Complete
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => handleDeleteTask(t.id)}
+              >
+                Delete
+              </button>
+            </>
+          )
+        )}
+        <button className="generator-button" onClick={savePrioritized}>
+          Save Order
+        </button>
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {displayedTasks.map((t) =>
+          renderTaskCard(
+            t,
+            <>
+              <button
+                className="generator-button"
+                onClick={() => handleCompleteTask(t.id)}
+              >
+                Complete
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => handleScheduleTask(t.id)}
+              >
+                Schedule
+              </button>
+              <button
+                className="generator-button"
+                onClick={() => handleDeleteTask(t.id)}
+              >
+                Delete
+              </button>
+            </>
+          )
+        )}
+        {displayedTasks.length === 0 && (
+          <p className="text-gray-400">No tasks.</p>
+        )}
+      </div>
+    )}
+
+    {synergyQueue.length > 0 &&
+      ReactDOM.createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 text-black">
+            <h3 className="mb-2 text-lg font-semibold">Synergize Tasks</h3>
+            <ul className="mb-4 list-inside list-disc text-sm">
+              {synergyQueue[synergyIndex].bundle.map((t) => (
+                <li key={t.id}>{t.message}</li>
+              ))}
+            </ul>
+            <textarea
+              className="mb-4 w-full border p-2"
+              value={synergyText}
+              onChange={(e) => setSynergyText(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                className="generator-button"
+                onClick={nextSynergy}
+              >
+                Skip
+              </button>
+              <button
+                className="generator-button"
+                onClick={() =>
+                  handleSynergize(
+                    synergyQueue[synergyIndex].bundle,
+                    synergyText
+                  )
+                }
+              >
+                Approve
+              </button>
             </div>
-
-            {prioritized ? (
-              <div className="space-y-4">
-                {prioritized.map((t, i) =>
-                  renderTaskCard(
-                    t,
-                    <>
-                      <button
-                        className="generator-button"
-                        onClick={() => movePriority(i, -1)}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => movePriority(i, 1)}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleScheduleTask(t.id)}
-                      >
-                        Schedule
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleCompleteTask(t.id)}
-                      >
-                        Complete
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleDeleteTask(t.id)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )
-                )}
-                <button className="generator-button" onClick={savePrioritized}>
-                  Save Order
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {displayedTasks.map((t) =>
-                  renderTaskCard(
-                    t,
-                    <>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleCompleteTask(t.id)}
-                      >
-                        Complete
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleScheduleTask(t.id)}
-                      >
-                        Schedule
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleDeleteTask(t.id)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )
-                )}
-                {displayedTasks.length === 0 && (
-                  <p className="text-gray-400">No tasks.</p>
-                )}
-              </div>
-            )}
-
-            {synergyQueue.length > 0 &&
-              ReactDOM.createPortal(
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-                  <div className="bg-white text-black rounded-lg p-6 w-full max-w-md">
-                    <h3 className="text-lg font-semibold mb-2">Synergize Tasks</h3>
-                    <ul className="list-disc list-inside mb-4 text-sm">
-                      {synergyQueue[synergyIndex].bundle.map((t) => (
-                        <li key={t.id}>{t.message}</li>
-                      ))}
-                    </ul>
-                    <textarea
-                      className="w-full border p-2 mb-4"
-                      value={synergyText}
-                      onChange={(e) => setSynergyText(e.target.value)}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        className="generator-button"
-                        onClick={nextSynergy}
-                      >
-                        Skip
-                      </button>
-                      <button
-                        className="generator-button"
-                        onClick={() => handleSynergize(synergyQueue[synergyIndex].bundle, synergyText)}
-                      >
-                        Approve
-                      </button>
-                    </div>
-                  </div>
-                </div>,
-                document.body
-              )}
           </div>
+        </div>,
+        document.body
+      )}
+  </div>
         ) : (
           <>
             <div className="filter-bar">
