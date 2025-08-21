@@ -704,7 +704,10 @@ Respond ONLY in this JSON format:
           header = `Send an email to ${assignee}`;
           break;
         case "meeting":
-          header = `Set up a meeting with ${assignee}`;
+          header =
+            assignee === currentUserName
+              ? "Suggested meetings"
+              : `Set up a meeting with ${assignee}`;
           break;
         case "call":
           header = `Call ${assignee}`;

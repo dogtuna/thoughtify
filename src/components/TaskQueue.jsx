@@ -156,9 +156,15 @@ export default function TaskQueue({
         case "email":
           header = `Send an email to ${assignee}`;
           break;
-        case "meeting":
-          header = `Set up a meeting with ${assignee}`;
+        case "meeting": {
+          const current =
+            auth.currentUser?.displayName || auth.currentUser?.email || "";
+          header =
+            assignee === current
+              ? "Suggested meetings"
+              : `Set up a meeting with ${assignee}`;
           break;
+        }
         case "call":
           header = `Call ${assignee}`;
           break;
