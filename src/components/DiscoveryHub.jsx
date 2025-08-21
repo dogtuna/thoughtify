@@ -444,10 +444,19 @@ Respond ONLY in this JSON format:
 
     try {
       for (const s of suggestions) {
-        if (s.type === 'question') {
-          const contactExists = contacts.some(c => c.name === s.assignee);
-          const assignedContact = contactExists ? s.assignee : name;
-          
+        const match = contacts.find(
+          (c) =>
+            c.name.toLowerCase() === (s.assignee || "").toLowerCase() ||
+            (c.role || "").toLowerCase() === (s.assignee || "").toLowerCase()
+        );
+
+        if (s.type === "question") {
+          const assignedContact = s.assignee
+            ? match
+              ? match.name
+              : s.assignee
+            : name;
+
           questionsToAdd.push({
             question: s.text,
             contacts: assignedContact ? [assignedContact] : [],
@@ -456,11 +465,14 @@ Respond ONLY in this JSON format:
           });
         } else {
           const tag = await classifyTask(s.text);
+          const assignee = match
+            ? match.name
+            : s.assignee || "Unassigned";
           // --- MODIFICATION: Save assignee and subType with the task ---
           tasksToAdd.push({
             name,
             message: s.text,
-            assignee: s.assignee || "Unassigned",
+            assignee,
             subType: s.subType || "task",
             status: "open",
             createdAt: serverTimestamp(),

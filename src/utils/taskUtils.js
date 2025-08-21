@@ -7,6 +7,24 @@ import { generate } from "../ai";
  * @returns {Promise<string>} tag
  */
 export async function classifyTask(message) {
+  const lower = (message || "").toLowerCase();
+  const researchKeywords = [
+    "research",
+    "analysis",
+    "analyze",
+    "analyse",
+    "assess",
+    "review",
+    "investigate",
+    "evaluate",
+    "explore",
+    "study",
+    "examine",
+  ];
+  if (researchKeywords.some((k) => lower.includes(k))) {
+    return "research";
+  }
+
   const prompt = `You are a smart assistant that decides how to handle tasks.\nChoose exactly one of: email, call, meeting, research.\nTask: ${message}`;
   try {
     const { text } = await generate(prompt);
