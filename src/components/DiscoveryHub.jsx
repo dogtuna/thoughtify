@@ -86,6 +86,7 @@ const DiscoveryHub = () => {
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
   const [taskProjectFilter, setTaskProjectFilter] = useState("all");
   const [taskContactFilter, setTaskContactFilter] = useState("all");
+  const [taskTypeFilter, setTaskTypeFilter] = useState("all");
   const [synergyQueue, setSynergyQueue] = useState([]);
   const [synergyIndex, setSynergyIndex] = useState(0);
   const [prioritized, setPrioritized] = useState(null);
@@ -135,6 +136,14 @@ const DiscoveryHub = () => {
     return Array.from(set);
   }, [projectTasks]);
 
+  const taskTypes = useMemo(() => {
+    const set = new Set();
+    projectTasks.forEach((t) => {
+      set.add(t.subType || "other");
+    });
+    return Array.from(set);
+  }, [projectTasks]);
+
   const displayedTasks = useMemo(() => {
     let tasks = projectTasks.filter(
       (t) => taskStatusFilter === "all" || (t.status || "open") === taskStatusFilter
@@ -149,8 +158,17 @@ const DiscoveryHub = () => {
         (t) => (t.assignee || t.name || "Unassigned") === taskContactFilter
       );
     }
+    if (taskTypeFilter !== "all") {
+      tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
+    }
     return tasks;
-  }, [projectTasks, taskStatusFilter, taskProjectFilter, taskContactFilter]);
+  }, [
+    projectTasks,
+    taskStatusFilter,
+    taskProjectFilter,
+    taskContactFilter,
+    taskTypeFilter,
+  ]);
 
   const taskSubTypeIcon = (subType) => {
     switch (subType) {
@@ -537,10 +555,13 @@ Respond ONLY in this JSON format:
   const updateTaskStatus = async (id, status, extra = {}) => {
     if (!uid || !initiativeId) return;
     try {
-      // This is the only part needed to update the task status
+      const data = { status, statusChangedAt: serverTimestamp(), ...extra };
+      if (status === "completed") {
+        data.completedAt = serverTimestamp();
+      }
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
-        { status, statusChangedAt: serverTimestamp(), ...extra }
+        data
       );
     } catch (err) {
       console.error("updateTaskStatus error", err);
@@ -559,6 +580,21 @@ Respond ONLY in this JSON format:
       );
     } catch (err) {
       console.error("deleteTask error", err);
+    }
+  };
+
+  const handleSubTaskToggle = async (taskId, index, completed) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
+        {
+          [`subTasks.${index}.completed`]: completed,
+          [`subTasks.${index}.completedAt`]: completed ? serverTimestamp() : null,
+        }
+      );
+    } catch (err) {
+      console.error("handleSubTaskToggle error", err);
     }
   };
 
@@ -620,12 +656,13 @@ Respond ONLY in this JSON format:
     }
   };
 
-  const handleSynergize = async (bundle, message) => {
+  const handleSynergize = async (bundle, header, bullets) => {
     if (!uid || !initiativeId || !bundle.length) return;
     const [first, ...rest] = bundle;
+    const subTasks = bullets.map((m) => ({ text: m, completed: false }));
     await updateDoc(
       doc(db, "users", uid, "initiatives", initiativeId, "tasks", first.id),
-      { message }
+      { message: header, subTasks }
     );
     for (const t of rest) {
       await deleteDoc(
@@ -697,6 +734,24 @@ Respond ONLY in this JSON format:
           <span className="task-project">{project}</span>
         </div>
         <p>{t.message}</p>
+        {t.subTasks && t.subTasks.length > 0 && (
+          <ul className="ml-4 list-disc space-y-1">
+            {t.subTasks.map((st, idx) => (
+              <li key={idx} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!st.completed}
+                  onChange={(e) =>
+                    handleSubTaskToggle(t.id, idx, e.target.checked)
+                  }
+                />
+                <span className={st.completed ? "line-through" : ""}>
+                  {st.text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="flex gap-2">{actionButtons}</div>
       </div>
     );
@@ -1476,6 +1531,18 @@ Respond ONLY in this JSON format:
           </option>
         ))}
       </select>
+      <select
+        value={taskTypeFilter}
+        onChange={(e) => setTaskTypeFilter(e.target.value)}
+        className="rounded-md bg-gray-700 px-3 py-1 text-gray-300"
+      >
+        <option value="all">All Types</option>
+        {taskTypes.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
     </div>
 
     {/* Task List */}
@@ -1583,7 +1650,8 @@ Respond ONLY in this JSON format:
                 onClick={() =>
                   handleSynergize(
                     synergyQueue[synergyIndex].bundle,
-                    synergyQueue[synergyIndex].text
+                    synergyQueue[synergyIndex].header,
+                    synergyQueue[synergyIndex].bullets
                   )
                 }
               >
