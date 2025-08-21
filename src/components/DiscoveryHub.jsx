@@ -9,6 +9,7 @@ import {
   collection,
   addDoc,
   serverTimestamp,
+  Timestamp,
   onSnapshot,
   updateDoc,
   deleteDoc,
@@ -605,7 +606,7 @@ Respond ONLY in this JSON format:
         ? {
             ...st,
             completed,
-            completedAt: completed ? serverTimestamp() : null,
+            completedAt: completed ? Timestamp.now() : null,
           }
         : st
     );
@@ -615,9 +616,7 @@ Respond ONLY in this JSON format:
         { subTasks: updated }
       );
       setProjectTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId ? { ...t, subTasks: updated } : t
-        )
+        prev.map((t) => (t.id === taskId ? { ...t, subTasks: updated } : t))
       );
     } catch (err) {
       console.error("handleSubTaskToggle error", err);
@@ -1769,22 +1768,17 @@ Respond ONLY in this JSON format:
 
     {synergyQueue.length > 0 &&
       createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 text-black">
-            <h3 className="mb-2 text-lg font-semibold">Synergize Tasks</h3>
-            <h4 className="mb-2 font-medium">
-              {synergyQueue[synergyIndex].header}
-            </h4>
+        <div className="modal-overlay">
+          <div className="initiative-card modal-content">
+            <h3>Synergize Tasks</h3>
+            <h4>{synergyQueue[synergyIndex].header}</h4>
             <ul className="mb-4 list-inside list-disc text-sm">
               {synergyQueue[synergyIndex].bullets.map((m, idx) => (
                 <li key={idx}>{m}</li>
               ))}
             </ul>
-            <div className="flex justify-end gap-2">
-              <button
-                className="generator-button"
-                onClick={nextSynergy}
-              >
+            <div className="modal-actions">
+              <button className="generator-button" onClick={nextSynergy}>
                 Skip
               </button>
               <button
@@ -1806,9 +1800,9 @@ Respond ONLY in this JSON format:
       )}
     {editTask &&
       createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 text-black">
-            <h3 className="text-lg font-semibold">Edit Task</h3>
+        <div className="modal-overlay">
+          <div className="initiative-card modal-content space-y-4">
+            <h3>Edit Task</h3>
             <div>
               <label className="block text-sm font-medium">Contact</label>
               <select
@@ -1863,7 +1857,7 @@ Respond ONLY in this JSON format:
                 Add Subtask
               </button>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="modal-actions">
               <button
                 className="generator-button"
                 onClick={() => setEditTask(null)}
