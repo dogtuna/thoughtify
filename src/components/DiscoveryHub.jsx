@@ -147,6 +147,14 @@ const DiscoveryHub = () => {
     return Array.from(set);
   }, [projectTasks]);
 
+  const taskTypes = useMemo(() => {
+    const set = new Set();
+    projectTasks.forEach((t) => {
+      set.add(t.subType || "other");
+    });
+    return Array.from(set);
+  }, [projectTasks]);
+
   const displayedTasks = useMemo(() => {
     let tasks = projectTasks.filter(
       (t) => taskStatusFilter === "all" || (t.status || "open") === taskStatusFilter
@@ -162,6 +170,9 @@ const DiscoveryHub = () => {
         const label = assignee === currentUserName ? "My Tasks" : assignee;
         return label === taskContactFilter;
       });
+    }
+    if (taskTypeFilter !== "all") {
+      tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
     }
     if (taskTypeFilter !== "all") {
       tasks = tasks.filter((t) => (t.subType || "other") === taskTypeFilter);
