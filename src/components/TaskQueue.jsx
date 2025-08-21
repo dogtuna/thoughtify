@@ -128,18 +128,24 @@ export default function TaskQueue({
 
   const computeBundles = () => {
     const map = {};
-    tasks.forEach((t) => {
-      const key = `${t.assignee || t.name || ""}-${
-        t.subType || t.tag || "other"
-      }`;
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    });
+    tasks
+      .filter((t) => (t.status || "open") === "open")
+      .forEach((t) => {
+        const key = `${t.assignee || t.name || ""}-${
+          t.subType || t.tag || "other"
+        }`;
+        if (!map[key]) map[key] = [];
+        map[key].push(t);
+      });
     return Object.values(map).filter((b) => b.length > 1);
   };
 
   const startSynergy = () => {
     const bundles = computeBundles();
+    if (!bundles.length) {
+      alert("No synergy opportunities found.");
+      return;
+    }
     const proposals = bundles.map((b) => {
       const first = b[0];
       const assignee = first.assignee || first.name || "";
@@ -180,14 +186,16 @@ export default function TaskQueue({
 
   const startPrioritize = async () => {
     try {
+      const openTasks = tasks.filter((t) => (t.status || "open") === "open");
       const { text } = await generate(
-        `Order the following tasks by priority and return a JSON array of ids in order:\n${tasks
+        `Order the following tasks by priority and return a JSON array of ids in order:\n${openTasks
           .map((t) => `${t.id}: ${t.message}`)
           .join("\n")}`
       );
-      const ids = JSON.parse(text.trim());
+      const match = text.match(/\[[^\]]*\]/);
+      const ids = match ? JSON.parse(match[0]) : [];
       const ordered = ids
-        .map((id) => tasks.find((t) => t.id === id))
+        .map((id) => openTasks.find((t) => t.id === id))
         .filter(Boolean);
       if (ordered.length) {
         setPrioritized(ordered);
@@ -196,7 +204,8 @@ export default function TaskQueue({
     } catch (err) {
       console.error("prioritize", err);
     }
-    setPrioritized([...tasks]);
+    const openTasks = tasks.filter((t) => (t.status || "open") === "open");
+    setPrioritized([...openTasks]);
   };
 
   const movePriority = (index, delta) => {
@@ -416,6 +425,7 @@ export default function TaskQueue({
               <ul className="task-list">
                 {prioritized.map((task, idx) => (
                   <li key={task.id} className="task-item">
+                    <span className="priority-index">{idx + 1}.</span>
                     <strong>
                       {task.name} ({task.email})
                     </strong>
