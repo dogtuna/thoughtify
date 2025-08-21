@@ -1385,26 +1385,33 @@ Respond ONLY in this JSON format:
         // --- MODIFICATION: Revamped project tasks view with AI features ---
         ) : active === "tasks" ? (
           <div className="tasks-section">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white">Project Tasks</h2>
-              <div className="flex gap-2">
-                <button
-                  className="flex w-32 items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg disabled:bg-indigo-800 disabled:cursor-not-allowed"
-                  disabled={isPrioritizing}
-                  onClick={startPrioritize}
-                >
-                  <Zap className="w-5 h-5" />
-                  {isPrioritizing ? "Prioritizing..." : "Prioritize"}
-                </button>
-                <button
-                  className="flex w-32 items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg"
-                  onClick={startSynergy}
-                >
-                  <Layers className="w-5 h-5" />
-                  Synergize
-                </button>
-              </div>
-            </div>
+           <div className="mb-4 flex w-full items-center justify-between gap-4">
+  <h2 className="min-w-0 truncate text-2xl font-bold text-white">
+    Project Tasks
+  </h2>
+
+  <div className="flex flex-shrink-0 items-center gap-2">
+    <button
+      type="button"
+      className="flex w-32 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-800"
+      disabled={isPrioritizing}
+      aria-busy={isPrioritizing}
+      onClick={startPrioritize}
+    >
+      <Zap className="h-5 w-5" />
+      {isPrioritizing ? "Prioritizing..." : "Prioritize"}
+    </button>
+
+    <button
+      type="button"
+      className="flex w-32 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white hover:bg-purple-500"
+      onClick={startSynergy}
+    >
+      <Layers className="h-5 w-5" />
+      Synergize
+    </button>
+  </div>
+</div>
 
             <div className="mb-4 flex flex-wrap gap-2">
               <select
