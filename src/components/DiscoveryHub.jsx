@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
@@ -614,6 +614,11 @@ Respond ONLY in this JSON format:
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
         { subTasks: updated }
       );
+      setProjectTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, subTasks: updated } : t
+        )
+      );
     } catch (err) {
       console.error("handleSubTaskToggle error", err);
     }
@@ -704,7 +709,10 @@ Respond ONLY in this JSON format:
           header = `Send an email to ${assignee}`;
           break;
         case "meeting":
-          header = `Set up a meeting with ${assignee}`;
+          header =
+            assignee === currentUserName
+              ? "Suggested meetings"
+              : `Set up a meeting with ${assignee}`;
           break;
         case "call":
           header = `Call ${assignee}`;
@@ -990,6 +998,45 @@ Respond ONLY in this JSON format:
       });
     }
     return name;
+  };
+
+  const addNamedContact = (name) => {
+    const role = prompt(`Role for ${name}? (optional)`) || "";
+    const email = prompt(`Email for ${name}? (optional)`) || "";
+    const color = colorPalette[contacts.length % colorPalette.length];
+    const newContact = { role, name, email, color };
+    const updated = [...contacts, newContact];
+    setContacts(updated);
+    if (uid) {
+      saveInitiative(uid, initiativeId, {
+        keyContacts: updated.map(({ name, role, email }) => ({
+          name,
+          role,
+          email,
+        })),
+      });
+    }
+  };
+
+  const ensureContactsForSuggestions = async (suggestions) => {
+    const existing = new Set(contacts.map((c) => c.name.toLowerCase()));
+    const newNames = [];
+    suggestions.forEach((s) => {
+      const assignee = (s.assignee || "").trim();
+      if (
+        assignee &&
+        assignee.toLowerCase() !== currentUserName.toLowerCase() &&
+        !existing.has(assignee.toLowerCase())
+      ) {
+        newNames.push(assignee);
+        existing.add(assignee.toLowerCase());
+      }
+    });
+    for (const name of newNames) {
+      if (window.confirm(`Create new contact "${name}"?`)) {
+        addNamedContact(name);
+      }
+    }
   };
 
   const addContactToQuestion = (idx, name) => {
@@ -1721,7 +1768,7 @@ Respond ONLY in this JSON format:
     )}
 
     {synergyQueue.length > 0 &&
-      ReactDOM.createPortal(
+      createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 text-black">
             <h3 className="mb-2 text-lg font-semibold">Synergize Tasks</h3>
@@ -1758,7 +1805,7 @@ Respond ONLY in this JSON format:
         document.body
       )}
     {editTask &&
-      ReactDOM.createPortal(
+      createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 text-black">
             <h3 className="text-lg font-semibold">Edit Task</h3>
@@ -2122,9 +2169,12 @@ Respond ONLY in this JSON format:
                 <button
                   className="generator-button"
                   onClick={async () => {
+                    await ensureContactsForSuggestions(
+                      analysisModal.selected
+                    );
                     await createTasksFromAnalysis(
                       analysisModal.name,
-                      analysisModal.selected,
+                      analysisModal.selected
                     );
                     setAnalysisModal(null);
                   }}
