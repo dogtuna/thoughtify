@@ -7,6 +7,24 @@ import { generate } from "../ai";
  * @returns {Promise<string>} tag
  */
 export async function classifyTask(message) {
+  const lower = (message || "").toLowerCase();
+  const researchKeywords = [
+    "research",
+    "analysis",
+    "analyze",
+    "analyse",
+    "assess",
+    "review",
+    "investigate",
+    "evaluate",
+    "explore",
+    "study",
+    "examine",
+  ];
+  if (researchKeywords.some((k) => lower.includes(k))) {
+    return "research";
+  }
+
   const prompt = `You are a smart assistant that decides how to handle tasks.\nChoose exactly one of: email, call, meeting, research.\nTask: ${message}`;
   try {
     const { text } = await generate(prompt);
@@ -54,4 +72,26 @@ export async function isQuestionTask(message) {
   }
 }
 
-export default { classifyTask, isQuestionTask };
+/**
+ * Remove duplicate tasks based on their message text.
+ * Comparison is case-insensitive and ignores punctuation and extra spaces.
+ * Keeps the first occurrence of each unique message.
+ * @param {Array<{message: string}>} tasks
+ * @returns {Array}
+ */
+export function dedupeByMessage(tasks) {
+  const normalize = (s) =>
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const seen = new Set();
+  return tasks.filter((t) => {
+    const key = normalize(t.message);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export default { classifyTask, isQuestionTask, dedupeByMessage };

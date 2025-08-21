@@ -17,7 +17,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
-import { classifyTask } from "../utils/taskUtils";
+import { classifyTask, dedupeByMessage } from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -88,7 +88,6 @@ const DiscoveryHub = () => {
   const [taskContactFilter, setTaskContactFilter] = useState("all");
   const [synergyQueue, setSynergyQueue] = useState([]);
   const [synergyIndex, setSynergyIndex] = useState(0);
-  const [synergyText, setSynergyText] = useState("");
   const [prioritized, setPrioritized] = useState(null);
   const [isPrioritizing, setIsPrioritizing] = useState(false);
   const [selected, setSelected] = useState([]);
@@ -344,9 +343,17 @@ const DiscoveryHub = () => {
           .join("\n");
         contextPieces.push(`Source Materials:\n${docs}`);
       }
-      const projectContext = contextPieces.join("\n\n");
 
-      // --- MODIFICATION: Updated prompt for sub-task classification ---
+      const existingTasks = projectTasks.map((t) => t.message).join("\n");
+      if (existingTasks) contextPieces.push(`Existing Tasks:\n${existingTasks}`);
+      const existingQuestions = questions.map((q) => q.question).join("\n");
+      if (existingQuestions)
+        contextPieces.push(`Existing Questions:\n${existingQuestions}`);
+
+      const projectContext = contextPieces.join("\n\n");
+      const taskSet = new Set(projectTasks.map((t) => t.message.toLowerCase()));
+      const questionSet = new Set(questions.map((q) => q.question.toLowerCase()));
+
       const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 
 Project Context:
@@ -357,6 +364,8 @@ ${question}
 
 Answer:
 ${text}
+
+Avoid suggesting tasks or questions that already exist in the provided lists.
 
 Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
@@ -370,14 +379,14 @@ Respond ONLY in this JSON format:
 {"analysis": "...", "suggestions": [{"text": "...", "type": "...", "assignee": "...", "subType": "..."}, ...]}`;
 
       const { text: res } = await ai.generate(prompt);
-      
+
       const parseResponse = (str) => {
         const parsed = JSON.parse(str);
         const analysis =
           typeof parsed.analysis === "string"
             ? parsed.analysis
             : JSON.stringify(parsed.analysis);
-        
+
         const suggestions = Array.isArray(parsed.suggestions)
           ? parsed.suggestions.filter(
               (s) =>
@@ -385,10 +394,12 @@ Respond ONLY in this JSON format:
                 typeof s.text === "string" &&
                 typeof s.type === "string" &&
                 typeof s.assignee === "string" &&
-                typeof s.subType === "string"
+                typeof s.subType === "string" &&
+                !taskSet.has(s.text.toLowerCase()) &&
+                !questionSet.has(s.text.toLowerCase())
             )
           : [];
-        
+
         return { analysis, suggestions };
       };
 
@@ -439,34 +450,61 @@ Respond ONLY in this JSON format:
 
   const createTasksFromAnalysis = async (name, suggestions) => {
     if (!uid || !initiativeId || !suggestions.length) return;
-    
+
     const questionsToAdd = [];
     const tasksToAdd = [];
 
+    const existingTaskSet = new Set(projectTasks.map((t) => t.message.toLowerCase()));
+    const existingQuestionSet = new Set(
+      questions.map((q) => q.question.toLowerCase())
+    );
+
     try {
       for (const s of suggestions) {
-        if (s.type === 'question') {
-          const contactExists = contacts.some(c => c.name === s.assignee);
-          const assignedContact = contactExists ? s.assignee : name;
-          
+        const lowerText = s.text.toLowerCase();
+        if (existingTaskSet.has(lowerText) || existingQuestionSet.has(lowerText))
+          continue;
+        let match = contacts.find((c) =>
+          lowerText.includes(c.name.toLowerCase())
+        );
+        if (!match) {
+          match = contacts.find(
+            (c) =>
+              c.name.toLowerCase() === (s.assignee || "").toLowerCase() ||
+              (c.role || "").toLowerCase() === (s.assignee || "").toLowerCase()
+          );
+        }
+
+        if (s.type === "question") {
+          const assignedContact = match
+            ? match.name
+            : s.assignee
+              ? s.assignee
+              : name;
+
           questionsToAdd.push({
             question: s.text,
             contacts: assignedContact ? [assignedContact] : [],
             answers: {},
             asked: assignedContact ? { [assignedContact]: false } : {},
           });
+          existingQuestionSet.add(lowerText);
         } else {
           const tag = await classifyTask(s.text);
+          const assignee = match
+            ? match.name
+            : s.assignee || "Unassigned";
           // --- MODIFICATION: Save assignee and subType with the task ---
           tasksToAdd.push({
             name,
             message: s.text,
-            assignee: s.assignee || "Unassigned",
+            assignee,
             subType: s.subType || "task",
             status: "open",
             createdAt: serverTimestamp(),
             tag,
           });
+          existingTaskSet.add(lowerText);
         }
       }
 
@@ -526,34 +564,49 @@ Respond ONLY in this JSON format:
 
   const computeBundles = () => {
     const map = {};
-    displayedTasks.forEach((t) => {
-      const key = `${t.project || "General"}-${t.subType || "other"}-${t.assignee || ""}`;
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    });
+    displayedTasks
+      .filter((t) => (t.status || "open") === "open")
+      .forEach((t) => {
+        const key = `${t.assignee || t.name || ""}-${
+          t.subType || t.tag || "other"
+        }`;
+        if (!map[key]) map[key] = [];
+        map[key].push(t);
+      });
     return Object.values(map).filter((b) => b.length > 1);
   };
 
-  const startSynergy = async () => {
+  const startSynergy = () => {
     const bundles = computeBundles();
-    const proposals = [];
-    for (const b of bundles) {
-      try {
-        const { text } = await generate(
-          `Combine the following tasks into one task description:\n${b
-            .map((t) => `- ${t.message}`)
-            .join("\n")}`
-        );
-        proposals.push({ bundle: b, text: text.trim() });
-      } catch (err) {
-        console.error("synergize", err);
-        proposals.push({ bundle: b, text: b.map((t) => t.message).join(" ") });
-      }
+    if (!bundles.length) {
+      alert("No synergy opportunities found.");
+      return;
     }
+    const proposals = bundles.map((b) => {
+      const first = b[0];
+      const assignee = first.assignee || first.name || "";
+      const type = first.subType || first.tag || "";
+      let header;
+      switch (type) {
+        case "email":
+          header = `Send an email to ${assignee}`;
+          break;
+        case "meeting":
+          header = `Set up a meeting with ${assignee}`;
+          break;
+        case "call":
+          header = `Call ${assignee}`;
+          break;
+        default:
+          header = `Work with ${assignee}`;
+      }
+      const bullets = dedupeByMessage(b).map((t) => t.message);
+      const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
+      return { bundle: b, text, header, bullets };
+    });
     if (proposals.length) {
       setSynergyQueue(proposals);
       setSynergyIndex(0);
-      setSynergyText(proposals[0].text);
     }
   };
 
@@ -561,11 +614,9 @@ Respond ONLY in this JSON format:
     const next = synergyIndex + 1;
     if (next < synergyQueue.length) {
       setSynergyIndex(next);
-      setSynergyText(synergyQueue[next].text);
     } else {
       setSynergyQueue([]);
       setSynergyIndex(0);
-      setSynergyText("");
     }
   };
 
@@ -587,19 +638,26 @@ Respond ONLY in this JSON format:
   const startPrioritize = async () => {
     setIsPrioritizing(true);
     try {
+      const openTasks = displayedTasks.filter(
+        (t) => (t.status || "open") === "open"
+      );
       const { text } = await generate(
-        `Order the following tasks by priority and return a JSON array of ids in order:\n${displayedTasks
+        `Order the following tasks by priority and return a JSON array of ids in order:\n${openTasks
           .map((t) => `${t.id}: ${t.message}`)
           .join("\n")}`
       );
-      const ids = JSON.parse(text.trim());
+      const match = text.match(/\[[^\]]*\]/);
+      const ids = match ? JSON.parse(match[0]) : [];
       const ordered = ids
-        .map((id) => displayedTasks.find((t) => t.id === id))
+        .map((id) => openTasks.find((t) => t.id === id))
         .filter(Boolean);
-      setPrioritized(ordered.length ? ordered : [...displayedTasks]);
+      setPrioritized(ordered.length ? ordered : [...openTasks]);
     } catch (err) {
       console.error("prioritize", err);
-      setPrioritized([...displayedTasks]);
+      const openTasks = displayedTasks.filter(
+        (t) => (t.status || "open") === "open"
+      );
+      setPrioritized([...openTasks]);
     } finally {
       setIsPrioritizing(false);
     }
@@ -1423,43 +1481,46 @@ Respond ONLY in this JSON format:
     {/* Task List */}
     {prioritized ? (
       <div className="space-y-4">
-        {prioritized.map((t, i) =>
-          renderTaskCard(
-            t,
-            <>
-              <button
-                className="generator-button"
-                onClick={() => movePriority(i, -1)}
-              >
-                ↑
-              </button>
-              <button
-                className="generator-button"
-                onClick={() => movePriority(i, 1)}
-              >
-                ↓
-              </button>
-              <button
-                className="generator-button"
-                onClick={() => handleScheduleTask(t.id)}
-              >
-                Schedule
-              </button>
-              <button
-                className="generator-button"
-                onClick={() => handleCompleteTask(t.id)}
-              >
-                Complete
-              </button>
-              <button
-                className="generator-button"
-                onClick={() => handleDeleteTask(t.id)}
-              >
-                Delete
-              </button>
-            </>
-          )
-        )}
+        {prioritized.map((t, i) => (
+          <div key={t.id} className="flex items-start gap-2">
+            <span className="task-rank">{i + 1}.</span>
+            {renderTaskCard(
+              t,
+              <>
+                <button
+                  className="generator-button"
+                  onClick={() => movePriority(i, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  className="generator-button"
+                  onClick={() => movePriority(i, 1)}
+                >
+                  ↓
+                </button>
+                <button
+                  className="generator-button"
+                  onClick={() => handleScheduleTask(t.id)}
+                >
+                  Schedule
+                </button>
+                <button
+                  className="generator-button"
+                  onClick={() => handleCompleteTask(t.id)}
+                >
+                  Complete
+                </button>
+                <button
+                  className="generator-button"
+                  onClick={() => handleDeleteTask(t.id)}
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+        ))}
         <button className="generator-button" onClick={savePrioritized}>
           Save Order
         </button>
@@ -1502,16 +1563,14 @@ Respond ONLY in this JSON format:
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 text-black">
             <h3 className="mb-2 text-lg font-semibold">Synergize Tasks</h3>
+            <h4 className="mb-2 font-medium">
+              {synergyQueue[synergyIndex].header}
+            </h4>
             <ul className="mb-4 list-inside list-disc text-sm">
-              {synergyQueue[synergyIndex].bundle.map((t) => (
-                <li key={t.id}>{t.message}</li>
+              {synergyQueue[synergyIndex].bullets.map((m, idx) => (
+                <li key={idx}>{m}</li>
               ))}
             </ul>
-            <textarea
-              className="mb-4 w-full border p-2"
-              value={synergyText}
-              onChange={(e) => setSynergyText(e.target.value)}
-            />
             <div className="flex justify-end gap-2">
               <button
                 className="generator-button"
@@ -1524,7 +1583,7 @@ Respond ONLY in this JSON format:
                 onClick={() =>
                   handleSynergize(
                     synergyQueue[synergyIndex].bundle,
-                    synergyText
+                    synergyQueue[synergyIndex].text
                   )
                 }
               >
