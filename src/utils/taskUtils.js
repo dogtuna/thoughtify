@@ -8,6 +8,22 @@ import { generate } from "../ai";
  */
 export async function classifyTask(message) {
   const lower = (message || "").toLowerCase();
+  const designKeywords = [
+    "design",
+    "develop",
+    "create",
+    "build",
+    "draft",
+    "write",
+    "outline",
+    "storyboard",
+    "instructional",
+    "content",
+  ];
+  if (designKeywords.some((k) => lower.includes(k))) {
+    return "instructional-design";
+  }
+
   const researchKeywords = [
     "research",
     "analysis",
@@ -25,7 +41,7 @@ export async function classifyTask(message) {
     return "research";
   }
 
-  const prompt = `You are a smart assistant that decides how to handle tasks.\nChoose exactly one of: email, call, meeting, research.\nTask: ${message}`;
+  const prompt = `You are a smart assistant that decides how to handle tasks.\nChoose exactly one of: email, call, meeting, research, instructional-design.\nTask: ${message}`;
   try {
     const { text } = await generate(prompt);
     const response = text.trim().toLowerCase();
@@ -33,6 +49,8 @@ export async function classifyTask(message) {
     if (response.includes("call")) return "call";
     if (response.includes("chat")) return "call";
     if (response.includes("research")) return "research";
+    if (response.includes("instructional-design") || response.includes("design"))
+      return "instructional-design";
     return "email";
   } catch (err) {
     console.error("classifyTask error", err);
@@ -94,4 +112,17 @@ export function dedupeByMessage(tasks) {
   });
 }
 
-export default { classifyTask, isQuestionTask, dedupeByMessage };
+export function normalizeAssigneeName(name, currentUser) {
+  const user = currentUser || "";
+  const normalized = (name || "").trim();
+  return /instructional\s*designer|performance\s*consultant/i.test(normalized)
+    ? user
+    : normalized || user;
+}
+
+export default {
+  classifyTask,
+  isQuestionTask,
+  dedupeByMessage,
+  normalizeAssigneeName,
+};
