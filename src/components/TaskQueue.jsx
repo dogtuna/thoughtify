@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
 import { generate } from "../ai";
-import { dedupeByMessage } from "../utils/taskUtils";
+import { dedupeByMessage, normalizeAssigneeName } from "../utils/taskUtils";
 import { auth, db } from "../firebase";
 import { updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import "../pages/admin.css";
@@ -28,23 +28,45 @@ export default function TaskQueue({
   const [prioritized, setPrioritized] = useState(null);
   const navigate = useNavigate();
 
+  const currentUserName =
+    auth.currentUser?.displayName || auth.currentUser?.email || "";
+
+  const normalizedTasks = useMemo(
+    () =>
+      tasks.map((t) => {
+        const assignees =
+          t.assignees && t.assignees.length
+            ? t.assignees.map((a) =>
+                normalizeAssigneeName(a, currentUserName),
+              )
+            : [
+                normalizeAssigneeName(
+                  t.assignee || t.name || "",
+                  currentUserName,
+                ),
+              ];
+        return { ...t, assignees, assignee: assignees[0] };
+      }),
+    [tasks, currentUserName],
+  );
+
   const projects = useMemo(() => {
     const set = new Set();
-    tasks.forEach((t) => {
+    normalizedTasks.forEach((t) => {
       set.add(t.project || "General");
     });
     return Array.from(set);
-  }, [tasks]);
+  }, [normalizedTasks]);
 
   const filteredTasks = useMemo(
     () =>
-      tasks.filter(
+      normalizedTasks.filter(
         (t) =>
           (statusFilter === "all" || (t.status || "open") === statusFilter) &&
           (projectFilter === "all" || t.project === projectFilter) &&
           (tagFilter === "all" || t.tag === tagFilter)
       ),
-    [tasks, statusFilter, projectFilter, tagFilter]
+    [normalizedTasks, statusFilter, projectFilter, tagFilter]
   );
 
   const groupedTasks = useMemo(() => {
@@ -147,7 +169,7 @@ export default function TaskQueue({
 
   const computeBundles = () => {
     const map = {};
-    tasks
+    normalizedTasks
       .filter((t) => (t.status || "open") === "open")
       .forEach((t) => {
         const assignees =
@@ -175,7 +197,7 @@ export default function TaskQueue({
         first.assignees && first.assignees.length
           ? first.assignees
           : [first.assignee || first.name || ""];
-      const assigneeLabel = assignees.join(", ");
+      const assigneeLabel = Array.from(new Set(assignees)).join(", ");
       const type = first.subType || first.tag || "";
       let header;
       switch (type) {
@@ -219,7 +241,9 @@ export default function TaskQueue({
 
   const startPrioritize = async () => {
     try {
-      const openTasks = tasks.filter((t) => (t.status || "open") === "open");
+      const openTasks = normalizedTasks.filter(
+        (t) => (t.status || "open") === "open",
+      );
       const { text } = await generate(
         `Order the following tasks by priority and return a JSON array of ids in order:\n${openTasks
           .map((t) => `${t.id}: ${t.message}`)
@@ -237,7 +261,9 @@ export default function TaskQueue({
     } catch (err) {
       console.error("prioritize", err);
     }
-    const openTasks = tasks.filter((t) => (t.status || "open") === "open");
+    const openTasks = normalizedTasks.filter(
+      (t) => (t.status || "open") === "open",
+    );
     setPrioritized([...openTasks]);
   };
 
@@ -345,12 +371,13 @@ export default function TaskQueue({
           </select>
           <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
             <option value="all">All Tags</option>
-            <option value="email">email</option>
-            <option value="call">call</option>
-            <option value="meeting">meeting</option>
-            <option value="research">research</option>
-          </select>
-        </div>
+          <option value="email">email</option>
+          <option value="call">call</option>
+          <option value="meeting">meeting</option>
+          <option value="research">research</option>
+          <option value="instructional-design">instructional-design</option>
+        </select>
+      </div>
 
         {/* Render the Task Queue items */}
         <h3>Tasks</h3>

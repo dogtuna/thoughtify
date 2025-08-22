@@ -18,7 +18,11 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
-import { classifyTask, dedupeByMessage } from "../utils/taskUtils";
+import {
+  classifyTask,
+  dedupeByMessage,
+  normalizeAssigneeName,
+} from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -160,12 +164,7 @@ const DiscoveryHub = () => {
   const navigate = useNavigate();
 
   const normalizeAssignee = useCallback(
-    (a) => {
-      if (!a) return currentUserName;
-      return /instructional designer|performance consultant/i.test(a)
-        ? currentUserName
-        : a;
-    },
+    (a) => normalizeAssigneeName(a, currentUserName),
     [currentUserName],
   );
 
@@ -325,6 +324,8 @@ const DiscoveryHub = () => {
         return "📨";
       case "research":
         return "🔎";
+      case "instructional-design":
+        return "🎨";
       case "question":
         return "❓";
       default:
@@ -578,7 +579,7 @@ Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
 - "suggestions": An array of objects for follow-up actions. Each object must have three string fields:
     1. "text": The follow-up action. Do not include any names in this text.
-    2. "category": One of "question", "meeting", "email", or "research".
+    2. "category": One of "question", "meeting", "email", "research", or "instructional-design". Use "instructional-design" for tasks involving designing or creating instructional materials.
     3. "who": The person or group to work with. This must be either a project contact, someone explicitly mentioned in the provided materials, or the current user.
 
 Respond ONLY in this JSON format:
@@ -593,7 +594,13 @@ Respond ONLY in this JSON format:
             ? parsed.analysis
             : JSON.stringify(parsed.analysis);
 
-        const allowedCategories = ["question", "meeting", "email", "research"];
+        const allowedCategories = [
+          "question",
+          "meeting",
+          "email",
+          "research",
+          "instructional-design",
+        ];
         const suggestions = Array.isArray(parsed.suggestions)
           ? parsed.suggestions
               .filter(
@@ -848,6 +855,7 @@ Respond ONLY in this JSON format:
   };
 
   const addAssigneeToTask = (taskId, name) => {
+    const normalized = normalizeAssigneeName(name, currentUserName);
     let newAssignees = [];
     setProjectTasks((prev) =>
       prev.map((t) => {
@@ -856,7 +864,7 @@ Respond ONLY in this JSON format:
           t.assignees && t.assignees.length
             ? [...t.assignees]
             : [t.assignee || currentUserName];
-        if (!assignees.includes(name)) assignees.push(name);
+        if (!assignees.includes(normalized)) assignees.push(normalized);
         newAssignees = assignees;
         return { ...t, assignees };
       })
@@ -870,6 +878,7 @@ Respond ONLY in this JSON format:
   };
 
   const removeAssigneeFromTask = (taskId, name) => {
+    const normalized = normalizeAssigneeName(name, currentUserName);
     let newAssignees = [];
     setProjectTasks((prev) =>
       prev.map((t) => {
@@ -878,7 +887,7 @@ Respond ONLY in this JSON format:
           t.assignees && t.assignees.length
             ? t.assignees
             : [t.assignee || currentUserName]
-        ).filter((a) => a !== name);
+        ).filter((a) => a !== normalized);
         newAssignees = assignees;
         return { ...t, assignees };
       })
@@ -2445,6 +2454,7 @@ Respond ONLY in this JSON format:
                 <option value="meeting">meeting</option>
                 <option value="communication">communication</option>
                 <option value="research">research</option>
+                <option value="instructional-design">instructional-design</option>
                 <option value="other">other</option>
               </select>
             </div>
