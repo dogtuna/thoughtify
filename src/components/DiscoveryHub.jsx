@@ -224,14 +224,16 @@ const DiscoveryHub = () => {
     return map;
   }, [displayedTasks, currentUserName]);
 
-  const taskSubTypeIcon = (subType) => {
-    switch (subType) {
+  const suggestionIcon = (category) => {
+    switch (category) {
       case "meeting":
         return "🗓️";
-      case "communication":
+      case "email":
         return "📨";
       case "research":
         return "🔎";
+      case "question":
+        return "❓";
       default:
         return "📝";
     }
@@ -441,14 +443,13 @@ Avoid suggesting tasks or questions that already exist in the provided lists.
 
 Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
-- "suggestions": An array of objects for follow-up actions. Each object must have four string fields:
-    1. "text": The follow-up action.
-    2. "type": Either "question" for direct follow-ups or "task" for internal actions.
-    3. "assignee": The name of the person or team to address (e.g., "Jessica Bell", "Engineering Team"), or "Project Manager" for internal tasks.
-    4. "subType": For tasks, classify their nature. Use "meeting" for scheduling discussions, "communication" for sending emails/chats, or "research" for verification, data analysis, or finding documents. For questions, this can be "communication".
+- "suggestions": An array of objects for follow-up actions. Each object must have three string fields:
+    1. "text": The follow-up action. Do not include any names in this text.
+    2. "category": One of "question", "meeting", "email", or "research".
+    3. "who": The person or group to work with. This must be either a project contact, someone explicitly mentioned in the provided materials, or the current user.
 
 Respond ONLY in this JSON format:
-{"analysis": "...", "suggestions": [{"text": "...", "type": "...", "assignee": "...", "subType": "..."}, ...]}`;
+{"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "..."}, ...]}`;
 
       const { text: res } = await ai.generate(prompt);
 
@@ -459,17 +460,24 @@ Respond ONLY in this JSON format:
             ? parsed.analysis
             : JSON.stringify(parsed.analysis);
 
+        const allowedCategories = ["question", "meeting", "email", "research"];
         const suggestions = Array.isArray(parsed.suggestions)
-          ? parsed.suggestions.filter(
-              (s) =>
-                s &&
-                typeof s.text === "string" &&
-                typeof s.type === "string" &&
-                typeof s.assignee === "string" &&
-                typeof s.subType === "string" &&
-                !taskSet.has(s.text.toLowerCase()) &&
-                !questionSet.has(s.text.toLowerCase())
-            )
+          ? parsed.suggestions
+              .filter(
+                (s) =>
+                  s &&
+                  typeof s.text === "string" &&
+                  typeof s.category === "string" &&
+                  typeof s.who === "string" &&
+                  allowedCategories.includes(s.category.toLowerCase()) &&
+                  !taskSet.has(s.text.toLowerCase()) &&
+                  !questionSet.has(s.text.toLowerCase())
+              )
+              .map((s) => ({
+                text: s.text,
+                category: s.category.toLowerCase(),
+                who: s.who,
+              }))
           : [];
 
         return { analysis, suggestions };
@@ -536,18 +544,14 @@ Respond ONLY in this JSON format:
         const lowerText = s.text.toLowerCase();
         if (existingTaskSet.has(lowerText) || existingQuestionSet.has(lowerText))
           continue;
-        let match = contacts.find((c) =>
-          lowerText.includes(c.name.toLowerCase())
-        );
-        if (!match) {
-          match = contacts.find(
-            (c) =>
-              c.name.toLowerCase() === (s.assignee || "").toLowerCase() ||
-              (c.role || "").toLowerCase() === (s.assignee || "").toLowerCase()
-          );
-        }
 
-        if (s.type === "question") {
+        let match = contacts.find(
+          (c) =>
+            c.name.toLowerCase() === (s.who || "").toLowerCase() ||
+            (c.role || "").toLowerCase() === (s.who || "").toLowerCase()
+        );
+
+        if (s.category === "question") {
           const assignedContact = match ? match.name : name;
 
           questionsToAdd.push({
@@ -559,15 +563,12 @@ Respond ONLY in this JSON format:
           existingQuestionSet.add(lowerText);
         } else {
           const tag = await classifyTask(s.text);
-          const assignee = match
-            ? match.name
-            : currentUserName;
-          // --- MODIFICATION: Save assignee and subType with the task ---
+          const assignee = match ? match.name : currentUserName;
           tasksToAdd.push({
             name,
             message: s.text,
             assignee,
-            subType: s.subType || "task",
+            subType: s.category,
             status: "open",
             createdAt: serverTimestamp(),
             tag,
@@ -898,13 +899,34 @@ Respond ONLY in this JSON format:
       return;
     }
     setAnalyzing(true);
+    setAnalysisModal({
+      idx,
+      name,
+      loading: true,
+      analysis: null,
+      suggestions: [],
+      selected: [],
+      progress: "Analyzing answer...",
+    });
+    const timeoutId = setTimeout(() => {
+      setAnalysisModal((prev) =>
+        prev && prev.loading ? { ...prev, progress: "Still analyzing..." } : prev
+      );
+    }, 3000);
     const result = await analyzeAnswer(
       questions[idx]?.question || "",
       text,
       name
     );
+    clearTimeout(timeoutId);
     setAnalyzing(false);
-    setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
+    setAnalysisModal({
+      idx,
+      name,
+      loading: false,
+      ...result,
+      selected: result.suggestions,
+    });
   };
 
   const toggleSuggestion = (suggestionObject) => {
@@ -1060,11 +1082,11 @@ Respond ONLY in this JSON format:
   const filterSuggestionsForContacts = (suggestions) => {
     const known = new Set(contacts.map((c) => c.name.toLowerCase()));
     return suggestions.filter((s) => {
-      const assignee = (s.assignee || "").trim().toLowerCase();
+      const who = (s.who || "").trim().toLowerCase();
       return (
-        !assignee ||
-        assignee === currentUserName.toLowerCase() ||
-        known.has(assignee)
+        !who ||
+        who === currentUserName.toLowerCase() ||
+        known.has(who)
       );
     });
   };
@@ -2301,82 +2323,94 @@ Respond ONLY in this JSON format:
             onClick={(e) => e.stopPropagation()}
           >
             <h3>{analysisModal.name}&apos;s Answer Analysis</h3>
-            <p>Question has been moved to answered.</p>
-            {analysisModal.analysis && (
-              <p>
-                {typeof analysisModal.analysis === "string"
-                  ? analysisModal.analysis
-                  : JSON.stringify(analysisModal.analysis)}
-              </p>
-            )}
-            {analysisModal.suggestions && analysisModal.suggestions.length > 0 && (
+            {analysisModal.loading ? (
               <>
-                <p>Suggested tasks:</p>
-                <ul>
-                  {analysisModal.suggestions.map((s, i) => (
-                    <li key={i}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={analysisModal.selected.some(item => item.text === s.text)}
-                          onChange={() => toggleSuggestion(s)}
-                        />
-                         {taskSubTypeIcon(s.subType)} {`[${s.type}] ${s.text} (${s.assignee})`}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+                <p>{analysisModal.progress}</p>
+                <div className="spinner small"></div>
+              </>
+            ) : (
+              <>
+                <p>Question has been moved to answered.</p>
+                {analysisModal.analysis && (
+                  <p>
+                    {typeof analysisModal.analysis === "string"
+                      ? analysisModal.analysis
+                      : JSON.stringify(analysisModal.analysis)}
+                  </p>
+                )}
+                {analysisModal.suggestions &&
+                  analysisModal.suggestions.length > 0 && (
+                    <>
+                      <p>Suggested tasks:</p>
+                      <ul>
+                        {analysisModal.suggestions.map((s, i) => (
+                          <li key={i}>
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={analysisModal.selected.some(
+                                  (item) => item.text === s.text
+                                )}
+                                onChange={() => toggleSuggestion(s)}
+                              />
+                              {suggestionIcon(s.category)} {`[${s.category}] ${s.text} (${s.who})`}
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                <div className="modal-actions">
+                  <button
+                    className="generator-button"
+                    onClick={() => {
+                      draftReply(
+                        analysisModal.idx,
+                        analysisModal.name,
+                        analysisModal.selected,
+                      );
+                      setAnalysisModal(null);
+                    }}
+                  >
+                    Draft Reply
+                  </button>
+                  {analysisModal.suggestions.length > 0 && (
+                    <button
+                      className="generator-button"
+                      onClick={async () => {
+                        const filtered = filterSuggestionsForContacts(
+                          analysisModal.selected
+                        );
+                        if (filtered.length === 0) {
+                          alert(
+                            "No tasks added: assignees must be existing project contacts."
+                          );
+                          return;
+                        }
+                        if (filtered.length < analysisModal.selected.length) {
+                          alert(
+                            "Some tasks were skipped because the assignees are not project contacts."
+                          );
+                        }
+                        await createTasksFromAnalysis(
+                          analysisModal.name,
+                          filtered
+                        );
+                        setAnalysisModal(null);
+                      }}
+                    >
+                      Add Selected Items
+                    </button>
+                  )}
+                  <button
+                    className="generator-button"
+                    onClick={() => setAnalysisModal(null)}
+                  >
+                    Close
+                  </button>
+                </div>
               </>
             )}
-            <div className="modal-actions">
-              <button
-                className="generator-button"
-                onClick={() => {
-                  draftReply(
-                    analysisModal.idx,
-                    analysisModal.name,
-                    analysisModal.selected,
-                  );
-                  setAnalysisModal(null);
-                }}
-              >
-                Draft Reply
-              </button>
-              {analysisModal.suggestions.length > 0 && (
-                <button
-                  className="generator-button"
-                  onClick={async () => {
-                    const filtered = filterSuggestionsForContacts(
-                      analysisModal.selected
-                    );
-                    if (filtered.length === 0) {
-                      alert(
-                        "No tasks added: assignees must be existing project contacts."
-                      );
-                      return;
-                    }
-                    if (filtered.length < analysisModal.selected.length) {
-                      alert(
-                        "Some tasks were skipped because the assignees are not project contacts."
-                      );
-                    }
-                    await createTasksFromAnalysis(
-                      analysisModal.name,
-                      filtered
-                    );
-                    setAnalysisModal(null);
-                  }}
-                >
-                  Add Selected Tasks
-                </button>
-              )}
-              <button
-                className="generator-button"
-                onClick={() => setAnalysisModal(null)}
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}
