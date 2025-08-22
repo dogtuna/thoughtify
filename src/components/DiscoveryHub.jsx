@@ -69,9 +69,32 @@ const colorPalette = [
   "#e2ccff",
 ];
 
+const parseContactNames = (whoRaw) => {
+  if (!whoRaw) return [];
+  const suffixMatch = whoRaw.trim().match(/\b(Teams?|Departments?|Groups?)$/i);
+  if (suffixMatch) {
+    const base = whoRaw.trim().slice(0, suffixMatch.index).trim();
+    const parts = base
+      .split(/\s*(?:,|and|&)\s*/i)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (
+      parts.length > 1 &&
+      parts.every((p) => !/\b(Team|Department|Group)\b$/i.test(p))
+    ) {
+      const suffix = " " + suffixMatch[1].replace(/s$/i, "");
+      return parts.map((p) => p + suffix);
+    }
+  }
+  return whoRaw
+    .split(/\s*(?:,|and|&)\s*/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+};
+
 const normalizeContacts = (value) => {
   if (!value) return [];
-  return Array.isArray(value) ? value : [value];
+  return Array.isArray(value) ? value : parseContactNames(value);
 };
 
 const DiscoveryHub = () => {
@@ -572,11 +595,13 @@ Respond ONLY in this JSON format:
       Object.keys(answerObj).indexOf(name)
     );
     const answerText = answerObj[name]?.text || "";
-    const preview = answerText
+    const answerPreview = answerText
       .split(/(?<=\.)\s+/)
       .slice(0, 2)
       .join(" ")
       .slice(0, 200);
+    const questionText = questions[idx]?.question || "";
+    const questionPreview = questionText.slice(0, 200);
 
     try {
       for (const s of suggestions) {
@@ -645,7 +670,9 @@ Respond ONLY in this JSON format:
             {
               question: idx,
               answer: answerIndex,
-              preview,
+              questionPreview,
+              answerPreview,
+              preview: answerPreview,
               ruleId: s.ruleId || s.templateId || null,
             },
           ];
@@ -974,14 +1001,14 @@ Respond ONLY in this JSON format:
               <div key={idxP} className="provenance-group">
                 <span
                   className="prov-chip"
-                  title={p.preview}
+                  title={p.questionPreview || p.preview}
                   onClick={() => focusQuestionCard(p.question)}
                 >
                   {`Q${p.question + 1}`}
                 </span>
                 <span
                   className="prov-chip"
-                  title={p.preview}
+                  title={p.answerPreview || p.preview}
                   onClick={() => focusQuestionCard(p.question)}
                 >
                   {`A${p.answer + 1}`}
@@ -989,7 +1016,7 @@ Respond ONLY in this JSON format:
                 {p.ruleId && (
                   <span
                     className="prov-chip"
-                    title={p.preview}
+                    title={p.answerPreview || p.preview}
                     onClick={() => focusQuestionCard(p.question)}
                   >
                     {p.ruleId}
@@ -1228,33 +1255,39 @@ Respond ONLY in this JSON format:
     const known = new Set(updatedContacts.map((c) => c.name.toLowerCase()));
     const resolved = [];
     for (const s of suggestions) {
-      const whoRaw = (s.who || "").trim();
-      const who = whoRaw.toLowerCase();
-      if (!who || who === currentUserName.toLowerCase() || known.has(who)) {
+      const names = parseContactNames(s.who || "");
+      if (!names.length) {
         resolved.push(s);
         continue;
       }
-      const create = window.confirm(
-        `${whoRaw} is not a project contact.\nClick OK to create this contact or Cancel to assign to yourself.`
-      );
-      if (create) {
-        const color = colorPalette[updatedContacts.length % colorPalette.length];
-        const newContact = { role: "", name: whoRaw, email: "", color };
-        updatedContacts = [...updatedContacts, newContact];
-        setContacts(updatedContacts);
-        if (uid) {
-          saveInitiative(uid, initiativeId, {
-            keyContacts: updatedContacts.map(({ name, role, email }) => ({
-              name,
-              role,
-              email,
-            })),
-          });
+      for (const name of names) {
+        const lower = name.toLowerCase();
+        if (!name || lower === currentUserName.toLowerCase() || known.has(lower)) {
+          resolved.push({ ...s, who: name });
+          continue;
         }
-        known.add(who);
-        resolved.push(s);
-      } else {
-        resolved.push({ ...s, who: currentUserName });
+        const create = window.confirm(
+          `${name} is not a project contact.\nClick OK to create this contact or Cancel to assign to yourself.`
+        );
+        if (create) {
+          const color = colorPalette[updatedContacts.length % colorPalette.length];
+          const newContact = { role: "", name, email: "", color };
+          updatedContacts = [...updatedContacts, newContact];
+          setContacts(updatedContacts);
+          if (uid) {
+            saveInitiative(uid, initiativeId, {
+              keyContacts: updatedContacts.map(({ name, role, email }) => ({
+                name,
+                role,
+                email,
+              })),
+            });
+          }
+          known.add(lower);
+          resolved.push({ ...s, who: name });
+        } else {
+          resolved.push({ ...s, who: currentUserName });
+        }
       }
     }
     return resolved;

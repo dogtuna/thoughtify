@@ -256,14 +256,14 @@ export default function TaskQueue({
             <div key={idx} className="provenance-group">
               <span
                 className="prov-chip"
-                title={p.preview}
+                title={p.questionPreview || p.preview}
                 onClick={() => navigate(`/discovery?focus=${p.question}`)}
               >
                 {`Q${p.question + 1}`}
               </span>
               <span
                 className="prov-chip"
-                title={p.preview}
+                title={p.answerPreview || p.preview}
                 onClick={() => navigate(`/discovery?focus=${p.question}`)}
               >
                 {`A${p.answer + 1}`}
@@ -271,7 +271,7 @@ export default function TaskQueue({
               {p.ruleId && (
                 <span
                   className="prov-chip"
-                  title={p.preview}
+                  title={p.answerPreview || p.preview}
                   onClick={() => navigate(`/discovery?focus=${p.question}`)}
                 >
                   {p.ruleId}
