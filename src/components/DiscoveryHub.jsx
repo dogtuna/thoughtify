@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
@@ -159,6 +159,16 @@ const DiscoveryHub = () => {
   const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
 
+  const normalizeAssignee = useCallback(
+    (a) => {
+      if (!a) return currentUserName;
+      return /instructional designer|performance consultant/i.test(a)
+        ? currentUserName
+        : a;
+    },
+    [currentUserName],
+  );
+
   const focusQuestionCard = (idx) => {
     const el = document.getElementById(`question-${idx}`);
     if (el) {
@@ -234,14 +244,14 @@ const DiscoveryHub = () => {
     projectTasks.forEach((t) => {
       const assignees =
         t.assignees && t.assignees.length
-          ? t.assignees
-          : [t.assignee || currentUserName];
+          ? t.assignees.map(normalizeAssignee)
+          : [normalizeAssignee(t.assignee || currentUserName)];
       assignees.forEach((a) => {
         set.add(a === currentUserName ? "My Tasks" : a);
       });
     });
     return Array.from(set);
-  }, [projectTasks, currentUserName]);
+  }, [projectTasks, currentUserName, normalizeAssignee]);
 
   const taskTypeOptions = useMemo(() => {
     const set = new Set();
@@ -264,8 +274,8 @@ const DiscoveryHub = () => {
       tasks = tasks.filter((t) => {
         const assignees =
           t.assignees && t.assignees.length
-            ? t.assignees
-            : [t.assignee || currentUserName];
+            ? t.assignees.map(normalizeAssignee)
+            : [normalizeAssignee(t.assignee || currentUserName)];
         const labels = assignees.map((a) =>
           a === currentUserName ? "My Tasks" : a
         );
@@ -283,6 +293,7 @@ const DiscoveryHub = () => {
     taskContactFilter,
     taskTypeFilter,
     currentUserName,
+    normalizeAssignee,
   ]);
 
   const tasksByAssignee = useMemo(() => {
@@ -290,8 +301,8 @@ const DiscoveryHub = () => {
     displayedTasks.forEach((t) => {
       const assignees =
         t.assignees && t.assignees.length
-          ? t.assignees
-          : [t.assignee || currentUserName];
+          ? t.assignees.map(normalizeAssignee)
+          : [normalizeAssignee(t.assignee || currentUserName)];
       if (assignees.length > 1) {
         const label = assignees.join(", ");
         if (!map[label]) map[label] = [];
@@ -304,7 +315,7 @@ const DiscoveryHub = () => {
       }
     });
     return map;
-  }, [displayedTasks, currentUserName]);
+  }, [displayedTasks, currentUserName, normalizeAssignee]);
 
   const suggestionIcon = (category) => {
     switch (category) {
@@ -721,8 +732,8 @@ Respond ONLY in this JSON format:
 
         const assigneeNames =
           s.assignees && s.assignees.length
-            ? s.assignees
-            : parseContactNames(s.who || "");
+            ? s.assignees.map(normalizeAssignee)
+            : parseContactNames(s.who || "").map(normalizeAssignee);
 
         if (s.category === "question") {
           const contactsList = assigneeNames.length ? assigneeNames : [name];
@@ -1386,11 +1397,18 @@ Respond ONLY in this JSON format:
       "tasks",
     );
     const unsub = onSnapshot(tasksRef, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs.map((d) => {
+        const data = d.data();
+        const assignees =
+          data.assignees && data.assignees.length
+            ? data.assignees.map(normalizeAssignee)
+            : [normalizeAssignee(data.assignee || currentUserName)];
+        return { id: d.id, ...data, assignees, assignee: assignees[0] };
+      });
       setProjectTasks(list);
     });
     return () => unsub();
-  }, [uid, initiativeId]);
+  }, [uid, initiativeId, currentUserName, normalizeAssignee]);
 
   const updateAnswer = (idx, name, value) => {
     const now = new Date().toISOString();
