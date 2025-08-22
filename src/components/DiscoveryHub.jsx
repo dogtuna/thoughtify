@@ -157,7 +157,8 @@ const DiscoveryHub = () => {
         restoredRef.current = true;
       }
     }
-  }, [questions, markAsked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions]);
 
   const taskProjects = useMemo(() => {
     const set = new Set();
@@ -1178,7 +1179,7 @@ Respond ONLY in this JSON format:
     }
   };
 
-  const markAsked = async (idx, names = []) => {
+  async function markAsked(idx, names = []) {
     const text = questions[idx]?.question || "";
     let updatedQuestions = questions;
     const now = new Date().toISOString();
@@ -1209,9 +1210,9 @@ Respond ONLY in this JSON format:
       });
     }
     return text;
-  };
+  }
 
-  const unmarkAsked = async (idx, name) => {
+  async function unmarkAsked(idx, name) {
     let updatedQuestions = questions;
     setQuestions((prev) => {
       const updated = [...prev];
@@ -1233,7 +1234,7 @@ Respond ONLY in this JSON format:
         clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
       });
     }
-  };
+  }
 
   const openComposer = (idx, contactsList) => {
     try {
