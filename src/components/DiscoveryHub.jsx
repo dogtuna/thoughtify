@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
@@ -9,6 +9,7 @@ import {
   collection,
   addDoc,
   serverTimestamp,
+  Timestamp,
   onSnapshot,
   updateDoc,
   deleteDoc,
@@ -605,7 +606,7 @@ Respond ONLY in this JSON format:
         ? {
             ...st,
             completed,
-            completedAt: completed ? serverTimestamp() : null,
+            completedAt: completed ? Timestamp.now() : null,
           }
         : st
     );
@@ -613,6 +614,9 @@ Respond ONLY in this JSON format:
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
         { subTasks: updated }
+      );
+      setProjectTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, subTasks: updated } : t))
       );
     } catch (err) {
       console.error("handleSubTaskToggle error", err);
@@ -704,7 +708,10 @@ Respond ONLY in this JSON format:
           header = `Send an email to ${assignee}`;
           break;
         case "meeting":
-          header = `Set up a meeting with ${assignee}`;
+          header =
+            assignee === currentUserName
+              ? "Suggested meetings"
+              : `Set up a meeting with ${assignee}`;
           break;
         case "call":
           header = `Call ${assignee}`;
@@ -990,6 +997,18 @@ Respond ONLY in this JSON format:
       });
     }
     return name;
+  };
+
+  const filterSuggestionsForContacts = (suggestions) => {
+    const known = new Set(contacts.map((c) => c.name.toLowerCase()));
+    return suggestions.filter((s) => {
+      const assignee = (s.assignee || "").trim().toLowerCase();
+      return (
+        !assignee ||
+        assignee === currentUserName.toLowerCase() ||
+        known.has(assignee)
+      );
+    });
   };
 
   const addContactToQuestion = (idx, name) => {
@@ -1721,23 +1740,18 @@ Respond ONLY in this JSON format:
     )}
 
     {synergyQueue.length > 0 &&
-      ReactDOM.createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 text-black">
-            <h3 className="mb-2 text-lg font-semibold">Synergize Tasks</h3>
-            <h4 className="mb-2 font-medium">
-              {synergyQueue[synergyIndex].header}
-            </h4>
+      createPortal(
+        <div className="modal-overlay">
+          <div className="initiative-card modal-content">
+            <h3>Synergize Tasks</h3>
+            <h4>{synergyQueue[synergyIndex].header}</h4>
             <ul className="mb-4 list-inside list-disc text-sm">
               {synergyQueue[synergyIndex].bullets.map((m, idx) => (
                 <li key={idx}>{m}</li>
               ))}
             </ul>
-            <div className="flex justify-end gap-2">
-              <button
-                className="generator-button"
-                onClick={nextSynergy}
-              >
+            <div className="modal-actions">
+              <button className="generator-button" onClick={nextSynergy}>
                 Skip
               </button>
               <button
@@ -1758,10 +1772,10 @@ Respond ONLY in this JSON format:
         document.body
       )}
     {editTask &&
-      ReactDOM.createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 text-black">
-            <h3 className="text-lg font-semibold">Edit Task</h3>
+      createPortal(
+        <div className="modal-overlay">
+          <div className="initiative-card modal-content space-y-4">
+            <h3>Edit Task</h3>
             <div>
               <label className="block text-sm font-medium">Contact</label>
               <select
@@ -1816,7 +1830,7 @@ Respond ONLY in this JSON format:
                 Add Subtask
               </button>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="modal-actions">
               <button
                 className="generator-button"
                 onClick={() => setEditTask(null)}
@@ -2122,9 +2136,23 @@ Respond ONLY in this JSON format:
                 <button
                   className="generator-button"
                   onClick={async () => {
+                    const filtered = filterSuggestionsForContacts(
+                      analysisModal.selected
+                    );
+                    if (filtered.length === 0) {
+                      alert(
+                        "No tasks added: assignees must be existing project contacts."
+                      );
+                      return;
+                    }
+                    if (filtered.length < analysisModal.selected.length) {
+                      alert(
+                        "Some tasks were skipped because the assignees are not project contacts."
+                      );
+                    }
                     await createTasksFromAnalysis(
                       analysisModal.name,
-                      analysisModal.selected,
+                      filtered
                     );
                     setAnalysisModal(null);
                   }}
