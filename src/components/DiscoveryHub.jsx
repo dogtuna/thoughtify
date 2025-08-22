@@ -168,12 +168,23 @@ const DiscoveryHub = () => {
     [currentUserName],
   );
 
-  const focusQuestionCard = (idx) => {
+  const focusQuestionCard = (idx, answerIdx = null) => {
     const el = document.getElementById(`question-${idx}`);
     if (el) {
       el.classList.add("highlight-question");
       el.scrollIntoView({ behavior: "smooth" });
       setTimeout(() => el.classList.remove("highlight-question"), 2000);
+      if (answerIdx !== null) {
+        const answerEl = document.getElementById(`answer-${idx}-${answerIdx}`);
+        if (answerEl) {
+          answerEl.classList.add("highlight-question");
+          answerEl.scrollIntoView({ behavior: "smooth" });
+          setTimeout(
+            () => answerEl.classList.remove("highlight-question"),
+            2000,
+          );
+        }
+      }
     }
   };
 
@@ -224,8 +235,11 @@ const DiscoveryHub = () => {
     const focus = searchParams.get("focus");
     if (focus !== null) {
       const idx = parseInt(focus, 10);
+      const answerParam = searchParams.get("answer");
+      const ansIdx =
+        answerParam !== null ? parseInt(answerParam, 10) : null;
       if (!Number.isNaN(idx)) {
-        setTimeout(() => focusQuestionCard(idx), 500);
+        setTimeout(() => focusQuestionCard(idx, ansIdx), 500);
       }
     }
   }, [searchParams, questions]);
@@ -1042,8 +1056,14 @@ Respond ONLY in this JSON format:
         case "call":
           header = `Call ${assigneeLabel}`;
           break;
-        default:
-          header = `Work with ${assigneeLabel}`;
+        default: {
+          const prettyType = type ? `${type.replace(/-/g, " ")} ` : "";
+          header =
+            assignees.length === 1 && assignees[0] === currentUserName
+              ? `Here are your current ${prettyType}tasks:`
+              : `Work with ${assigneeLabel}`;
+          break;
+        }
       }
       const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
@@ -1221,7 +1241,7 @@ Respond ONLY in this JSON format:
                 <span
                   className="prov-chip"
                   title={p.answerPreview || p.preview}
-                  onClick={() => focusQuestionCard(p.question)}
+                  onClick={() => focusQuestionCard(p.question, p.answer)}
                 >
                   {`A${p.answer + 1}`}
                 </span>
@@ -1229,7 +1249,7 @@ Respond ONLY in this JSON format:
                   <span
                     className="prov-chip"
                     title={p.answerPreview || p.preview}
-                    onClick={() => focusQuestionCard(p.question)}
+                    onClick={() => focusQuestionCard(p.question, p.answer)}
                   >
                     {p.ruleId}
                   </span>
@@ -2666,7 +2686,7 @@ Respond ONLY in this JSON format:
                         </div>
                       )}
                       {q.status !== "toask" &&
-                        q.contacts.map((name) => {
+                        q.contacts.map((name, idxAns) => {
                           const key = `${q.idx}-${name}`;
                           const draft = answerDrafts[key];
                           const isActive =
@@ -2674,7 +2694,11 @@ Respond ONLY in this JSON format:
                             activeComposer.idx === q.idx &&
                             activeComposer.name === name;
                           return (
-                            <div key={name} className="answer-block">
+                            <div
+                              key={name}
+                              id={`answer-${q.idx}-${idxAns}`}
+                              className="answer-block"
+                            >
                               <strong>{name}:</strong>
                               {activeComposer &&
                                 activeComposer.idx === q.idx &&

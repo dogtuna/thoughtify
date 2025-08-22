@@ -200,13 +200,13 @@ export default function TaskQueue({
       const assigneeLabel = Array.from(new Set(assignees)).join(", ");
       const type = first.subType || first.tag || "";
       let header;
+      const current =
+        auth.currentUser?.displayName || auth.currentUser?.email || "";
       switch (type) {
         case "email":
           header = `Send an email to ${assigneeLabel}`;
           break;
         case "meeting": {
-          const current =
-            auth.currentUser?.displayName || auth.currentUser?.email || "";
           header =
             assignees.length === 1 && assignees[0] === current
               ? "Suggested meetings"
@@ -216,8 +216,14 @@ export default function TaskQueue({
         case "call":
           header = `Call ${assigneeLabel}`;
           break;
-        default:
-          header = `Work with ${assigneeLabel}`;
+        default: {
+          const prettyType = type ? `${type.replace(/-/g, " ")} ` : "";
+          header =
+            assignees.length === 1 && assignees[0] === current
+              ? `Here are your current ${prettyType}tasks:`
+              : `Work with ${assigneeLabel}`;
+          break;
+        }
       }
       const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
@@ -289,23 +295,26 @@ export default function TaskQueue({
       {Array.isArray(task.provenance) && task.provenance.length > 0 && (
         <div className="provenance-chips">
           {task.provenance.map((p, idx) => {
-            const params = new URLSearchParams();
-            if (task.project) params.set("initiativeId", task.project);
-            params.set("focus", p.question);
-            const link = `/discovery?${params.toString()}`;
+            const baseParams = new URLSearchParams();
+            if (task.project) baseParams.set("initiativeId", task.project);
+            baseParams.set("focus", p.question);
+            const questionLink = `/discovery?${baseParams.toString()}`;
+            const answerParams = new URLSearchParams(baseParams);
+            answerParams.set("answer", p.answer);
+            const answerLink = `/discovery?${answerParams.toString()}`;
             return (
               <div key={idx} className="provenance-group">
                 <span
                   className="prov-chip"
                   title={p.questionPreview || p.preview}
-                  onClick={() => navigate(link)}
+                  onClick={() => navigate(questionLink)}
                 >
                   {`Q${p.question + 1}`}
                 </span>
                 <span
                   className="prov-chip"
                   title={p.answerPreview || p.preview}
-                  onClick={() => navigate(link)}
+                  onClick={() => navigate(answerLink)}
                 >
                   {`A${p.answer + 1}`}
                 </span>
@@ -313,7 +322,7 @@ export default function TaskQueue({
                   <span
                     className="prov-chip"
                     title={p.answerPreview || p.preview}
-                    onClick={() => navigate(link)}
+                    onClick={() => navigate(answerLink)}
                   >
                     {p.ruleId}
                   </span>
