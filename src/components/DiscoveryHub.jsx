@@ -124,6 +124,7 @@ const DiscoveryHub = () => {
   const [summary, setSummary] = useState("");
   const [showSummary, setShowSummary] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [openTaskDropdown, setOpenTaskDropdown] = useState(null);
   const [menu, setMenu] = useState(null);
   const [focusRole, setFocusRole] = useState("");
   const [editData, setEditData] = useState(null);
@@ -291,11 +292,16 @@ const DiscoveryHub = () => {
         t.assignees && t.assignees.length
           ? t.assignees
           : [t.assignee || currentUserName];
-      assignees.forEach((a) => {
+      if (assignees.length > 1) {
+        const label = assignees.join(", ");
+        if (!map[label]) map[label] = [];
+        map[label].push(t);
+      } else {
+        const a = assignees[0];
         const label = a === currentUserName ? "My Tasks" : a;
         if (!map[label]) map[label] = [];
         map[label].push(t);
-      });
+      }
     });
     return map;
   }, [displayedTasks, currentUserName]);
@@ -407,6 +413,46 @@ const DiscoveryHub = () => {
       if (!chosen.length) return;
       const drafts = chosen.map((name) =>
         generateDraft([name], [{ text: q.question, id: q.id }])
+      );
+      startDraftQueue(drafts);
+    };
+    if (targets.length === 1) {
+      handleSelection(targets);
+    } else {
+      openRecipientModal(targets, handleSelection);
+    }
+  };
+
+  const generateTaskEmail = (recipients, task) => {
+    const userName =
+      auth.currentUser?.displayName || auth.currentUser?.email || "";
+    const toNames = recipients.join(", ");
+    const subject = `Regarding: ${task.message}`;
+    const body = `Hi ${toNames},\n\n${task.message}\n\nBest regards,\n${userName}`;
+    return { subject, body, recipients, taskIds: [task.id] };
+  };
+
+  const draftTaskEmail = (task) => {
+    if (!emailConnected) {
+      if (window.confirm("Connect your Gmail account in settings?")) {
+        navigate("/settings");
+      }
+      return;
+    }
+    if (!auth.currentUser) {
+      alert("Please log in to draft emails.");
+      console.warn("auth.currentUser is null when drafting email");
+      return;
+    }
+    const targets =
+      task.assignees && task.assignees.length
+        ? task.assignees
+        : [task.assignee || currentUserName];
+    if (!targets.length) return;
+    const handleSelection = (chosen) => {
+      if (!chosen.length) return;
+      const drafts = chosen.map((name) =>
+        generateTaskEmail([name], task)
       );
       startDraftQueue(drafts);
     };
@@ -790,6 +836,59 @@ Respond ONLY in this JSON format:
     }
   };
 
+  const addAssigneeToTask = (taskId, name) => {
+    let newAssignees = [];
+    setProjectTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        const assignees =
+          t.assignees && t.assignees.length
+            ? [...t.assignees]
+            : [t.assignee || currentUserName];
+        if (!assignees.includes(name)) assignees.push(name);
+        newAssignees = assignees;
+        return { ...t, assignees };
+      })
+    );
+    if (uid && initiativeId && newAssignees.length) {
+      updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
+        { assignees: newAssignees, assignee: newAssignees[0] }
+      ).catch((err) => console.error("addAssigneeToTask error", err));
+    }
+  };
+
+  const removeAssigneeFromTask = (taskId, name) => {
+    let newAssignees = [];
+    setProjectTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        const assignees = (
+          t.assignees && t.assignees.length
+            ? t.assignees
+            : [t.assignee || currentUserName]
+        ).filter((a) => a !== name);
+        newAssignees = assignees;
+        return { ...t, assignees };
+      })
+    );
+    if (uid && initiativeId) {
+      updateDoc(
+        doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
+        { assignees: newAssignees, assignee: newAssignees[0] || "" }
+      ).catch((err) => console.error("removeAssigneeFromTask error", err));
+    }
+  };
+
+  const handleTaskContactSelect = (taskId, value) => {
+    if (value === "__add__") {
+      const newName = addContact();
+      if (newName) addAssigneeToTask(taskId, newName);
+    } else if (value) {
+      addAssigneeToTask(taskId, value);
+    }
+  };
+
   const handleSubTaskToggle = async (taskId, index, completed) => {
     if (!uid || !initiativeId) return;
     const task = projectTasks.find((t) => t.id === taskId);
@@ -1033,20 +1132,57 @@ Respond ONLY in this JSON format:
       t.assignees && t.assignees.length
         ? t.assignees
         : [t.assignee || currentUserName];
-    const contactLabels = contactsArr.map((c) =>
-      c === currentUserName ? "My Tasks" : c
-    );
     const project = t.project || projectName || "General";
     return (
       <div key={t.id} className="initiative-card task-card space-y-3">
         {t.tag && <span className={`task-tag ${t.tag}`}>{t.tag}</span>}
         <div className="task-card-header">
-          <div className="flex flex-wrap gap-1">
-            {contactLabels.map((lbl) => (
-              <span key={lbl} className="task-contact">
-                {lbl}
+          <div className="contact-row">
+            {contactsArr.map((name) => (
+              <span
+                key={name}
+                className="contact-tag"
+                style={{ backgroundColor: getColor(name) }}
+              >
+                {name === currentUserName ? "My Tasks" : name}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAssigneeFromTask(t.id, name);
+                  }}
+                >
+                  ×
+                </button>
               </span>
             ))}
+            <button
+              className="add-contact-btn"
+              onClick={() =>
+                setOpenTaskDropdown((d) => (d === t.id ? null : t.id))
+              }
+            >
+              +
+            </button>
+            {openTaskDropdown === t.id && (
+              <select
+                className="contact-select"
+                value=""
+                onChange={(e) => {
+                  handleTaskContactSelect(t.id, e.target.value);
+                  setOpenTaskDropdown(null);
+                }}
+              >
+                <option value="">Select Contact</option>
+                {contacts
+                  .filter((c) => !contactsArr.includes(c.name))
+                  .map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                <option value="__add__">Add New Contact</option>
+              </select>
+            )}
           </div>
           <span className="task-project">{project}</span>
         </div>
@@ -2128,12 +2264,22 @@ Respond ONLY in this JSON format:
                 >
                   Edit
                 </button>
-                <button
-                  className="generator-button"
-                  onClick={() => handleScheduleTask(t.id)}
-                >
-                  Schedule
-                </button>
+                {(t.subType === "email" || t.tag === "email") && (
+                  <button
+                    className="generator-button"
+                    onClick={() => draftTaskEmail(t)}
+                  >
+                    Draft Email
+                  </button>
+                )}
+                {(t.subType === "meeting" || t.tag === "meeting") && (
+                  <button
+                    className="generator-button"
+                    onClick={() => handleScheduleTask(t.id)}
+                  >
+                    Schedule
+                  </button>
+                )}
                 <button
                   className="generator-button"
                   onClick={() => handleCompleteTask(t.id)}
@@ -2156,42 +2302,56 @@ Respond ONLY in this JSON format:
       </div>
     ) : (
       <div className="space-y-4">
-        {Object.entries(tasksByAssignee).map(([assignee, tasks]) => (
-          <div key={assignee} className="initiative-card space-y-2">
-            <h3 className="font-semibold">{assignee}</h3>
-            {tasks.map((t) =>
-              renderTaskCard(
-                t,
-                <>
-                  <button
-                    className="generator-button"
-                    onClick={() => openEditModal(t)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="generator-button"
-                    onClick={() => handleCompleteTask(t.id)}
-                  >
-                    Complete
-                  </button>
-                  <button
-                    className="generator-button"
-                    onClick={() => handleScheduleTask(t.id)}
-                  >
-                    Schedule
-                  </button>
-                  <button
-                    className="generator-button"
-                    onClick={() => handleDeleteTask(t.id)}
-                  >
-                    Delete
-                  </button>
-                </>
-              )
-            )}
-          </div>
-        ))}
+        {Object.entries(tasksByAssignee)
+          .sort((a, b) =>
+            a[0] === "My Tasks" ? -1 : b[0] === "My Tasks" ? 1 : 0
+          )
+          .map(([assignee, tasks]) => (
+            <div key={assignee} className="initiative-card space-y-2">
+              <h3 className="font-semibold">{assignee}</h3>
+              {tasks.map((t) =>
+                renderTaskCard(
+                  t,
+                  <>
+                    <button
+                      className="generator-button"
+                      onClick={() => openEditModal(t)}
+                    >
+                      Edit
+                    </button>
+                    {(t.subType === "email" || t.tag === "email") && (
+                      <button
+                        className="generator-button"
+                        onClick={() => draftTaskEmail(t)}
+                      >
+                        Draft Email
+                      </button>
+                    )}
+                    {(t.subType === "meeting" || t.tag === "meeting") && (
+                      <button
+                        className="generator-button"
+                        onClick={() => handleScheduleTask(t.id)}
+                      >
+                        Schedule
+                      </button>
+                    )}
+                    <button
+                      className="generator-button"
+                      onClick={() => handleCompleteTask(t.id)}
+                    >
+                      Complete
+                    </button>
+                    <button
+                      className="generator-button"
+                      onClick={() => handleDeleteTask(t.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )
+              )}
+            </div>
+          ))}
         {displayedTasks.length === 0 && (
           <p className="text-gray-400">No tasks.</p>
         )}
