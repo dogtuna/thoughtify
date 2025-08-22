@@ -359,6 +359,11 @@
   color: #fbcfe8;
 }
 
+.task-tag.instructional-design {
+  background-color: #4c1d95;
+  color: #ddd6fe;
+}
+
 .task-tag.default {
   background-color: #374151;
   color: #d1d5db;

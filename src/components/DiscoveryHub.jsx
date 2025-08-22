@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
@@ -18,7 +18,11 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
-import { classifyTask, dedupeByMessage } from "../utils/taskUtils";
+import {
+  classifyTask,
+  dedupeByMessage,
+  normalizeAssigneeName,
+} from "../utils/taskUtils";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -159,6 +163,11 @@ const DiscoveryHub = () => {
   const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
 
+  const normalizeAssignee = useCallback(
+    (a) => normalizeAssigneeName(a, currentUserName),
+    [currentUserName],
+  );
+
   const focusQuestionCard = (idx) => {
     const el = document.getElementById(`question-${idx}`);
     if (el) {
@@ -234,14 +243,14 @@ const DiscoveryHub = () => {
     projectTasks.forEach((t) => {
       const assignees =
         t.assignees && t.assignees.length
-          ? t.assignees
-          : [t.assignee || currentUserName];
+          ? t.assignees.map(normalizeAssignee)
+          : [normalizeAssignee(t.assignee || currentUserName)];
       assignees.forEach((a) => {
         set.add(a === currentUserName ? "My Tasks" : a);
       });
     });
     return Array.from(set);
-  }, [projectTasks, currentUserName]);
+  }, [projectTasks, currentUserName, normalizeAssignee]);
 
   const taskTypeOptions = useMemo(() => {
     const set = new Set();
@@ -264,8 +273,8 @@ const DiscoveryHub = () => {
       tasks = tasks.filter((t) => {
         const assignees =
           t.assignees && t.assignees.length
-            ? t.assignees
-            : [t.assignee || currentUserName];
+            ? t.assignees.map(normalizeAssignee)
+            : [normalizeAssignee(t.assignee || currentUserName)];
         const labels = assignees.map((a) =>
           a === currentUserName ? "My Tasks" : a
         );
@@ -283,6 +292,7 @@ const DiscoveryHub = () => {
     taskContactFilter,
     taskTypeFilter,
     currentUserName,
+    normalizeAssignee,
   ]);
 
   const tasksByAssignee = useMemo(() => {
@@ -290,8 +300,8 @@ const DiscoveryHub = () => {
     displayedTasks.forEach((t) => {
       const assignees =
         t.assignees && t.assignees.length
-          ? t.assignees
-          : [t.assignee || currentUserName];
+          ? t.assignees.map(normalizeAssignee)
+          : [normalizeAssignee(t.assignee || currentUserName)];
       if (assignees.length > 1) {
         const label = assignees.join(", ");
         if (!map[label]) map[label] = [];
@@ -304,7 +314,7 @@ const DiscoveryHub = () => {
       }
     });
     return map;
-  }, [displayedTasks, currentUserName]);
+  }, [displayedTasks, currentUserName, normalizeAssignee]);
 
   const suggestionIcon = (category) => {
     switch (category) {
@@ -314,6 +324,8 @@ const DiscoveryHub = () => {
         return "📨";
       case "research":
         return "🔎";
+      case "instructional-design":
+        return "🎨";
       case "question":
         return "❓";
       default:
@@ -567,7 +579,7 @@ Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
 - "suggestions": An array of objects for follow-up actions. Each object must have three string fields:
     1. "text": The follow-up action. Do not include any names in this text.
-    2. "category": One of "question", "meeting", "email", or "research".
+    2. "category": One of "question", "meeting", "email", "research", or "instructional-design". Use "instructional-design" for tasks involving designing or creating instructional materials.
     3. "who": The person or group to work with. This must be either a project contact, someone explicitly mentioned in the provided materials, or the current user.
 
 Respond ONLY in this JSON format:
@@ -582,7 +594,13 @@ Respond ONLY in this JSON format:
             ? parsed.analysis
             : JSON.stringify(parsed.analysis);
 
-        const allowedCategories = ["question", "meeting", "email", "research"];
+        const allowedCategories = [
+          "question",
+          "meeting",
+          "email",
+          "research",
+          "instructional-design",
+        ];
         const suggestions = Array.isArray(parsed.suggestions)
           ? parsed.suggestions
               .filter(
@@ -721,8 +739,8 @@ Respond ONLY in this JSON format:
 
         const assigneeNames =
           s.assignees && s.assignees.length
-            ? s.assignees
-            : parseContactNames(s.who || "");
+            ? s.assignees.map(normalizeAssignee)
+            : parseContactNames(s.who || "").map(normalizeAssignee);
 
         if (s.category === "question") {
           const contactsList = assigneeNames.length ? assigneeNames : [name];
@@ -837,6 +855,7 @@ Respond ONLY in this JSON format:
   };
 
   const addAssigneeToTask = (taskId, name) => {
+    const normalized = normalizeAssigneeName(name, currentUserName);
     let newAssignees = [];
     setProjectTasks((prev) =>
       prev.map((t) => {
@@ -845,7 +864,7 @@ Respond ONLY in this JSON format:
           t.assignees && t.assignees.length
             ? [...t.assignees]
             : [t.assignee || currentUserName];
-        if (!assignees.includes(name)) assignees.push(name);
+        if (!assignees.includes(normalized)) assignees.push(normalized);
         newAssignees = assignees;
         return { ...t, assignees };
       })
@@ -859,6 +878,7 @@ Respond ONLY in this JSON format:
   };
 
   const removeAssigneeFromTask = (taskId, name) => {
+    const normalized = normalizeAssigneeName(name, currentUserName);
     let newAssignees = [];
     setProjectTasks((prev) =>
       prev.map((t) => {
@@ -867,7 +887,7 @@ Respond ONLY in this JSON format:
           t.assignees && t.assignees.length
             ? t.assignees
             : [t.assignee || currentUserName]
-        ).filter((a) => a !== name);
+        ).filter((a) => a !== normalized);
         newAssignees = assignees;
         return { ...t, assignees };
       })
@@ -1386,11 +1406,18 @@ Respond ONLY in this JSON format:
       "tasks",
     );
     const unsub = onSnapshot(tasksRef, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs.map((d) => {
+        const data = d.data();
+        const assignees =
+          data.assignees && data.assignees.length
+            ? data.assignees.map(normalizeAssignee)
+            : [normalizeAssignee(data.assignee || currentUserName)];
+        return { id: d.id, ...data, assignees, assignee: assignees[0] };
+      });
       setProjectTasks(list);
     });
     return () => unsub();
-  }, [uid, initiativeId]);
+  }, [uid, initiativeId, currentUserName, normalizeAssignee]);
 
   const updateAnswer = (idx, name, value) => {
     const now = new Date().toISOString();
@@ -2427,6 +2454,7 @@ Respond ONLY in this JSON format:
                 <option value="meeting">meeting</option>
                 <option value="communication">communication</option>
                 <option value="research">research</option>
+                <option value="instructional-design">instructional-design</option>
                 <option value="other">other</option>
               </select>
             </div>
