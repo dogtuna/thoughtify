@@ -298,6 +298,7 @@ export default function TaskQueue({
             const baseParams = new URLSearchParams();
             if (task.project) baseParams.set("initiativeId", task.project);
             baseParams.set("focus", p.question);
+            baseParams.set("qa", "1");
             const questionLink = `/discovery?${baseParams.toString()}`;
             const answerParams = new URLSearchParams(baseParams);
             answerParams.set("answer", p.answer);

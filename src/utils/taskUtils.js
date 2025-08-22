@@ -8,6 +8,22 @@ import { generate } from "../ai";
  */
 export async function classifyTask(message) {
   const lower = (message || "").toLowerCase();
+  const designKeywords = [
+    "design",
+    "develop",
+    "create",
+    "build",
+    "draft",
+    "write",
+    "outline",
+    "storyboard",
+    "instructional",
+    "content",
+  ];
+  if (designKeywords.some((k) => lower.includes(k))) {
+    return "instructional-design";
+  }
+
   const researchKeywords = [
     "research",
     "analysis",
@@ -23,22 +39,6 @@ export async function classifyTask(message) {
   ];
   if (researchKeywords.some((k) => lower.includes(k))) {
     return "research";
-  }
-
-  const designKeywords = [
-    "design",
-    "develop",
-    "create",
-    "build",
-    "draft",
-    "write",
-    "outline",
-    "storyboard",
-    "instructional",
-    "content",
-  ];
-  if (designKeywords.some((k) => lower.includes(k))) {
-    return "instructional-design";
   }
 
   const prompt = `You are a smart assistant that decides how to handle tasks.\nChoose exactly one of: email, call, meeting, research, instructional-design.\nTask: ${message}`;

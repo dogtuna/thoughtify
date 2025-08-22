@@ -161,6 +161,7 @@ const DiscoveryHub = () => {
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
   const [viewingStatus, setViewingStatus] = useState("");
+  const [qaModal, setQaModal] = useState(null);
   const navigate = useNavigate();
 
   const normalizeAssignee = useCallback(
@@ -168,7 +169,7 @@ const DiscoveryHub = () => {
     [currentUserName],
   );
 
-  const focusQuestionCard = (idx, answerIdx = null) => {
+  const focusQuestionCard = useCallback((idx, answerIdx = null) => {
     const el = document.getElementById(`question-${idx}`);
     if (el) {
       el.classList.add("highlight-question");
@@ -186,7 +187,15 @@ const DiscoveryHub = () => {
         }
       }
     }
-  };
+  }, []);
+
+  const openQAModal = useCallback(
+    (qIdx, aIdx = null) => {
+      focusQuestionCard(qIdx, aIdx);
+      setQaModal({ qIdx, aIdx });
+    },
+    [focusQuestionCard],
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -239,10 +248,14 @@ const DiscoveryHub = () => {
       const ansIdx =
         answerParam !== null ? parseInt(answerParam, 10) : null;
       if (!Number.isNaN(idx)) {
-        setTimeout(() => focusQuestionCard(idx, ansIdx), 500);
+        const qa = searchParams.get("qa");
+        setTimeout(() => {
+          if (qa === "1") openQAModal(idx, ansIdx);
+          else focusQuestionCard(idx, ansIdx);
+        }, 500);
       }
     }
-  }, [searchParams, questions]);
+  }, [searchParams, questions, openQAModal, focusQuestionCard]);
 
   const taskProjects = useMemo(() => {
     const set = new Set();
@@ -880,7 +893,7 @@ Respond ONLY in this JSON format:
             : [t.assignee || currentUserName];
         if (!assignees.includes(normalized)) assignees.push(normalized);
         newAssignees = assignees;
-        return { ...t, assignees };
+        return { ...t, assignees, assignee: assignees[0] };
       })
     );
     if (uid && initiativeId && newAssignees.length) {
@@ -903,7 +916,7 @@ Respond ONLY in this JSON format:
             : [t.assignee || currentUserName]
         ).filter((a) => a !== normalized);
         newAssignees = assignees;
-        return { ...t, assignees };
+        return { ...t, assignees, assignee: assignees[0] || "" };
       })
     );
     if (uid && initiativeId) {
@@ -1234,14 +1247,14 @@ Respond ONLY in this JSON format:
                 <span
                   className="prov-chip"
                   title={p.questionPreview || p.preview}
-                  onClick={() => focusQuestionCard(p.question)}
+                  onClick={() => openQAModal(p.question)}
                 >
                   {`Q${p.question + 1}`}
                 </span>
                 <span
                   className="prov-chip"
                   title={p.answerPreview || p.preview}
-                  onClick={() => focusQuestionCard(p.question, p.answer)}
+                  onClick={() => openQAModal(p.question, p.answer)}
                 >
                   {`A${p.answer + 1}`}
                 </span>
@@ -1249,7 +1262,7 @@ Respond ONLY in this JSON format:
                   <span
                     className="prov-chip"
                     title={p.answerPreview || p.preview}
-                    onClick={() => focusQuestionCard(p.question, p.answer)}
+                    onClick={() => openQAModal(p.question, p.answer)}
                   >
                     {p.ruleId}
                   </span>
@@ -2431,6 +2444,35 @@ Respond ONLY in this JSON format:
                 }
               >
                 Approve
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    {qaModal &&
+      createPortal(
+        <div className="modal-overlay" onClick={() => setQaModal(null)}>
+          <div
+            className="initiative-card modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>{`Q${qaModal.qIdx + 1}`}</h3>
+            <p>{questions[qaModal.qIdx]?.question}</p>
+            {qaModal.aIdx !== null && (
+              <>
+                <h4>{`A${qaModal.aIdx + 1}`}</h4>
+                <p>
+                  {questions[qaModal.qIdx]?.answers?.[qaModal.aIdx] || ""}
+                </p>
+              </>
+            )}
+            <div className="modal-actions">
+              <button
+                className="generator-button"
+                onClick={() => setQaModal(null)}
+              >
+                Close
               </button>
             </div>
           </div>
