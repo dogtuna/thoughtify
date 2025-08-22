@@ -141,6 +141,30 @@
   cursor: pointer;
 }
 
+.provenance-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.provenance-group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.prov-chip {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.highlight-question {
+  outline: 2px solid #f59e0b;
+}
+
 .contact-tag button {
   background: none;
   border: none;

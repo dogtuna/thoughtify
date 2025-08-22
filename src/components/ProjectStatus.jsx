@@ -147,6 +147,16 @@ const ProjectStatus = ({
     (t) => `- ${t.message || ""} (${t.status || "open"})`
   );
 
+  const provenanceNotes = tasks
+    .filter((t) => Array.isArray(t.provenance) && t.provenance.length)
+    .map((t) => {
+      const refs = t.provenance
+        .map((p) => `Q${p.question + 1}/A${p.answer + 1}`)
+        .join(", ");
+      return `- ${t.message || ""} (${refs})`;
+    })
+    .join("\n");
+
   const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
 
   const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
@@ -234,9 +244,12 @@ ${allOutstanding || "None"}`;
   try {
     const { text } = await ai.generate(prompt);
     const clean = text.trim();
-    setSummary(clean);
+    const final = provenanceNotes
+      ? `${clean}\n\nProvenance notes:\n${provenanceNotes}`
+      : clean;
+    setSummary(final);
     const now = new Date().toISOString();
-    const entry = { date: now, summary: clean, sent: false };
+    const entry = { date: now, summary: final, sent: false };
     const colRef = collection(
       db,
       "users",
