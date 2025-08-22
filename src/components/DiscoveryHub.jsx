@@ -69,9 +69,32 @@ const colorPalette = [
   "#e2ccff",
 ];
 
+const parseContactNames = (whoRaw) => {
+  if (!whoRaw) return [];
+  const suffixMatch = whoRaw.trim().match(/\b(Teams?|Departments?|Groups?)$/i);
+  if (suffixMatch) {
+    const base = whoRaw.trim().slice(0, suffixMatch.index).trim();
+    const parts = base
+      .split(/\s*(?:,|and|&)\s*/i)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (
+      parts.length > 1 &&
+      parts.every((p) => !/\b(Team|Department|Group)\b$/i.test(p))
+    ) {
+      const suffix = " " + suffixMatch[1].replace(/s$/i, "");
+      return parts.map((p) => p + suffix);
+    }
+  }
+  return whoRaw
+    .split(/\s*(?:,|and|&)\s*/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+};
+
 const normalizeContacts = (value) => {
   if (!value) return [];
-  return Array.isArray(value) ? value : [value];
+  return Array.isArray(value) ? value : parseContactNames(value);
 };
 
 const DiscoveryHub = () => {
@@ -117,6 +140,7 @@ const DiscoveryHub = () => {
   const [activeComposer, setActiveComposer] = useState(null);
   const [restoredDraftKey, setRestoredDraftKey] = useState(null);
   const [composerError, setComposerError] = useState(null);
+  const [toast, setToast] = useState(null);
   const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -168,6 +192,12 @@ const DiscoveryHub = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     const focus = searchParams.get("focus");
@@ -553,8 +583,8 @@ Respond ONLY in this JSON format:
 
     const questionsToAdd = [];
     const tasksToAdd = [];
+    let addedCount = 0;
 
-    const existingTaskSet = new Set(projectTasks.map((t) => t.message.toLowerCase()));
     const existingQuestionSet = new Set(
       questions.map((q) => q.question.toLowerCase())
     );
@@ -565,17 +595,57 @@ Respond ONLY in this JSON format:
       Object.keys(answerObj).indexOf(name)
     );
     const answerText = answerObj[name]?.text || "";
-    const preview = answerText
+    const answerPreview = answerText
       .split(/(?<=\.)\s+/)
       .slice(0, 2)
       .join(" ")
       .slice(0, 200);
+    const questionText = questions[idx]?.question || "";
+    const questionPreview = questionText.slice(0, 200);
 
     try {
       for (const s of suggestions) {
         const lowerText = s.text.toLowerCase();
-        if (existingTaskSet.has(lowerText) || existingQuestionSet.has(lowerText))
-          continue;
+        if (existingQuestionSet.has(lowerText)) continue;
+
+        const duplicateTasks = projectTasks.filter(
+          (t) => t.message.toLowerCase() === lowerText
+        );
+        if (duplicateTasks.length > 0) {
+          const choice = prompt(
+            `Task with the same intent already exists:\n${duplicateTasks
+              .map((t) => `- ${t.message}`)
+              .join("\n")}\nAdd anyway (a) / Skip (s) / Merge now (m)?`,
+            "s"
+          );
+          const c = (choice || "").toLowerCase();
+          if (c === "" || c === "s") {
+            continue;
+          }
+          if (c === "m") {
+            const existing = duplicateTasks[0];
+            const merged = prompt(
+              `Existing: ${existing.message}\nNew: ${s.text}\nMerged task:`,
+              `${existing.message}; ${s.text}`
+            );
+            if (merged) {
+              const tag = await classifyTask(merged);
+              await updateDoc(
+                doc(
+                  db,
+                  "users",
+                  uid,
+                  "initiatives",
+                  initiativeId,
+                  "tasks",
+                  existing.id
+                ),
+                { message: merged, tag }
+              );
+            }
+            continue;
+          }
+        }
 
         let match = contacts.find(
           (c) =>
@@ -600,7 +670,9 @@ Respond ONLY in this JSON format:
             {
               question: idx,
               answer: answerIndex,
-              preview,
+              questionPreview,
+              answerPreview,
+              preview: answerPreview,
               ruleId: s.ruleId || s.templateId || null,
             },
           ];
@@ -614,7 +686,7 @@ Respond ONLY in this JSON format:
             tag,
             provenance,
           });
-          existingTaskSet.add(lowerText);
+          addedCount += 1;
         }
       }
 
@@ -650,6 +722,7 @@ Respond ONLY in this JSON format:
           return updatedQuestions;
         });
       }
+      return addedCount;
     } catch (err) {
       console.error("createTasksFromAnalysis error", err);
     }
@@ -928,14 +1001,14 @@ Respond ONLY in this JSON format:
               <div key={idxP} className="provenance-group">
                 <span
                   className="prov-chip"
-                  title={p.preview}
+                  title={p.questionPreview || p.preview}
                   onClick={() => focusQuestionCard(p.question)}
                 >
                   {`Q${p.question + 1}`}
                 </span>
                 <span
                   className="prov-chip"
-                  title={p.preview}
+                  title={p.answerPreview || p.preview}
                   onClick={() => focusQuestionCard(p.question)}
                 >
                   {`A${p.answer + 1}`}
@@ -943,7 +1016,7 @@ Respond ONLY in this JSON format:
                 {p.ruleId && (
                   <span
                     className="prov-chip"
-                    title={p.preview}
+                    title={p.answerPreview || p.preview}
                     onClick={() => focusQuestionCard(p.question)}
                   >
                     {p.ruleId}
@@ -1177,16 +1250,47 @@ Respond ONLY in this JSON format:
     return name;
   };
 
-  const filterSuggestionsForContacts = (suggestions) => {
-    const known = new Set(contacts.map((c) => c.name.toLowerCase()));
-    return suggestions.filter((s) => {
-      const who = (s.who || "").trim().toLowerCase();
-      return (
-        !who ||
-        who === currentUserName.toLowerCase() ||
-        known.has(who)
-      );
-    });
+  const resolveSuggestionsForContacts = async (suggestions) => {
+    let updatedContacts = [...contacts];
+    const known = new Set(updatedContacts.map((c) => c.name.toLowerCase()));
+    const resolved = [];
+    for (const s of suggestions) {
+      const names = parseContactNames(s.who || "");
+      if (!names.length) {
+        resolved.push(s);
+        continue;
+      }
+      for (const name of names) {
+        const lower = name.toLowerCase();
+        if (!name || lower === currentUserName.toLowerCase() || known.has(lower)) {
+          resolved.push({ ...s, who: name });
+          continue;
+        }
+        const create = window.confirm(
+          `${name} is not a project contact.\nClick OK to create this contact or Cancel to assign to yourself.`
+        );
+        if (create) {
+          const color = colorPalette[updatedContacts.length % colorPalette.length];
+          const newContact = { role: "", name, email: "", color };
+          updatedContacts = [...updatedContacts, newContact];
+          setContacts(updatedContacts);
+          if (uid) {
+            saveInitiative(uid, initiativeId, {
+              keyContacts: updatedContacts.map(({ name, role, email }) => ({
+                name,
+                role,
+                email,
+              })),
+            });
+          }
+          known.add(lower);
+          resolved.push({ ...s, who: name });
+        } else {
+          resolved.push({ ...s, who: currentUserName });
+        }
+      }
+    }
+    return resolved;
   };
 
   const addContactToQuestion = (idx, name) => {
@@ -1688,6 +1792,7 @@ Respond ONLY in this JSON format:
 
   return (
     <div className="dashboard-container discovery-hub">
+      {toast && <div className="toast">{toast}</div>}
       <aside className="sidebar">
         <h2>Discovery Hub</h2>
         <ul>
@@ -2441,6 +2546,25 @@ Respond ONLY in this JSON format:
                   analysisModal.suggestions.length > 0 && (
                     <>
                       <p>Suggested tasks:</p>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={
+                            analysisModal.selected.length ===
+                              analysisModal.suggestions.length &&
+                            analysisModal.suggestions.length > 0
+                          }
+                          onChange={(e) =>
+                            setAnalysisModal((prev) => ({
+                              ...prev,
+                              selected: e.target.checked
+                                ? prev.suggestions
+                                : [],
+                            }))
+                          }
+                        />
+                        Select All
+                      </label>
                       <ul>
                         {analysisModal.suggestions.map((s, i) => (
                           <li key={i}>
@@ -2477,29 +2601,21 @@ Respond ONLY in this JSON format:
                     <button
                       className="generator-button"
                       onClick={async () => {
-                        const filtered = filterSuggestionsForContacts(
+                        const resolved = await resolveSuggestionsForContacts(
                           analysisModal.selected
                         );
-                        if (filtered.length === 0) {
-                          alert(
-                            "No tasks added: assignees must be existing project contacts."
-                          );
-                          return;
-                        }
-                        if (filtered.length < analysisModal.selected.length) {
-                          alert(
-                            "Some tasks were skipped because the assignees are not project contacts."
-                          );
-                        }
-                        await createTasksFromAnalysis(
+                        const added = await createTasksFromAnalysis(
                           analysisModal.idx,
                           analysisModal.name,
-                          filtered
+                          resolved
                         );
+                        if (added > 0) {
+                          setToast(`Added ${added} tasks.`);
+                        }
                         setAnalysisModal(null);
                       }}
                     >
-                      Add Selected Items
+                      {`Add ${analysisModal.selected.length} tasks`}
                     </button>
                   )}
                   <button
