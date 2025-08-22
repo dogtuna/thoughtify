@@ -141,6 +141,13 @@ const DiscoveryHub = () => {
   const [restoredDraftKey, setRestoredDraftKey] = useState(null);
   const [composerError, setComposerError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [assigneeChoices, setAssigneeChoices] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("assigneeChoices") || "{}");
+    } catch {
+      return {};
+    }
+  });
   const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -200,6 +207,10 @@ const DiscoveryHub = () => {
   }, [toast]);
 
   useEffect(() => {
+    localStorage.setItem("assigneeChoices", JSON.stringify(assigneeChoices));
+  }, [assigneeChoices]);
+
+  useEffect(() => {
     const focus = searchParams.get("focus");
     if (focus !== null) {
       const idx = parseInt(focus, 10);
@@ -220,8 +231,13 @@ const DiscoveryHub = () => {
   const taskContacts = useMemo(() => {
     const set = new Set();
     projectTasks.forEach((t) => {
-      const assignee = t.assignee || currentUserName;
-      set.add(assignee === currentUserName ? "My Tasks" : assignee);
+      const assignees =
+        t.assignees && t.assignees.length
+          ? t.assignees
+          : [t.assignee || currentUserName];
+      assignees.forEach((a) => {
+        set.add(a === currentUserName ? "My Tasks" : a);
+      });
     });
     return Array.from(set);
   }, [projectTasks, currentUserName]);
@@ -245,9 +261,14 @@ const DiscoveryHub = () => {
     }
     if (taskContactFilter !== "all") {
       tasks = tasks.filter((t) => {
-        const assignee = t.assignee || currentUserName;
-        const label = assignee === currentUserName ? "My Tasks" : assignee;
-        return label === taskContactFilter;
+        const assignees =
+          t.assignees && t.assignees.length
+            ? t.assignees
+            : [t.assignee || currentUserName];
+        const labels = assignees.map((a) =>
+          a === currentUserName ? "My Tasks" : a
+        );
+        return labels.includes(taskContactFilter);
       });
     }
     if (taskTypeFilter !== "all") {
@@ -266,10 +287,15 @@ const DiscoveryHub = () => {
   const tasksByAssignee = useMemo(() => {
     const map = {};
     displayedTasks.forEach((t) => {
-      const assignee = t.assignee || currentUserName;
-      const label = assignee === currentUserName ? "My Tasks" : assignee;
-      if (!map[label]) map[label] = [];
-      map[label].push(t);
+      const assignees =
+        t.assignees && t.assignees.length
+          ? t.assignees
+          : [t.assignee || currentUserName];
+      assignees.forEach((a) => {
+        const label = a === currentUserName ? "My Tasks" : a;
+        if (!map[label]) map[label] = [];
+        map[label].push(t);
+      });
     });
     return map;
   }, [displayedTasks, currentUserName]);
@@ -647,25 +673,29 @@ Respond ONLY in this JSON format:
           }
         }
 
-        let match = contacts.find(
-          (c) =>
-            c.name.toLowerCase() === (s.who || "").toLowerCase() ||
-            (c.role || "").toLowerCase() === (s.who || "").toLowerCase()
-        );
+        const assigneeNames =
+          s.assignees && s.assignees.length
+            ? s.assignees
+            : parseContactNames(s.who || "");
 
         if (s.category === "question") {
-          const assignedContact = match ? match.name : name;
-
+          const contactsList = assigneeNames.length ? assigneeNames : [name];
+          const asked = contactsList.reduce(
+            (acc, c) => ({ ...acc, [c]: false }),
+            {}
+          );
           questionsToAdd.push({
             question: s.text,
-            contacts: assignedContact ? [assignedContact] : [],
+            contacts: contactsList,
             answers: {},
-            asked: assignedContact ? { [assignedContact]: false } : {},
+            asked,
           });
           existingQuestionSet.add(lowerText);
         } else {
           const tag = await classifyTask(s.text);
-          const assignee = match ? match.name : currentUserName;
+          const finalAssignees = assigneeNames.length
+            ? assigneeNames
+            : [currentUserName];
           const provenance = [
             {
               question: idx,
@@ -679,7 +709,8 @@ Respond ONLY in this JSON format:
           tasksToAdd.push({
             name,
             message: s.text,
-            assignee,
+            assignees: finalAssignees,
+            assignee: finalAssignees[0],
             subType: s.category,
             status: "open",
             createdAt: serverTimestamp(),
@@ -788,7 +819,10 @@ Respond ONLY in this JSON format:
   const openEditModal = (task) => {
     setEditTask({
       id: task.id,
-      assignee: task.assignee || currentUserName,
+      assignees:
+        task.assignees && task.assignees.length
+          ? [...task.assignees]
+          : [task.assignee || currentUserName],
       subType: task.subType || "task",
       subTasks: task.subTasks ? task.subTasks.map((st) => ({ ...st })) : [],
     });
@@ -823,13 +857,16 @@ Respond ONLY in this JSON format:
 
   const saveEditTask = async () => {
     if (!uid || !initiativeId || !editTask) return;
-    const assignee =
-      editTask.assignee === "My Tasks" ? currentUserName : editTask.assignee;
+    const assignees =
+      editTask.assignees && editTask.assignees.length
+        ? editTask.assignees
+        : [currentUserName];
     try {
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", editTask.id),
         {
-          assignee,
+          assignees,
+          assignee: assignees[0],
           subType: editTask.subType,
           subTasks: editTask.subTasks,
         }
@@ -845,7 +882,11 @@ Respond ONLY in this JSON format:
     displayedTasks
       .filter((t) => (t.status || "open") === "open")
       .forEach((t) => {
-        const key = `${t.assignee || t.name || ""}-${
+        const assignees =
+          t.assignees && t.assignees.length
+            ? t.assignees
+            : [t.assignee || t.name || ""];
+        const key = `${assignees.slice().sort().join("|")}-${
           t.subType || t.tag || "other"
         }`;
         if (!map[key]) map[key] = [];
@@ -862,24 +903,28 @@ Respond ONLY in this JSON format:
     }
     const proposals = bundles.map((b) => {
       const first = b[0];
-      const assignee = first.assignee || first.name || "";
+      const assignees =
+        first.assignees && first.assignees.length
+          ? first.assignees
+          : [first.assignee || first.name || ""];
+      const assigneeLabel = assignees.join(", ");
       const type = first.subType || first.tag || "";
       let header;
       switch (type) {
         case "email":
-          header = `Send an email to ${assignee}`;
+          header = `Send an email to ${assigneeLabel}`;
           break;
         case "meeting":
           header =
-            assignee === currentUserName
+            assignees.length === 1 && assignees[0] === currentUserName
               ? "Suggested meetings"
-              : `Set up a meeting with ${assignee}`;
+              : `Set up a meeting with ${assigneeLabel}`;
           break;
         case "call":
-          header = `Call ${assignee}`;
+          header = `Call ${assigneeLabel}`;
           break;
         default:
-          header = `Work with ${assignee}`;
+          header = `Work with ${assigneeLabel}`;
       }
       const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
@@ -984,14 +1029,25 @@ Respond ONLY in this JSON format:
   };
 
   const renderTaskCard = (t, actionButtons) => {
-    const contact = t.assignee || currentUserName;
-    const contactLabel = contact === currentUserName ? "My Tasks" : contact;
+    const contactsArr =
+      t.assignees && t.assignees.length
+        ? t.assignees
+        : [t.assignee || currentUserName];
+    const contactLabels = contactsArr.map((c) =>
+      c === currentUserName ? "My Tasks" : c
+    );
     const project = t.project || projectName || "General";
     return (
       <div key={t.id} className="initiative-card task-card space-y-3">
         {t.tag && <span className={`task-tag ${t.tag}`}>{t.tag}</span>}
         <div className="task-card-header">
-          <span className="task-contact">{contactLabel}</span>
+          <div className="flex flex-wrap gap-1">
+            {contactLabels.map((lbl) => (
+              <span key={lbl} className="task-contact">
+                {lbl}
+              </span>
+            ))}
+          </div>
           <span className="task-project">{project}</span>
         </div>
         <p>{t.message}</p>
@@ -1257,18 +1313,40 @@ Respond ONLY in this JSON format:
     for (const s of suggestions) {
       const names = parseContactNames(s.who || "");
       if (!names.length) {
-        resolved.push(s);
+        resolved.push({ ...s, assignees: [] });
         continue;
       }
+      const finalNames = [];
       for (const name of names) {
         const lower = name.toLowerCase();
-        if (!name || lower === currentUserName.toLowerCase() || known.has(lower)) {
-          resolved.push({ ...s, who: name });
+        if (
+          !name ||
+          lower === "current user" ||
+          lower === currentUserName.toLowerCase()
+        ) {
+          finalNames.push(currentUserName);
+          continue;
+        }
+        if (known.has(lower)) {
+          finalNames.push(name);
+          continue;
+        }
+        if (assigneeChoices[lower]) {
+          if (assigneeChoices[lower] === "create") {
+            finalNames.push(name);
+            known.add(lower);
+          } else {
+            finalNames.push(currentUserName);
+          }
           continue;
         }
         const create = window.confirm(
           `${name} is not a project contact.\nClick OK to create this contact or Cancel to assign to yourself.`
         );
+        setAssigneeChoices((prev) => ({
+          ...prev,
+          [lower]: create ? "create" : "self",
+        }));
         if (create) {
           const color = colorPalette[updatedContacts.length % colorPalette.length];
           const newContact = { role: "", name, email: "", color };
@@ -1284,11 +1362,16 @@ Respond ONLY in this JSON format:
             });
           }
           known.add(lower);
-          resolved.push({ ...s, who: name });
+          finalNames.push(name);
         } else {
-          resolved.push({ ...s, who: currentUserName });
+          finalNames.push(currentUserName);
         }
       }
+      resolved.push({
+        ...s,
+        who: finalNames.join(", "),
+        assignees: finalNames,
+      });
     }
     return resolved;
   };
@@ -2153,17 +2236,19 @@ Respond ONLY in this JSON format:
           <div className="initiative-card modal-content space-y-4">
             <h3>Edit Task</h3>
             <div>
-              <label className="block text-sm font-medium">Contact</label>
+              <label className="block text-sm font-medium">Contacts</label>
               <select
-                value={
-                  editTask.assignee === currentUserName
-                    ? "My Tasks"
-                    : editTask.assignee
+                multiple
+                value={editTask.assignees}
+                onChange={(e) =>
+                  updateEditTaskField(
+                    "assignees",
+                    Array.from(e.target.selectedOptions, (o) => o.value)
+                  )
                 }
-                onChange={(e) => updateEditTaskField("assignee", e.target.value)}
                 className="w-full rounded-md border px-2 py-1"
               >
-                <option value="My Tasks">My Tasks</option>
+                <option value={currentUserName}>My Tasks</option>
                 {contacts.map((c) => (
                   <option key={c.name} value={c.name}>
                     {c.name}
@@ -2566,20 +2651,26 @@ Respond ONLY in this JSON format:
                         Select All
                       </label>
                       <ul>
-                        {analysisModal.suggestions.map((s, i) => (
-                          <li key={i}>
-                            <label>
-                              <input
-                                type="checkbox"
-                                checked={analysisModal.selected.some(
-                                  (item) => item.text === s.text
-                                )}
-                                onChange={() => toggleSuggestion(s)}
-                              />
-                              {suggestionIcon(s.category)} {`[${s.category}] ${s.text} (${s.who})`}
-                            </label>
-                          </li>
-                        ))}
+                        {analysisModal.suggestions.map((s, i) => {
+                          const whoDisplay = Array.isArray(s.assignees)
+                            ? s.assignees.join(", ")
+                            : s.who;
+                          return (
+                            <li key={i}>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={analysisModal.selected.some(
+                                    (item) => item.text === s.text
+                                  )}
+                                  onChange={() => toggleSuggestion(s)}
+                                />
+                                {suggestionIcon(s.category)} {`[${s.category}] ${s.text}`}
+                                {whoDisplay ? ` (${whoDisplay})` : ""}
+                              </label>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </>
                   )}
