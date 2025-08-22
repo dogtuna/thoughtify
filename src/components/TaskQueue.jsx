@@ -262,33 +262,39 @@ export default function TaskQueue({
       <p>{task.message}</p>
       {Array.isArray(task.provenance) && task.provenance.length > 0 && (
         <div className="provenance-chips">
-          {task.provenance.map((p, idx) => (
-            <div key={idx} className="provenance-group">
-              <span
-                className="prov-chip"
-                title={p.questionPreview || p.preview}
-                onClick={() => navigate(`/discovery?focus=${p.question}`)}
-              >
-                {`Q${p.question + 1}`}
-              </span>
-              <span
-                className="prov-chip"
-                title={p.answerPreview || p.preview}
-                onClick={() => navigate(`/discovery?focus=${p.question}`)}
-              >
-                {`A${p.answer + 1}`}
-              </span>
-              {p.ruleId && (
+          {task.provenance.map((p, idx) => {
+            const params = new URLSearchParams();
+            if (task.project) params.set("initiativeId", task.project);
+            params.set("focus", p.question);
+            const link = `/discovery?${params.toString()}`;
+            return (
+              <div key={idx} className="provenance-group">
+                <span
+                  className="prov-chip"
+                  title={p.questionPreview || p.preview}
+                  onClick={() => navigate(link)}
+                >
+                  {`Q${p.question + 1}`}
+                </span>
                 <span
                   className="prov-chip"
                   title={p.answerPreview || p.preview}
-                  onClick={() => navigate(`/discovery?focus=${p.question}`)}
+                  onClick={() => navigate(link)}
                 >
-                  {p.ruleId}
+                  {`A${p.answer + 1}`}
                 </span>
-              )}
-            </div>
-          ))}
+                {p.ruleId && (
+                  <span
+                    className="prov-chip"
+                    title={p.answerPreview || p.preview}
+                    onClick={() => navigate(link)}
+                  >
+                    {p.ruleId}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       <div className="task-actions">
