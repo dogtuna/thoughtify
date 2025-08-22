@@ -359,11 +359,17 @@ const DiscoveryHub = () => {
     let open = 0;
     let answered = 0;
     questions.forEach((q) => {
-      const allAnswered =
-        q.contacts.length > 0 &&
-        q.contacts.every((n) => (q.answers?.[n]?.text || "").trim());
-      if (allAnswered && q.contacts.length > 0) answered++;
-      else open++;
+      if (q.contacts.length === 0) {
+        open++;
+      } else {
+        q.contacts.forEach((name) => {
+          if ((q.answers?.[name]?.text || "").trim()) {
+            answered++;
+          } else {
+            open++;
+          }
+        });
+      }
     });
     return { open, answered };
   }, [questions]);
@@ -2783,7 +2789,7 @@ Respond ONLY in this JSON format:
               )}
             </div>
             {statusFilter === "" && (
-              <div className="flex gap-4 flex-wrap mb-4">
+              <div className="flex gap-4 mb-4">
                 <div className="initiative-card counter-card">
                   <div className="text-sm opacity-80">Open Questions</div>
                   <div className="text-3xl font-bold">{questionCounts.open}</div>
