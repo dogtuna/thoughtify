@@ -150,7 +150,11 @@ export default function TaskQueue({
     tasks
       .filter((t) => (t.status || "open") === "open")
       .forEach((t) => {
-        const key = `${t.assignee || t.name || ""}-${
+        const assignees =
+          t.assignees && t.assignees.length
+            ? t.assignees
+            : [t.assignee || t.name || ""];
+        const key = `${assignees.slice().sort().join("|")}-${
           t.subType || t.tag || "other"
         }`;
         if (!map[key]) map[key] = [];
@@ -167,27 +171,31 @@ export default function TaskQueue({
     }
     const proposals = bundles.map((b) => {
       const first = b[0];
-      const assignee = first.assignee || first.name || "";
+      const assignees =
+        first.assignees && first.assignees.length
+          ? first.assignees
+          : [first.assignee || first.name || ""];
+      const assigneeLabel = assignees.join(", ");
       const type = first.subType || first.tag || "";
       let header;
       switch (type) {
         case "email":
-          header = `Send an email to ${assignee}`;
+          header = `Send an email to ${assigneeLabel}`;
           break;
         case "meeting": {
           const current =
             auth.currentUser?.displayName || auth.currentUser?.email || "";
           header =
-            assignee === current
+            assignees.length === 1 && assignees[0] === current
               ? "Suggested meetings"
-              : `Set up a meeting with ${assignee}`;
+              : `Set up a meeting with ${assigneeLabel}`;
           break;
         }
         case "call":
-          header = `Call ${assignee}`;
+          header = `Call ${assigneeLabel}`;
           break;
         default:
-          header = `Work with ${assignee}`;
+          header = `Work with ${assigneeLabel}`;
       }
       const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
@@ -246,7 +254,9 @@ export default function TaskQueue({
   const renderTask = (task) => (
     <li key={task.id} className="task-item">
       <strong>
-        {task.name} ({task.email})
+        {task.assignees && task.assignees.length
+          ? task.assignees.join(", ")
+          : `${task.name} (${task.email})`}
       </strong>
       {task.tag && <span className={`tag-badge tag-${task.tag}`}>{task.tag}</span>}
       <p>{task.message}</p>
@@ -256,14 +266,14 @@ export default function TaskQueue({
             <div key={idx} className="provenance-group">
               <span
                 className="prov-chip"
-                title={p.preview}
+                title={p.questionPreview || p.preview}
                 onClick={() => navigate(`/discovery?focus=${p.question}`)}
               >
                 {`Q${p.question + 1}`}
               </span>
               <span
                 className="prov-chip"
-                title={p.preview}
+                title={p.answerPreview || p.preview}
                 onClick={() => navigate(`/discovery?focus=${p.question}`)}
               >
                 {`A${p.answer + 1}`}
@@ -271,7 +281,7 @@ export default function TaskQueue({
               {p.ruleId && (
                 <span
                   className="prov-chip"
-                  title={p.preview}
+                  title={p.answerPreview || p.preview}
                   onClick={() => navigate(`/discovery?focus=${p.question}`)}
                 >
                   {p.ruleId}
