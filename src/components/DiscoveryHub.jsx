@@ -345,7 +345,7 @@ const DiscoveryHub = () => {
     }
   };
 
-  const analyzeAnswer = async (question, text) => {
+  const analyzeAnswer = async (question, text, respondent) => {
     try {
       const contextPieces = [];
       if (projectName) contextPieces.push(`Project Name: ${projectName}`);
@@ -390,7 +390,7 @@ const DiscoveryHub = () => {
       const taskSet = new Set(projectTasks.map((t) => t.message.toLowerCase()));
       const questionSet = new Set(questions.map((q) => q.question.toLowerCase()));
 
-      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing a stakeholder's answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
+      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 
 Project Context:
 ${projectContext}
@@ -398,7 +398,7 @@ ${projectContext}
 Discovery Question:
 ${question}
 
-Answer:
+Answer from ${respondent}:
 ${text}
 
 Avoid suggesting tasks or questions that already exist in the provided lists.
@@ -852,7 +852,7 @@ Respond ONLY in this JSON format:
       return next;
     });
     setAnalyzing(true);
-    const result = await analyzeAnswer(questions[idx]?.question || "", text);
+    const result = await analyzeAnswer(questions[idx]?.question || "", text, name);
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
@@ -2090,7 +2090,7 @@ Respond ONLY in this JSON format:
             className="initiative-card modal-content"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>Answer Analysis</h3>
+            <h3>{analysisModal.name}&apos;s Answer Analysis</h3>
             <p>Question has been moved to answered.</p>
             {analysisModal.analysis && (
               <p>
