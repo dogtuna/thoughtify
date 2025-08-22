@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
@@ -114,6 +114,10 @@ const DiscoveryHub = () => {
   const [recipientModal, setRecipientModal] = useState(null);
   const [analysisModal, setAnalysisModal] = useState(null);
   const [answerDrafts, setAnswerDrafts] = useState({});
+  const [activeComposer, setActiveComposer] = useState(null);
+  const [restoredDraftKey, setRestoredDraftKey] = useState(null);
+  const [composerError, setComposerError] = useState(null);
+  const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
@@ -122,6 +126,38 @@ const DiscoveryHub = () => {
   const [projectConstraints, setProjectConstraints] = useState("");
   const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      Object.entries(answerDrafts).forEach(([k, v]) => {
+        localStorage.setItem(`answerDraft_${k}`, v);
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [answerDrafts]);
+
+  useEffect(() => {
+    if (restoredRef.current) return;
+    if (!questions.length) return;
+    const keys = Object.keys(localStorage).filter((k) =>
+      k.startsWith("answerDraft_")
+    );
+    if (keys.length) {
+      const key = keys[0].replace("answerDraft_", "");
+      const [idxStr, name] = key.split("-");
+      const idx = parseInt(idxStr, 10);
+      if (!Number.isNaN(idx) && questions[idx]) {
+        setAnswerDrafts((prev) => ({
+          ...prev,
+          [key]: localStorage.getItem(`answerDraft_${key}`) || "",
+        }));
+        markAsked(idx, [name]);
+        setActiveComposer({ idx, name, contacts: questions[idx].contacts });
+        setRestoredDraftKey(key);
+        restoredRef.current = true;
+      }
+    }
+  }, [questions, markAsked]);
 
   const taskProjects = useMemo(() => {
     const set = new Set();
@@ -844,15 +880,29 @@ Respond ONLY in this JSON format:
   const handleAnswerSubmit = async (idx, name) => {
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
-    if (!text) return;
+    if (text.length < 2) return;
+    try {
       updateAnswer(idx, name, text);
-    setAnswerDrafts((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
+      setAnswerDrafts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      localStorage.removeItem(`answerDraft_${key}`);
+      setActiveComposer(null);
+      alert("Answer saved.");
+    } catch {
+      if (window.confirm("Error saving answer. Retry?")) {
+        return handleAnswerSubmit(idx, name);
+      }
+      return;
+    }
     setAnalyzing(true);
-    const result = await analyzeAnswer(questions[idx]?.question || "", text, name);
+    const result = await analyzeAnswer(
+      questions[idx]?.question || "",
+      text,
+      name
+    );
     setAnalyzing(false);
     setAnalysisModal({ idx, name, ...result, selected: result.suggestions });
   };
@@ -958,15 +1008,23 @@ Respond ONLY in this JSON format:
   }, [uid, initiativeId]);
 
   const updateAnswer = (idx, name, value) => {
+    const now = new Date().toISOString();
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
       q.answers = {
         ...q.answers,
-        [name]: { text: value, timestamp: new Date().toISOString() },
+        [name]: {
+          ...(q.answers?.[name] || {}),
+          text: value,
+          answeredAt: now,
+          answeredBy: currentUserName,
+        },
       };
       if (value && !q.asked[name]) {
         q.asked[name] = true;
+        q.answers[name].askedAt = now;
+        q.answers[name].askedBy = currentUserName;
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -1101,13 +1159,20 @@ Respond ONLY in this JSON format:
   const markAsked = async (idx, names = []) => {
     const text = questions[idx]?.question || "";
     let updatedQuestions = questions;
+    const now = new Date().toISOString();
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
       if (q) {
         const targets = names.length ? names : q.contacts;
+        q.answers = q.answers || {};
         targets.forEach((n) => {
           q.asked[n] = true;
+          q.answers[n] = {
+            ...(q.answers[n] || {}),
+            askedAt: now,
+            askedBy: currentUserName,
+          };
         });
       }
       updatedQuestions = updated;
@@ -1115,11 +1180,97 @@ Respond ONLY in this JSON format:
     });
     if (uid) {
       const askedArray = updatedQuestions.map((qq) => qq?.asked || {});
+      const answersArray = updatedQuestions.map((qq) => qq?.answers || {});
       await saveInitiative(uid, initiativeId, {
         clarifyingAsked: askedArray,
+        clarifyingAnswers: answersArray,
       });
     }
     return text;
+  };
+
+  const unmarkAsked = async (idx, name) => {
+    let updatedQuestions = questions;
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const q = updated[idx];
+      if (q) {
+        if (q.asked[name] !== undefined) {
+          delete q.asked[name];
+        }
+        if (q.answers && q.answers[name]) {
+          delete q.answers[name];
+        }
+      }
+      updatedQuestions = updated;
+      return updated;
+    });
+    if (uid) {
+      await saveInitiative(uid, initiativeId, {
+        clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
+        clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
+      });
+    }
+  };
+
+  const openComposer = (idx, contactsList) => {
+    try {
+      const name = contactsList[0];
+      markAsked(idx, [name]);
+      const key = `${idx}-${name}`;
+      const saved = localStorage.getItem(`answerDraft_${key}`);
+      if (saved) {
+        setAnswerDrafts((prev) => ({ ...prev, [key]: saved }));
+        setRestoredDraftKey(key);
+      } else {
+        setRestoredDraftKey(null);
+      }
+      setActiveComposer({ idx, name, contacts: contactsList });
+      setComposerError(null);
+    } catch {
+      setComposerError(idx);
+    }
+  };
+
+  const handleComposerContactChange = (newName) => {
+    if (!activeComposer) return;
+    const { idx, name: prev } = activeComposer;
+    if (newName === prev) return;
+    unmarkAsked(idx, prev);
+    markAsked(idx, [newName]);
+    const key = `${idx}-${newName}`;
+    const saved = localStorage.getItem(`answerDraft_${key}`);
+    if (saved) {
+      setAnswerDrafts((prev) => ({ ...prev, [key]: saved }));
+      setRestoredDraftKey(key);
+    } else {
+      setRestoredDraftKey(null);
+    }
+    setActiveComposer({ idx, name: newName, contacts: activeComposer.contacts });
+  };
+
+  const cancelComposer = (idx, name) => {
+    unmarkAsked(idx, name);
+    const key = `${idx}-${name}`;
+    setAnswerDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    localStorage.removeItem(`answerDraft_${key}`);
+    setActiveComposer(null);
+  };
+
+  const handleComposerKeyDown = (e, idx, name) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if ((answerDrafts[`${idx}-${name}`] || "").trim().length >= 2) {
+        handleAnswerSubmit(idx, name);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelComposer(idx, name);
+    }
   };
 
   const handleDocFiles = async (files) => {
@@ -1978,6 +2129,14 @@ Respond ONLY in this JSON format:
                         <p>{q.question}</p>
                       </div>
                       <div className="question-actions">
+                        {q.status === "toask" && (
+                          <button
+                            className="generator-button"
+                            onClick={() => openComposer(q.idx, q.contacts)}
+                          >
+                            Ask
+                          </button>
+                        )}
                         <button
                           className="generator-button"
                           onClick={() => draftEmail(q)}
@@ -1997,13 +2156,43 @@ Respond ONLY in this JSON format:
                           Delete
                         </button>
                       </div>
+                      {composerError === q.idx && (
+                        <div className="composer-error">
+                          Failed to open composer.{' '}
+                          <a
+                            onClick={() => setStatusFilter('asked')}
+                          >
+                            Open in Asked tab
+                          </a>
+                        </div>
+                      )}
                       {q.status !== "toask" &&
                         q.contacts.map((name) => {
                           const key = `${q.idx}-${name}`;
                           const draft = answerDrafts[key];
+                          const isActive =
+                            activeComposer &&
+                            activeComposer.idx === q.idx &&
+                            activeComposer.name === name;
                           return (
                             <div key={name} className="answer-block">
                               <strong>{name}:</strong>
+                              {activeComposer &&
+                                activeComposer.idx === q.idx &&
+                                activeComposer.contacts.length > 1 && (
+                                  <select
+                                    value={activeComposer.name}
+                                    onChange={(e) =>
+                                      handleComposerContactChange(e.target.value)
+                                    }
+                                  >
+                                    {activeComposer.contacts.map((c) => (
+                                      <option key={c} value={c}>
+                                        {c}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
                               <textarea
                                 className="generator-input"
                                 placeholder="Enter answer or notes here"
@@ -2019,14 +2208,35 @@ Respond ONLY in this JSON format:
                                   }))
                                 }
                                 rows={3}
+                                ref={(el) => {
+                                  if (el && isActive) {
+                                    el.focus();
+                                  }
+                                }}
+                                onKeyDown={(e) =>
+                                  handleComposerKeyDown(e, q.idx, name)
+                                }
                               />
-                              <button
-                                className="generator-button"
-                                disabled={!answerDrafts[key]?.trim()}
-                                onClick={() => handleAnswerSubmit(q.idx, name)}
-                              >
-                                Submit
-                              </button>
+                              {restoredDraftKey === key && (
+                                <div className="draft-restored">Draft restored</div>
+                              )}
+                              <div className="composer-actions">
+                                <button
+                                  className="generator-button"
+                                  disabled={
+                                    (answerDrafts[key] || "").trim().length < 2
+                                  }
+                                  onClick={() => handleAnswerSubmit(q.idx, name)}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  className="generator-button"
+                                  onClick={() => cancelComposer(q.idx, name)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
                             </div>
                           );
                         })}

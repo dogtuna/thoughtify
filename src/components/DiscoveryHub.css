@@ -117,6 +117,30 @@
   margin-top: 0.5rem;
 }
 
+.composer-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.draft-restored {
+  font-size: 0.8rem;
+  color: #9ae6b4;
+  margin-top: 0.25rem;
+}
+
+.composer-error {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #f87171;
+}
+
+.composer-error a {
+  color: #93c5fd;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .contact-tag button {
   background: none;
   border: none;
