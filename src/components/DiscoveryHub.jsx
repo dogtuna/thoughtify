@@ -133,6 +133,7 @@ const DiscoveryHub = () => {
   const [focusRole, setFocusRole] = useState("");
   const [editData, setEditData] = useState(null);
   const [editTask, setEditTask] = useState(null);
+  const [completionModal, setCompletionModal] = useState(null);
   const [emailConnected, setEmailConnected] = useState(false);
   const [emailDraft, setEmailDraft] = useState(null);
   const [generatingEmail, setGeneratingEmail] = useState(false);
@@ -342,6 +343,30 @@ const DiscoveryHub = () => {
     });
     return map;
   }, [displayedTasks, currentUserName, normalizeAssignee]);
+
+  const taskCounts = useMemo(() => {
+    const counts = { open: 0, scheduled: 0, completed: 0 };
+    projectTasks.forEach((t) => {
+      const status = t.status || "open";
+      if (status === "scheduled") counts.scheduled++;
+      else if (status === "completed") counts.completed++;
+      else counts.open++;
+    });
+    return counts;
+  }, [projectTasks]);
+
+  const questionCounts = useMemo(() => {
+    let open = 0;
+    let answered = 0;
+    questions.forEach((q) => {
+      const allAnswered =
+        q.contacts.length > 0 &&
+        q.contacts.every((n) => (q.answers?.[n]?.text || "").trim());
+      if (allAnswered && q.contacts.length > 0) answered++;
+      else open++;
+    });
+    return { open, answered };
+  }, [questions]);
 
   const suggestionIcon = (category) => {
     switch (category) {
@@ -867,7 +892,71 @@ Respond ONLY in this JSON format:
   };
 
   // Handlers for updating task status
-  const handleCompleteTask = (id) => updateTaskStatus(id, "completed");
+  const openCompleteModal = (task) => {
+    setCompletionModal({ task, notes: "", fileText: "" });
+  };
+
+  const submitCompletion = async () => {
+    if (!completionModal) return;
+    const { task, notes, fileText } = completionModal;
+    const combined = [notes, fileText].filter(Boolean).join("\n\n");
+    await updateTaskStatus(
+      task.id,
+      "completed",
+      combined ? { completionNotes: combined } : {}
+    );
+    setProjectTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id
+          ? { ...t, status: "completed", completionNotes: combined }
+          : t
+      )
+    );
+    setCompletionModal(null);
+    if (combined.trim()) {
+      setAnalyzing(true);
+      setAnalysisModal({
+        idx: null,
+        name: currentUserName,
+        loading: true,
+        analysis: null,
+        suggestions: [],
+        selected: [],
+        progress: "Analyzing completion...",
+      });
+      const timeoutId = setTimeout(() => {
+        setAnalysisModal((prev) =>
+          prev && prev.loading ? { ...prev, progress: "Still analyzing..." } : prev
+        );
+      }, 3000);
+      const result = await analyzeAnswer(
+        task.message,
+        combined,
+        currentUserName
+      );
+      clearTimeout(timeoutId);
+      setAnalyzing(false);
+      setAnalysisModal({
+        idx: null,
+        name: currentUserName,
+        loading: false,
+        ...result,
+        selected: result.suggestions,
+      });
+    }
+  };
+
+  const handleCompletionFile = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setCompletionModal((prev) => ({ ...prev, fileText: ev.target.result }));
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const handleScheduleTask = (id) => updateTaskStatus(id, "scheduled");
   const handleDeleteTask = async (id) => {
 
@@ -969,7 +1058,7 @@ Respond ONLY in this JSON format:
         task.assignees && task.assignees.length
           ? [...task.assignees]
           : [task.assignee || currentUserName],
-      subType: task.subType || "task",
+      subType: task.subType || task.tag || "task",
       subTasks: task.subTasks ? task.subTasks.map((st) => ({ ...st })) : [],
     });
   };
@@ -1014,8 +1103,23 @@ Respond ONLY in this JSON format:
           assignees,
           assignee: assignees[0],
           subType: editTask.subType,
+          tag: editTask.subType,
           subTasks: editTask.subTasks,
         }
+      );
+      setProjectTasks((prev) =>
+        prev.map((t) =>
+          t.id === editTask.id
+            ? {
+                ...t,
+                assignees,
+                assignee: assignees[0],
+                subType: editTask.subType,
+                tag: editTask.subType,
+                subTasks: editTask.subTasks,
+              }
+            : t
+        )
       );
       setEditTask(null);
     } catch (err) {
@@ -2257,6 +2361,23 @@ Respond ONLY in this JSON format:
   </div>
 </div>
 
+  {taskStatusFilter === "all" && (
+    <div className="flex flex-wrap gap-4">
+      <div className="initiative-card counter-card">
+        <div className="text-sm opacity-80">Open Tasks</div>
+        <div className="text-3xl font-bold">{taskCounts.open}</div>
+      </div>
+      <div className="initiative-card counter-card">
+        <div className="text-sm opacity-80">Scheduled Tasks</div>
+        <div className="text-3xl font-bold">{taskCounts.scheduled}</div>
+      </div>
+      <div className="initiative-card counter-card">
+        <div className="text-sm opacity-80">Completed Tasks</div>
+        <div className="text-3xl font-bold">{taskCounts.completed}</div>
+      </div>
+    </div>
+  )}
+
     {/* Filters */}
     <div className="flex flex-wrap gap-2">
       <select
@@ -2342,7 +2463,7 @@ Respond ONLY in this JSON format:
                 )}
                 <button
                   className="generator-button"
-                  onClick={() => handleCompleteTask(t.id)}
+                  onClick={() => openCompleteModal(t)}
                 >
                   Complete
                 </button>
@@ -2397,7 +2518,7 @@ Respond ONLY in this JSON format:
                     )}
                     <button
                       className="generator-button"
-                      onClick={() => handleCompleteTask(t.id)}
+                      onClick={() => openCompleteModal(t)}
                     >
                       Complete
                     </button>
@@ -2413,7 +2534,7 @@ Respond ONLY in this JSON format:
             </div>
           ))}
         {displayedTasks.length === 0 && (
-          <p className="text-gray-400">No tasks.</p>
+          <p className="text-gray-400">Looks like you are all caught up!</p>
         )}
       </div>
     )}
@@ -2444,6 +2565,48 @@ Respond ONLY in this JSON format:
                 }
               >
                 Approve
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    {completionModal &&
+      createPortal(
+        <div className="modal-overlay">
+          <div className="initiative-card modal-content space-y-4">
+            <h3>Complete Task</h3>
+            <p>
+              {(() => {
+                const type =
+                  completionModal.task.subType || completionModal.task.tag || "";
+                if (type === "meeting")
+                  return "Do you want to include a transcript or any meeting notes?";
+                if (type === "email") return "What was the response?";
+                if (type === "research") return "What were your findings?";
+                return "Add any notes about completing this task.";
+              })()}
+            </p>
+            <textarea
+              className="w-full rounded-md border px-2 py-1"
+              value={completionModal.notes}
+              onChange={(e) =>
+                setCompletionModal((prev) => ({ ...prev, notes: e.target.value }))
+              }
+            />
+            {(completionModal.task.subType === "meeting" ||
+              completionModal.task.tag === "meeting") && (
+              <input type="file" onChange={handleCompletionFile} />
+            )}
+            <div className="modal-actions">
+              <button
+                className="generator-button"
+                onClick={() => setCompletionModal(null)}
+              >
+                Cancel
+              </button>
+              <button className="generator-button" onClick={submitCompletion}>
+                Submit
               </button>
             </div>
           </div>
@@ -2619,6 +2782,18 @@ Respond ONLY in this JSON format:
                 </button>
               )}
             </div>
+            {statusFilter === "" && (
+              <div className="flex gap-4 flex-wrap mb-4">
+                <div className="initiative-card counter-card">
+                  <div className="text-sm opacity-80">Open Questions</div>
+                  <div className="text-3xl font-bold">{questionCounts.open}</div>
+                </div>
+                <div className="initiative-card counter-card">
+                  <div className="text-sm opacity-80">Answered Questions</div>
+                  <div className="text-3xl font-bold">{questionCounts.answered}</div>
+                </div>
+              </div>
+            )}
             {Object.entries(grouped).map(([grp, items]) => (
               <div key={grp} className="group-section">
                 {groupBy && <h3>{grp}</h3>}
@@ -2810,6 +2985,9 @@ Respond ONLY in this JSON format:
                 })}
               </div>
             ))}
+            {filtered.length === 0 && (
+              <p className="text-gray-400">Looks like you are all caught up!</p>
+            )}
           </>
         )}
       </div>

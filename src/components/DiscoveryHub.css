@@ -369,3 +369,12 @@
   color: #d1d5db;
 }
 
+.counter-card {
+  width: auto;
+  text-align: center;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
