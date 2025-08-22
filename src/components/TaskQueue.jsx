@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
 import { generate } from "../ai";
-import { dedupeByMessage } from "../utils/taskUtils";
+import { dedupeByMessage, normalizeAssigneeName } from "../utils/taskUtils";
 import { auth, db } from "../firebase";
 import { updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import "../pages/admin.css";
@@ -28,23 +28,45 @@ export default function TaskQueue({
   const [prioritized, setPrioritized] = useState(null);
   const navigate = useNavigate();
 
+  const currentUserName =
+    auth.currentUser?.displayName || auth.currentUser?.email || "";
+
+  const normalizedTasks = useMemo(
+    () =>
+      tasks.map((t) => {
+        const assignees =
+          t.assignees && t.assignees.length
+            ? t.assignees.map((a) =>
+                normalizeAssigneeName(a, currentUserName),
+              )
+            : [
+                normalizeAssigneeName(
+                  t.assignee || t.name || "",
+                  currentUserName,
+                ),
+              ];
+        return { ...t, assignees, assignee: assignees[0] };
+      }),
+    [tasks, currentUserName],
+  );
+
   const projects = useMemo(() => {
     const set = new Set();
-    tasks.forEach((t) => {
+    normalizedTasks.forEach((t) => {
       set.add(t.project || "General");
     });
     return Array.from(set);
-  }, [tasks]);
+  }, [normalizedTasks]);
 
   const filteredTasks = useMemo(
     () =>
-      tasks.filter(
+      normalizedTasks.filter(
         (t) =>
           (statusFilter === "all" || (t.status || "open") === statusFilter) &&
           (projectFilter === "all" || t.project === projectFilter) &&
           (tagFilter === "all" || t.tag === tagFilter)
       ),
-    [tasks, statusFilter, projectFilter, tagFilter]
+    [normalizedTasks, statusFilter, projectFilter, tagFilter]
   );
 
   const groupedTasks = useMemo(() => {
@@ -147,7 +169,7 @@ export default function TaskQueue({
 
   const computeBundles = () => {
     const map = {};
-    tasks
+    normalizedTasks
       .filter((t) => (t.status || "open") === "open")
       .forEach((t) => {
         const assignees =
@@ -175,16 +197,16 @@ export default function TaskQueue({
         first.assignees && first.assignees.length
           ? first.assignees
           : [first.assignee || first.name || ""];
-      const assigneeLabel = assignees.join(", ");
+      const assigneeLabel = Array.from(new Set(assignees)).join(", ");
       const type = first.subType || first.tag || "";
       let header;
+      const current =
+        auth.currentUser?.displayName || auth.currentUser?.email || "";
       switch (type) {
         case "email":
           header = `Send an email to ${assigneeLabel}`;
           break;
         case "meeting": {
-          const current =
-            auth.currentUser?.displayName || auth.currentUser?.email || "";
           header =
             assignees.length === 1 && assignees[0] === current
               ? "Suggested meetings"
@@ -194,8 +216,14 @@ export default function TaskQueue({
         case "call":
           header = `Call ${assigneeLabel}`;
           break;
-        default:
-          header = `Work with ${assigneeLabel}`;
+        default: {
+          const prettyType = type ? `${type.replace(/-/g, " ")} ` : "";
+          header =
+            assignees.length === 1 && assignees[0] === current
+              ? `Here are your current ${prettyType}tasks:`
+              : `Work with ${assigneeLabel}`;
+          break;
+        }
       }
       const bullets = dedupeByMessage(b).map((t) => t.message);
       const text = [header, ...bullets.map((m) => `- ${m}`)].join("\n");
@@ -219,7 +247,9 @@ export default function TaskQueue({
 
   const startPrioritize = async () => {
     try {
-      const openTasks = tasks.filter((t) => (t.status || "open") === "open");
+      const openTasks = normalizedTasks.filter(
+        (t) => (t.status || "open") === "open",
+      );
       const { text } = await generate(
         `Order the following tasks by priority and return a JSON array of ids in order:\n${openTasks
           .map((t) => `${t.id}: ${t.message}`)
@@ -237,7 +267,9 @@ export default function TaskQueue({
     } catch (err) {
       console.error("prioritize", err);
     }
-    const openTasks = tasks.filter((t) => (t.status || "open") === "open");
+    const openTasks = normalizedTasks.filter(
+      (t) => (t.status || "open") === "open",
+    );
     setPrioritized([...openTasks]);
   };
 
@@ -262,33 +294,42 @@ export default function TaskQueue({
       <p>{task.message}</p>
       {Array.isArray(task.provenance) && task.provenance.length > 0 && (
         <div className="provenance-chips">
-          {task.provenance.map((p, idx) => (
-            <div key={idx} className="provenance-group">
-              <span
-                className="prov-chip"
-                title={p.questionPreview || p.preview}
-                onClick={() => navigate(`/discovery?focus=${p.question}`)}
-              >
-                {`Q${p.question + 1}`}
-              </span>
-              <span
-                className="prov-chip"
-                title={p.answerPreview || p.preview}
-                onClick={() => navigate(`/discovery?focus=${p.question}`)}
-              >
-                {`A${p.answer + 1}`}
-              </span>
-              {p.ruleId && (
+          {task.provenance.map((p, idx) => {
+            const baseParams = new URLSearchParams();
+            if (task.project) baseParams.set("initiativeId", task.project);
+            baseParams.set("focus", p.question);
+            const questionLink = `/discovery?${baseParams.toString()}`;
+            const answerParams = new URLSearchParams(baseParams);
+            answerParams.set("answer", p.answer);
+            const answerLink = `/discovery?${answerParams.toString()}`;
+            return (
+              <div key={idx} className="provenance-group">
+                <span
+                  className="prov-chip"
+                  title={p.questionPreview || p.preview}
+                  onClick={() => navigate(questionLink)}
+                >
+                  {`Q${p.question + 1}`}
+                </span>
                 <span
                   className="prov-chip"
                   title={p.answerPreview || p.preview}
-                  onClick={() => navigate(`/discovery?focus=${p.question}`)}
+                  onClick={() => navigate(answerLink)}
                 >
-                  {p.ruleId}
+                  {`A${p.answer + 1}`}
                 </span>
-              )}
-            </div>
-          ))}
+                {p.ruleId && (
+                  <span
+                    className="prov-chip"
+                    title={p.answerPreview || p.preview}
+                    onClick={() => navigate(answerLink)}
+                  >
+                    {p.ruleId}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       <div className="task-actions">
@@ -339,12 +380,13 @@ export default function TaskQueue({
           </select>
           <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
             <option value="all">All Tags</option>
-            <option value="email">email</option>
-            <option value="call">call</option>
-            <option value="meeting">meeting</option>
-            <option value="research">research</option>
-          </select>
-        </div>
+          <option value="email">email</option>
+          <option value="call">call</option>
+          <option value="meeting">meeting</option>
+          <option value="research">research</option>
+          <option value="instructional-design">instructional-design</option>
+        </select>
+      </div>
 
         {/* Render the Task Queue items */}
         <h3>Tasks</h3>
