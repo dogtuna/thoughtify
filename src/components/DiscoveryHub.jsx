@@ -2368,7 +2368,7 @@ Respond ONLY in this JSON format:
 </div>
 
   {taskStatusFilter === "all" && (
-    <div className="flex flex-wrap gap-4">
+    <div className="counter-row">
       <div className="initiative-card counter-card">
         <div className="text-sm opacity-80">Open Tasks</div>
         <div className="text-3xl font-bold">{taskCounts.open}</div>
@@ -2789,7 +2789,7 @@ Respond ONLY in this JSON format:
               )}
             </div>
             {statusFilter === "" && (
-              <div className="flex gap-4 mb-4">
+              <div className="counter-row mb-4">
                 <div className="initiative-card counter-card">
                   <div className="text-sm opacity-80">Open Questions</div>
                   <div className="text-3xl font-bold">{questionCounts.open}</div>
