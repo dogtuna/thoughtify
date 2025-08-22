@@ -999,43 +999,16 @@ Respond ONLY in this JSON format:
     return name;
   };
 
-  const addNamedContact = (name) => {
-    const role = prompt(`Role for ${name}? (optional)`) || "";
-    const email = prompt(`Email for ${name}? (optional)`) || "";
-    const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = { role, name, email, color };
-    const updated = [...contacts, newContact];
-    setContacts(updated);
-    if (uid) {
-      saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ name, role, email }) => ({
-          name,
-          role,
-          email,
-        })),
-      });
-    }
-  };
-
-  const ensureContactsForSuggestions = async (suggestions) => {
-    const existing = new Set(contacts.map((c) => c.name.toLowerCase()));
-    const newNames = [];
-    suggestions.forEach((s) => {
-      const assignee = (s.assignee || "").trim();
-      if (
-        assignee &&
-        assignee.toLowerCase() !== currentUserName.toLowerCase() &&
-        !existing.has(assignee.toLowerCase())
-      ) {
-        newNames.push(assignee);
-        existing.add(assignee.toLowerCase());
-      }
+  const filterSuggestionsForContacts = (suggestions) => {
+    const known = new Set(contacts.map((c) => c.name.toLowerCase()));
+    return suggestions.filter((s) => {
+      const assignee = (s.assignee || "").trim().toLowerCase();
+      return (
+        !assignee ||
+        assignee === currentUserName.toLowerCase() ||
+        known.has(assignee)
+      );
     });
-    for (const name of newNames) {
-      if (window.confirm(`Create new contact "${name}"?`)) {
-        addNamedContact(name);
-      }
-    }
   };
 
   const addContactToQuestion = (idx, name) => {
@@ -2163,12 +2136,23 @@ Respond ONLY in this JSON format:
                 <button
                   className="generator-button"
                   onClick={async () => {
-                    await ensureContactsForSuggestions(
+                    const filtered = filterSuggestionsForContacts(
                       analysisModal.selected
                     );
+                    if (filtered.length === 0) {
+                      alert(
+                        "No tasks added: assignees must be existing project contacts."
+                      );
+                      return;
+                    }
+                    if (filtered.length < analysisModal.selected.length) {
+                      alert(
+                        "Some tasks were skipped because the assignees are not project contacts."
+                      );
+                    }
                     await createTasksFromAnalysis(
                       analysisModal.name,
-                      analysisModal.selected
+                      filtered
                     );
                     setAnalysisModal(null);
                   }}
