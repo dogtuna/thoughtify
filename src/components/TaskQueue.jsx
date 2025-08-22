@@ -1,5 +1,6 @@
 // src/TaskQueue.jsx
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
 import { generate } from "../ai";
@@ -25,6 +26,7 @@ export default function TaskQueue({
   const [synergyQueue, setSynergyQueue] = useState([]);
   const [synergyIndex, setSynergyIndex] = useState(0);
   const [prioritized, setPrioritized] = useState(null);
+  const navigate = useNavigate();
 
   const projects = useMemo(() => {
     const set = new Set();
@@ -90,8 +92,24 @@ export default function TaskQueue({
     const user = auth.currentUser;
     if (!user || !bundle.length) return;
     const [first, ...rest] = bundle;
+    const provenance = [];
+    bundle.forEach((t) => {
+      (t.provenance || []).forEach((p) => {
+        if (
+          !provenance.some(
+            (q) =>
+              q.question === p.question &&
+              q.answer === p.answer &&
+              q.ruleId === p.ruleId
+          )
+        ) {
+          provenance.push(p);
+        }
+      });
+    });
     await updateDoc(doc(db, "profiles", user.uid, "taskQueue", first.id), {
       message,
+      provenance,
     });
     for (const t of rest) {
       await deleteDoc(doc(db, "profiles", user.uid, "taskQueue", t.id));
@@ -232,6 +250,37 @@ export default function TaskQueue({
       </strong>
       {task.tag && <span className={`tag-badge tag-${task.tag}`}>{task.tag}</span>}
       <p>{task.message}</p>
+      {Array.isArray(task.provenance) && task.provenance.length > 0 && (
+        <div className="provenance-chips">
+          {task.provenance.map((p, idx) => (
+            <div key={idx} className="provenance-group">
+              <span
+                className="prov-chip"
+                title={p.preview}
+                onClick={() => navigate(`/discovery?focus=${p.question}`)}
+              >
+                {`Q${p.question + 1}`}
+              </span>
+              <span
+                className="prov-chip"
+                title={p.preview}
+                onClick={() => navigate(`/discovery?focus=${p.question}`)}
+              >
+                {`A${p.answer + 1}`}
+              </span>
+              {p.ruleId && (
+                <span
+                  className="prov-chip"
+                  title={p.preview}
+                  onClick={() => navigate(`/discovery?focus=${p.question}`)}
+                >
+                  {p.ruleId}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="task-actions">
         <button className="complete-button" onClick={() => handleComplete(task)}>
           Complete

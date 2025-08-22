@@ -238,6 +238,26 @@
     justify-content: space-between;
     margin-top: 10px;
   }
+
+  .provenance-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .provenance-group {
+    display: flex;
+    gap: 4px;
+  }
+
+  .prov-chip {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
   
   .complete-button {
     background-color: #64ffda;

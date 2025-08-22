@@ -127,6 +127,15 @@ const DiscoveryHub = () => {
   const [viewingStatus, setViewingStatus] = useState("");
   const navigate = useNavigate();
 
+  const focusQuestionCard = (idx) => {
+    const el = document.getElementById(`question-${idx}`);
+    if (el) {
+      el.classList.add("highlight-question");
+      el.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => el.classList.remove("highlight-question"), 2000);
+    }
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       Object.entries(answerDrafts).forEach(([k, v]) => {
@@ -159,6 +168,16 @@ const DiscoveryHub = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions]);
+
+  useEffect(() => {
+    const focus = searchParams.get("focus");
+    if (focus !== null) {
+      const idx = parseInt(focus, 10);
+      if (!Number.isNaN(idx)) {
+        setTimeout(() => focusQuestionCard(idx), 500);
+      }
+    }
+  }, [searchParams, questions]);
 
   const taskProjects = useMemo(() => {
     const set = new Set();
@@ -529,7 +548,7 @@ Respond ONLY in this JSON format:
   };
 
 
-  const createTasksFromAnalysis = async (name, suggestions) => {
+  const createTasksFromAnalysis = async (idx, name, suggestions) => {
     if (!uid || !initiativeId || !suggestions.length) return;
 
     const questionsToAdd = [];
@@ -539,6 +558,18 @@ Respond ONLY in this JSON format:
     const existingQuestionSet = new Set(
       questions.map((q) => q.question.toLowerCase())
     );
+
+    const answerObj = questions[idx]?.answers || {};
+    const answerIndex = Math.max(
+      0,
+      Object.keys(answerObj).indexOf(name)
+    );
+    const answerText = answerObj[name]?.text || "";
+    const preview = answerText
+      .split(/(?<=\.)\s+/)
+      .slice(0, 2)
+      .join(" ")
+      .slice(0, 200);
 
     try {
       for (const s of suggestions) {
@@ -565,6 +596,14 @@ Respond ONLY in this JSON format:
         } else {
           const tag = await classifyTask(s.text);
           const assignee = match ? match.name : currentUserName;
+          const provenance = [
+            {
+              question: idx,
+              answer: answerIndex,
+              preview,
+              ruleId: s.ruleId || s.templateId || null,
+            },
+          ];
           tasksToAdd.push({
             name,
             message: s.text,
@@ -573,13 +612,21 @@ Respond ONLY in this JSON format:
             status: "open",
             createdAt: serverTimestamp(),
             tag,
+            provenance,
           });
           existingTaskSet.add(lowerText);
         }
       }
 
       if (tasksToAdd.length > 0) {
-        const tasksCollection = collection(db, "users", uid, "initiatives", initiativeId, "tasks");
+        const tasksCollection = collection(
+          db,
+          "users",
+          uid,
+          "initiatives",
+          initiativeId,
+          "tasks"
+        );
         await Promise.all(
           tasksToAdd.map((taskData) => addDoc(tasksCollection, taskData))
         );
@@ -590,8 +637,12 @@ Respond ONLY in this JSON format:
           const updatedQuestions = [...prevQuestions, ...questionsToAdd];
           if (uid) {
             saveInitiative(uid, initiativeId, {
-              clarifyingQuestions: updatedQuestions.map((q) => ({ question: q.question })),
-              clarifyingContacts: Object.fromEntries(updatedQuestions.map((qq, i) => [i, qq.contacts])),
+              clarifyingQuestions: updatedQuestions.map((q) => ({
+                question: q.question,
+              })),
+              clarifyingContacts: Object.fromEntries(
+                updatedQuestions.map((qq, i) => [i, qq.contacts])
+              ),
               clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
               clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
             });
@@ -781,9 +832,24 @@ Respond ONLY in this JSON format:
     if (!uid || !initiativeId || !bundle.length) return;
     const [first, ...rest] = bundle;
     const subTasks = bullets.map((m) => ({ text: m, completed: false }));
+    const provenance = [];
+    bundle.forEach((t) => {
+      (t.provenance || []).forEach((p) => {
+        if (
+          !provenance.some(
+            (q) =>
+              q.question === p.question &&
+              q.answer === p.answer &&
+              q.ruleId === p.ruleId
+          )
+        ) {
+          provenance.push(p);
+        }
+      });
+    });
     await updateDoc(
       doc(db, "users", uid, "initiatives", initiativeId, "tasks", first.id),
-      { message: header, subTasks }
+      { message: header, subTasks, provenance }
     );
     for (const t of rest) {
       await deleteDoc(
@@ -856,6 +922,37 @@ Respond ONLY in this JSON format:
           <span className="task-project">{project}</span>
         </div>
         <p>{t.message}</p>
+        {Array.isArray(t.provenance) && t.provenance.length > 0 && (
+          <div className="provenance-chips">
+            {t.provenance.map((p, idxP) => (
+              <div key={idxP} className="provenance-group">
+                <span
+                  className="prov-chip"
+                  title={p.preview}
+                  onClick={() => focusQuestionCard(p.question)}
+                >
+                  {`Q${p.question + 1}`}
+                </span>
+                <span
+                  className="prov-chip"
+                  title={p.preview}
+                  onClick={() => focusQuestionCard(p.question)}
+                >
+                  {`A${p.answer + 1}`}
+                </span>
+                {p.ruleId && (
+                  <span
+                    className="prov-chip"
+                    title={p.preview}
+                    onClick={() => focusQuestionCard(p.question)}
+                  >
+                    {p.ruleId}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {t.subTasks && t.subTasks.length > 0 && (
           <ul className="ml-4 list-disc space-y-1">
             {t.subTasks.map((st, idx) => (
@@ -2090,6 +2187,7 @@ Respond ONLY in this JSON format:
                   return (
                     <div
                       key={selKey}
+                      id={`question-${q.idx}`}
                       className={`initiative-card question-card ${q.status}`}
                     >
                       <span className="status-tag">{statusLabel(q.status)}</span>
@@ -2394,6 +2492,7 @@ Respond ONLY in this JSON format:
                           );
                         }
                         await createTasksFromAnalysis(
+                          analysisModal.idx,
                           analysisModal.name,
                           filtered
                         );
