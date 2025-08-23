@@ -5,7 +5,7 @@ import { InquiryMapProvider, useInquiryMap } from "../context/InquiryMapContext"
 import { auth } from "../firebase";
 
 const InquiryMapContent = () => {
-  const { hypotheses, loadHypotheses } = useInquiryMap();
+  const { hypotheses, businessGoal, loadHypotheses } = useInquiryMap();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
 
@@ -16,9 +16,13 @@ const InquiryMapContent = () => {
     }
   }, [initiativeId, loadHypotheses]);
 
-  const hypothesisLabels = hypotheses.map((h) => h.text || h.label || h.id);
+  const parsedHypotheses = hypotheses.map((h) => ({
+    id: h.id,
+    statement: h.statement || h.text || h.label || h.id,
+    confidence: h.confidence,
+  }));
 
-  return <InquiryMap hypotheses={hypothesisLabels} />;
+  return <InquiryMap businessGoal={businessGoal} hypotheses={parsedHypotheses} />;
 };
 
 const InquiryMapPage = () => (

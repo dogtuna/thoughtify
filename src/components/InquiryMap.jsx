@@ -17,9 +17,19 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
   const computedNodes = useMemo(() => {
     const hypoNodes = hypotheses.map((hypo, index) => {
       const angle = (index / Math.max(hypotheses.length, 1)) * 2 * Math.PI;
+      const baseLabel =
+        typeof hypo === "string"
+          ? hypo
+          : `${hypo.id ? `${hypo.id}: ` : ""}${
+              hypo.statement || hypo.label || ""
+            }`;
+      const label =
+        typeof hypo === "object" && typeof hypo.confidence === "number"
+          ? `${baseLabel} (${Math.round(hypo.confidence * 100)}%)`
+          : baseLabel;
       return {
         id: `hypothesis-${index}`,
-        data: { label: hypo },
+        data: { label, confidence: hypo.confidence },
         position: {
           x: centerX + radius * Math.cos(angle),
           y: centerY + radius * Math.sin(angle),
@@ -135,7 +145,17 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
 
 InquiryMap.propTypes = {
   businessGoal: PropTypes.string,
-  hypotheses: PropTypes.arrayOf(PropTypes.string),
+  hypotheses: PropTypes.arrayOf(
+    PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        id: PropTypes.string,
+        statement: PropTypes.string,
+        label: PropTypes.string,
+        confidence: PropTypes.number,
+      }),
+    ])
+  ),
 };
 
 export default InquiryMap;
