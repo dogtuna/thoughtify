@@ -1583,42 +1583,32 @@ export const generateInitialInquiryMap = onCall(
     if (!brief) {
       throw new HttpsError("invalid-argument", "project brief is required.");
     }
-
-generateInitialInquiryMapApp.post("/", async (req, res) => {
-  const { brief } = req.body || {};
-  if (!brief) {
-    res.status(400).json({ error: "project brief is required." });
-    return;
-  }
-
-  const key = process.env.GOOGLE_GENAI_API_KEY;
-  if (!key) {
-    res.status(500).json({ error: "No API key available." });
-    return;
-  }
-
-  const ai = genkit({
-    plugins: [googleAI({ apiKey: key })],
-    model: gemini("gemini-1.5-pro"),
-  });
-
-  const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
-    const prompt = `Given the project brief below, generate 3 initial hypotheses as a JSON array. Each item must contain: title, parentHypothesisId (null), confidenceScore (0-1), status, links (empty array).\nProject brief: ${brief}`;
-    const { text } = await ai.generate(prompt);
-    return parseJsonFromText(text);
-  });
-
-  let hypotheses;
-  try {
-    hypotheses = await flow();
-    if (!Array.isArray(hypotheses)) {
-      throw new Error("AI did not return an array");
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) {
+      throw new HttpsError("internal", "No API key available.");
     }
-  } catch (error) {
-    console.error("AI generation failed:", error);
-    res.status(500).json({ error: "Failed to generate hypotheses" });
-    return;
-  }
+
+    const ai = genkit({
+      plugins: [googleAI({ apiKey: key })],
+      model: gemini("gemini-1.5-pro"),
+    });
+
+    const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
+      const prompt = `Given the project brief below, generate 3 initial hypotheses as a JSON array. Each item must contain: title, parentHypothesisId (null), confidenceScore (0-1), status, links (empty array).\nProject brief: ${brief}`;
+      const { text } = await ai.generate(prompt);
+      return parseJsonFromText(text);
+    });
+
+    let hypotheses;
+    try {
+      hypotheses = await flow();
+      if (!Array.isArray(hypotheses)) {
+        throw new Error("AI did not return an array");
+      }
+    } catch (error) {
+      console.error("AI generation failed:", error);
+      throw new HttpsError("internal", "Failed to generate hypotheses");
+    }
 
     return { hypotheses, count: hypotheses.length };
   },
