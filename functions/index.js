@@ -1621,18 +1621,18 @@ Project Data: ${brief}`;
       return parseJsonFromText(text);
     });
 
-    let hypotheses;
+    let result;
     try {
-      hypotheses = await flow();
-      if (!Array.isArray(hypotheses)) {
-        throw new Error("AI did not return an array");
+      result = await flow();
+      if (!result || !Array.isArray(result.hypotheses)) {
+        throw new Error("AI did not return hypotheses array");
       }
     } catch (error) {
       console.error("AI generation failed:", error);
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
 
-    return { hypotheses, count: hypotheses.length };
+    return { hypotheses: result.hypotheses, count: result.hypotheses.length };
   },
 );
 
