@@ -1579,9 +1579,18 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
 export const generateInitialInquiryMap = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
-    const { brief } = request.data || {};
-    if (!brief) {
-      throw new HttpsError("invalid-argument", "project brief is required.");
+    const {
+      brief,
+      documents = "",
+      answers = "",
+      uid,
+      initiativeId,
+    } = request.data || {};
+    if (!brief || !uid || !initiativeId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "brief, uid, and initiativeId are required.",
+      );
     }
     const key = process.env.GOOGLE_GENAI_API_KEY;
     if (!key) {
@@ -1594,21 +1603,72 @@ export const generateInitialInquiryMap = onCall(
     });
 
     const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
-      const prompt = `Given the project brief below, generate 3 initial hypotheses as a JSON array. Each item must contain: title, parentHypothesisId (null), confidenceScore (0-1), status, links (empty array).\nProject brief: ${brief}`;
+      const projectData = [`Project Brief: ${brief}`];
+      if (documents) projectData.push(`Documents:\n${documents}`);
+      if (answers) projectData.push(`Clarifying Answers:\n${answers}`);
+
+      const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. Your primary goal is to analyze the initial project information and formulate a set of clear, testable hypotheses that will guide the discovery phase.
+
+Based on the Project Data provided below, perform the following steps:
+
+Formulate the Primary Hypothesis: Analyze the explicit statements, complaints, and suggested solutions in the initial request. Formulate a single, clear "Primary Hypothesis" that represents the client's initial diagnosis of the problem.
+
+Generate Alternative Hypotheses: Think beyond the initial request. Generate 2-4 "Alternative Hypotheses" that explore other common, potential root causes for the stated business problem. Frame these as competing theories that must be investigated. Consider systemic issues such as:
+
+Process or Workflow Inefficiencies
+Technology or Tooling Gaps
+Misaligned Incentives or Metrics
+Communication Breakdowns
+
+Structure the Output: Respond ONLY in a valid JSON object format. Create a root object called "hypotheses". Each hypothesis should be an object in an array, containing the following keys:
+
+id: A unique identifier (e.g., "A", "B", "C").
+type: "Primary" or "Alternative".
+statement: The full text of the hypothesis.
+supportingEvidence: An empty array.
+refutingEvidence: An empty array.
+status: "Unexplored".
+
+Project Data:\n${projectData.join("\n\n")}`;
       const { text } = await ai.generate(prompt);
       return parseJsonFromText(text);
     });
 
-    let hypotheses;
+    let result;
     try {
-      hypotheses = await flow();
-      if (!Array.isArray(hypotheses)) {
-        throw new Error("AI did not return an array");
-      }
+      result = await flow();
     } catch (error) {
       console.error("AI generation failed:", error);
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
+
+    const hypotheses = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.hypotheses)
+        ? result.hypotheses
+        : null;
+
+    if (!hypotheses) {
+      throw new HttpsError("internal", "AI did not return hypotheses array");
+    }
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("initiatives")
+      .doc(initiativeId)
+      .set(
+        {
+          brief,
+          inquiryMap: {
+            hypotheses,
+            hypothesisCount: hypotheses.length,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
 
     return { hypotheses, count: hypotheses.length };
   },
