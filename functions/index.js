@@ -1579,9 +1579,18 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
 export const generateInitialInquiryMap = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
   async (request) => {
-    const { brief } = request.data || {};
-    if (!brief) {
-      throw new HttpsError("invalid-argument", "project brief is required.");
+    const {
+      brief,
+      documents = "",
+      answers = "",
+      uid,
+      initiativeId,
+    } = request.data || {};
+    if (!brief || !uid || !initiativeId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "brief, uid, and initiativeId are required.",
+      );
     }
     const key = process.env.GOOGLE_GENAI_API_KEY;
     if (!key) {
@@ -1594,6 +1603,10 @@ export const generateInitialInquiryMap = onCall(
     });
 
     const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
+      const projectData = [`Project Brief: ${brief}`];
+      if (documents) projectData.push(`Documents:\n${documents}`);
+      if (answers) projectData.push(`Clarifying Answers:\n${answers}`);
+
       const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. Your primary goal is to analyze the initial project information and formulate a set of clear, testable hypotheses that will guide the discovery phase.
 
 Based on the Project Data provided below, perform the following steps:
@@ -1616,7 +1629,7 @@ supportingEvidence: An empty array.
 refutingEvidence: An empty array.
 status: "Unexplored".
 
-Project Data: ${brief}`;
+Project Data:\n${projectData.join("\n\n")}`;
       const { text } = await ai.generate(prompt);
       return parseJsonFromText(text);
     });
@@ -1624,15 +1637,40 @@ Project Data: ${brief}`;
     let result;
     try {
       result = await flow();
-      if (!result || !Array.isArray(result.hypotheses)) {
-        throw new Error("AI did not return hypotheses array");
-      }
     } catch (error) {
       console.error("AI generation failed:", error);
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
 
-    return { hypotheses: result.hypotheses, count: result.hypotheses.length };
+    const hypotheses = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.hypotheses)
+        ? result.hypotheses
+        : null;
+
+    if (!hypotheses) {
+      throw new HttpsError("internal", "AI did not return hypotheses array");
+    }
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("initiatives")
+      .doc(initiativeId)
+      .set(
+        {
+          brief,
+          inquiryMap: {
+            hypotheses,
+            hypothesisCount: hypotheses.length,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+    return { hypotheses, count: hypotheses.length };
   },
 );
 

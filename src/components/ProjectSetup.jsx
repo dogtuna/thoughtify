@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { serverTimestamp } from "firebase/firestore";
 import { app, auth } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
@@ -233,16 +232,14 @@ const ProjectSetup = () => {
 
         const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
         try {
-          const mapResp = await generateInitialInquiryMap({ brief });
-          const hypotheses = mapResp?.data?.hypotheses || [];
-          await saveInitiative(uid, initiativeId, {
+          const mapResp = await generateInitialInquiryMap({
+            uid,
+            initiativeId,
             brief,
-            inquiryMap: {
-              hypotheses,
-              hypothesisCount: hypotheses.length,
-              createdAt: serverTimestamp(),
-            },
+            documents: getCombinedSource(),
+            answers: "",
           });
+          const hypotheses = mapResp?.data?.hypotheses || [];
           setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
           await new Promise((res) => setTimeout(res, 1000));
         } catch (mapErr) {
