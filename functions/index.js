@@ -183,33 +183,6 @@ function parseJsonFromText(text) {
   throw new Error("No complete JSON content found");
 }
 
-function getInquiryMapCollections(projectId) {
-  const base = db.collection("projects").doc(projectId).collection("inquiryMap");
-  return {
-    hypotheses: base.collection("hypotheses"),
-    questions: base.collection("questions"),
-    evidence: base.collection("evidence"),
-    tasks: base.collection("tasks"),
-  };
-}
-
-function buildInquiryNode({
-  title,
-  parentHypothesisId = null,
-  confidenceScore = 0,
-  status = "open",
-  links = [],
-}) {
-  return {
-    title,
-    parentHypothesisId,
-    confidenceScore,
-    status,
-    links,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-}
 
 export const setCustomClaims = onRequest(async (req, res) => {
   // Expect a JSON body like: { id: "USER_UID", claims: { admin: true } }
@@ -1599,17 +1572,14 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
     console.error("Error sending email:", error);
     return { success: false, error: error.message };
   }
-});
+  });
 
 export const generateInitialInquiryMap = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
-    const { projectId, brief } = request.data || {};
-    if (!projectId || !brief) {
-      throw new HttpsError(
-        "invalid-argument",
-        "projectId and project brief are required."
-      );
+    const { brief } = request.data || {};
+    if (!brief) {
+      throw new HttpsError("invalid-argument", "project brief is required.");
     }
 
     const key = process.env.GOOGLE_GENAI_API_KEY;
@@ -1639,16 +1609,8 @@ export const generateInitialInquiryMap = onCall(
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
 
-    const collections = getInquiryMapCollections(projectId);
-    const batch = db.batch();
-    hypotheses.forEach((h) => {
-      const docRef = collections.hypotheses.doc();
-      batch.set(docRef, buildInquiryNode(h));
-    });
-    await batch.commit();
-
-    return { count: hypotheses.length };
-  }
+    return { hypotheses, count: hypotheses.length };
+  },
 );
 
 // ---------------------------------------
