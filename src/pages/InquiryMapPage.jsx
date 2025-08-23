@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
 import { InquiryMapProvider, useInquiryMap } from "../context/InquiryMapContext";
 import { auth } from "../firebase";
 
 const InquiryMapContent = () => {
-  const { hypotheses, businessGoal, loadHypotheses } = useInquiryMap();
+  const { hypotheses, businessGoal, loadHypotheses, updateConfidence } =
+    useInquiryMap();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
 
@@ -19,10 +20,26 @@ const InquiryMapContent = () => {
   const parsedHypotheses = hypotheses.map((h) => ({
     id: h.id,
     statement: h.statement || h.text || h.label || h.id,
-    confidence: h.confidence,
+    confidence: typeof h.confidence === "number" ? h.confidence : 0,
   }));
 
-  return <InquiryMap businessGoal={businessGoal} hypotheses={parsedHypotheses} />;
+  const handleUpdateConfidence = useCallback(
+    (hypothesisId, confidence) => {
+      const user = auth.currentUser;
+      if (user && initiativeId) {
+        updateConfidence(user.uid, initiativeId, hypothesisId, confidence);
+      }
+    },
+    [initiativeId, updateConfidence]
+  );
+
+  return (
+    <InquiryMap
+      businessGoal={businessGoal}
+      hypotheses={parsedHypotheses}
+      onUpdateConfidence={handleUpdateConfidence}
+    />
+  );
 };
 
 const InquiryMapPage = () => (

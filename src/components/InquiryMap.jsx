@@ -8,7 +8,11 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import PropTypes from "prop-types";
 
-const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
+const InquiryMap = ({
+  businessGoal,
+  hypotheses = [],
+  onUpdateConfidence,
+}) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -20,7 +24,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
   const radius = 200;
 
   const getColor = (confidence) => {
-    if (typeof confidence !== "number") return "#d1d5db"; // gray for unknown
+    if (typeof confidence !== "number") return "#f87171"; // red for unknown
     if (confidence < 0.33) return "#f87171"; // red
     if (confidence < 0.66) return "#fbbf24"; // amber
     return "#4ade80"; // green
@@ -29,6 +33,10 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
   const computedNodes = useMemo(() => {
     const hypoNodes = hypotheses.map((hypo, index) => {
       const angle = (index / Math.max(hypotheses.length, 1)) * 2 * Math.PI;
+      const id =
+        typeof hypo === "object" && hypo.id
+          ? hypo.id
+          : `hypothesis-${index}`;
       const baseLabel =
         typeof hypo === "string"
           ? hypo
@@ -42,7 +50,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
       const confidence =
         typeof hypo === "object" ? hypo.confidence : undefined;
       return {
-        id: `hypothesis-${index}`,
+        id,
         data: { label, confidence },
         position: {
           x: centerX + radius * Math.cos(angle),
@@ -63,10 +71,13 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
 
   const computedEdges = useMemo(
     () =>
-      hypotheses.map((_, index) => ({
+      hypotheses.map((hypo, index) => ({
         id: `edge-${index}`,
         source: "goal",
-        target: `hypothesis-${index}`,
+        target:
+          typeof hypo === "object" && hypo.id
+            ? hypo.id
+            : `hypothesis-${index}`,
       })),
     [hypotheses]
   );
@@ -74,7 +85,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
   useEffect(() => {
     setNodes(computedNodes);
     setEdges(computedEdges);
-  }, [computedNodes, computedEdges]);
+  }, [computedNodes, computedEdges, setNodes, setEdges]);
 
   const onNodeClick = (_, node) => {
     setSelected(node);
@@ -101,6 +112,9 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
           }
         : sel
     );
+    if (onUpdateConfidence) {
+      onUpdateConfidence(id, confidence);
+    }
   };
 
   const addHypothesis = (e) => {
@@ -110,7 +124,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
     const angle = ((index - 1) / index) * 2 * Math.PI;
     const newNode = {
       id: `hypothesis-${index - 1}`,
-      data: { label: newHypothesis },
+      data: { label: newHypothesis, confidence: 0 },
       position: {
         x: centerX + radius * Math.cos(angle),
         y: centerY + radius * Math.sin(angle),
@@ -208,6 +222,7 @@ InquiryMap.propTypes = {
       }),
     ])
   ),
+  onUpdateConfidence: PropTypes.func,
 };
 
 export default InquiryMap;
