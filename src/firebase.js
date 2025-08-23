@@ -3,6 +3,9 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
+
+// Explicit side‑effect import to ensure App Check registers its component
+import "firebase/app-check";
 import {
   initializeAppCheck,
   ReCaptchaV3Provider,
