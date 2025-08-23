@@ -36,7 +36,10 @@ export const InquiryMapProvider = ({ children }) => {
   const [recommendations, setRecommendations] = useState(
     defaultState.recommendations,
   );
+  const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
+
+  const isAnalyzing = activeTriages > 0;
 
   const loadHypotheses = useCallback((uid, initiativeId) => {
     if (unsubscribeRef.current) {
@@ -96,18 +99,22 @@ export const InquiryMapProvider = ({ children }) => {
 
   const triageEvidence = useCallback(
     async (uid, initiativeId, evidenceText) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const current = data?.inquiryMap?.hypotheses || [];
-      const hypothesesList = current
-        .map(
-          (h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`,
-        )
-        .join("\n");
+      setActiveTriages((c) => c + 1);
+      try {
+        const ref = doc(db, "users", uid, "initiatives", initiativeId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          return;
+        }
+        const data = snap.data();
+        const current = data?.inquiryMap?.hypotheses || [];
+        const hypothesesList = current
+          .map(
+            (h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`,
+          )
+          .join("\n");
 
-      const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. A new piece of evidence has been added to the project. Your task is to analyze this evidence in the context of our current working hypotheses.
+        const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. A new piece of evidence has been added to the project. Your task is to analyze this evidence in the context of our current working hypotheses.
 
 Assess Relevance: Determine which of the Existing Hypotheses this new Evidence most strongly supports or refutes.
 
@@ -139,53 +146,99 @@ Existing Hypotheses:
 ${hypothesesList}
 `;
 
-      let analysis;
-      try {
-        const { text } = await generate(prompt);
-        analysis = JSON.parse(text);
-      } catch (err) {
-        console.error("AI triage failed", err);
-        return;
+        let analysis;
+        try {
+          const { text } = await generate(prompt);
+          analysis = JSON.parse(text);
+        } catch (err) {
+          console.error("AI triage failed", err);
+          return;
+        }
+
+        let updatedHypotheses = current;
+        analysis.hypothesisLinks.forEach((link) => {
+          const key =
+            link.relationship === "Supports"
+              ? "supportingEvidence"
+              : "refutingEvidence";
+          const delta =
+            (link.relationship === "Supports" ? 1 : -1) *
+            scoreFromImpact(link.impact);
+          updatedHypotheses = updatedHypotheses.map((h) =>
+            h.id === link.hypothesisId
+              ? {
+                  ...h,
+                  [key]: [
+                    ...(h[key] || []),
+                    {
+                      text: evidenceText,
+                      analysisSummary: analysis.analysisSummary,
+                      impact: link.impact,
+                    },
+                  ],
+                  confidence: (h.confidence || 0) + delta,
+                }
+              : h,
+          );
+        });
+
+        const updatedRecommendations = [
+          ...(data?.inquiryMap?.recommendations || []),
+          ...(analysis.strategicRecommendations || []),
+        ];
+
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": updatedHypotheses,
+          "inquiryMap.recommendations": updatedRecommendations,
+        });
+      } finally {
+        setActiveTriages((c) => c - 1);
       }
-
-      let updatedHypotheses = current;
-      analysis.hypothesisLinks.forEach((link) => {
-        const key =
-          link.relationship === "Supports"
-            ? "supportingEvidence"
-            : "refutingEvidence";
-        const delta =
-          (link.relationship === "Supports" ? 1 : -1) *
-          scoreFromImpact(link.impact);
-        updatedHypotheses = updatedHypotheses.map((h) =>
-          h.id === link.hypothesisId
-            ? {
-                ...h,
-                [key]: [
-                  ...(h[key] || []),
-                  {
-                    text: evidenceText,
-                    analysisSummary: analysis.analysisSummary,
-                    impact: link.impact,
-                  },
-                ],
-                confidence: (h.confidence || 0) + delta,
-              }
-            : h,
-        );
-      });
-
-      const updatedRecommendations = [
-        ...(data?.inquiryMap?.recommendations || []),
-        ...(analysis.strategicRecommendations || []),
-      ];
-
-      await updateDoc(ref, {
-        "inquiryMap.hypotheses": updatedHypotheses,
-        "inquiryMap.recommendations": updatedRecommendations,
-      });
     },
     [],
+  );
+
+  const refreshInquiryMap = useCallback(
+    async (uid, initiativeId) => {
+      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const current = data?.inquiryMap?.hypotheses || [];
+
+      const existing = new Set();
+      current.forEach((h) => {
+        (h.supportingEvidence || []).forEach((e) => existing.add(e.text));
+        (h.refutingEvidence || []).forEach((e) => existing.add(e.text));
+      });
+
+      const materials = data?.sourceMaterials || [];
+      for (const docItem of materials) {
+        const text = `Title: ${docItem.name}\n\n${docItem.content}`;
+        if (!existing.has(text)) {
+          await triageEvidence(uid, initiativeId, text);
+          existing.add(text);
+        }
+      }
+
+      const questions = data?.clarifyingQuestions || [];
+      const answers = data?.clarifyingAnswers || [];
+      for (let i = 0; i < questions.length; i += 1) {
+        const q = questions[i]?.question;
+        const ansObj = answers[i] || {};
+        for (const ans of Object.values(ansObj)) {
+          const ansText = ans?.text;
+          if (q && ansText && ansText.trim()) {
+            const combined = `Question: ${q}\nAnswer: ${ansText}`;
+            if (!existing.has(combined)) {
+              await triageEvidence(uid, initiativeId, combined);
+              existing.add(combined);
+            }
+          }
+        }
+      }
+    },
+    [triageEvidence],
   );
 
   const updateConfidence = useCallback(
@@ -211,7 +264,9 @@ ${hypothesesList}
     addQuestion,
     addEvidence,
     triageEvidence,
+    refreshInquiryMap,
     updateConfidence,
+    isAnalyzing,
   };
 
   return (

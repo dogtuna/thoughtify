@@ -5,8 +5,14 @@ import { useInquiryMap } from "../context/InquiryMapContext";
 import { auth } from "../firebase";
 
 const InquiryMapContent = () => {
-  const { hypotheses, businessGoal, loadHypotheses, updateConfidence } =
-    useInquiryMap();
+  const {
+    hypotheses,
+    businessGoal,
+    loadHypotheses,
+    updateConfidence,
+    refreshInquiryMap,
+    isAnalyzing,
+  } = useInquiryMap();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
 
@@ -33,12 +39,30 @@ const InquiryMapContent = () => {
     [initiativeId, updateConfidence]
   );
 
+  const handleRefresh = useCallback(() => {
+    const user = auth.currentUser;
+    if (user && initiativeId) {
+      refreshInquiryMap(user.uid, initiativeId);
+    }
+  }, [initiativeId, refreshInquiryMap]);
+
   return (
-    <InquiryMap
-      businessGoal={businessGoal}
-      hypotheses={parsedHypotheses}
-      onUpdateConfidence={handleUpdateConfidence}
-    />
+    <div>
+      <div className="flex items-center gap-4 mb-4">
+        <button
+          className="px-4 py-2 bg-green-500 text-white rounded"
+          onClick={handleRefresh}
+        >
+          Refresh Inquiry Map
+        </button>
+        {isAnalyzing && <span>Analyzing evidence...</span>}
+      </div>
+      <InquiryMap
+        businessGoal={businessGoal}
+        hypotheses={parsedHypotheses}
+        onUpdateConfidence={handleUpdateConfidence}
+      />
+    </div>
   );
 };
 
