@@ -55,6 +55,8 @@ const InquiryMapContent = () => {
         businessGoal={businessGoal}
         hypotheses={parsedHypotheses}
         onUpdateConfidence={handleUpdateConfidence}
+        onRefresh={handleRefresh}
+        isAnalyzing={isAnalyzing}
       />
     </main>
   );
