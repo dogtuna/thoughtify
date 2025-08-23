@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db, functions, appCheck } from "../firebase";
+import { auth, db, functions } from "../firebase";
 import {
   doc,
   getDoc,
@@ -15,7 +15,6 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import { processEvidence } from "../utils/inquiryMap";
 import ai, { generate } from "../ai";
@@ -545,9 +544,6 @@ const DiscoveryHub = () => {
       return;
     }
     try {
-      if (appCheck) {
-        await getAppCheckToken(appCheck);
-      }
       await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
