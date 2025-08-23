@@ -5,8 +5,24 @@ import ReactFlow, {
   Background,
   useNodesState,
 } from "reactflow";
+import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
+import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
+
+const ResizableNode = ({ data, selected }) => (
+  <div className="relative p-2 text-center">
+    <NodeResizer minWidth={100} minHeight={40} isVisible={selected} />
+    <div className="whitespace-pre-wrap">{data.label}</div>
+  </div>
+);
+
+ResizableNode.propTypes = {
+  data: PropTypes.shape({ label: PropTypes.string }),
+  selected: PropTypes.bool,
+};
+
+const nodeTypes = { resizable: ResizableNode };
 
 const InquiryMap = ({
   businessGoal,
@@ -51,6 +67,7 @@ const InquiryMap = ({
         typeof hypo === "object" ? hypo.confidence : undefined;
       return {
         id,
+        type: "resizable",
         data: { label, confidence },
         position: {
           x: centerX + radius * Math.cos(angle),
@@ -62,6 +79,7 @@ const InquiryMap = ({
     return [
       {
         id: "goal",
+        type: "resizable",
         data: { label: businessGoal || "Business Goal" },
         position: { x: centerX, y: centerY },
       },
@@ -147,13 +165,14 @@ const InquiryMap = ({
         edges={edges}
         onNodesChange={onNodesChange}
         onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
         fitView
       >
         <MiniMap />
         <Controls />
         <Background />
       </ReactFlow>
-      <div className="mt-4 flex gap-4 items-center">
+      <div className="mt-4 mb-8 flex gap-4 items-center">
         <button
           className="px-4 py-2 bg-blue-500 text-white rounded"
           onClick={() => setModalOpen(true)}

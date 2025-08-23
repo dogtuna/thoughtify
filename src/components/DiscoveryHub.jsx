@@ -18,6 +18,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
+import { useInquiryMap } from "../context/InquiryMapContext";
 import {
   classifyTask,
   dedupeByMessage,
@@ -157,6 +158,7 @@ const DiscoveryHub = () => {
   const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const { triageEvidence } = useInquiryMap();
   const [businessGoal, setBusinessGoal] = useState("");
   const [statusHistory, setStatusHistory] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -681,22 +683,40 @@ Respond ONLY in this JSON format:
         return { analysis, suggestions };
       };
 
+      let result;
       if (typeof res === "string") {
         try {
-          return parseResponse(res);
+          result = parseResponse(res);
         } catch {
           const match = res.match(/\{[\s\S]*\}/);
           if (match) {
             try {
-              return parseResponse(match[0]);
+              result = parseResponse(match[0]);
             } catch {
               // fall through
             }
           }
-          return { analysis: res.trim(), suggestions: [] };
+          if (!result) {
+            result = { analysis: res.trim(), suggestions: [] };
+          }
+        }
+      } else {
+        result = { analysis: "Unexpected response format.", suggestions: [] };
+      }
+
+      if (uid && initiativeId) {
+        try {
+          await triageEvidence(
+            uid,
+            initiativeId,
+            `Question: ${question}\nAnswer: ${text}`,
+          );
+        } catch (err) {
+          console.error("triageEvidence error", err);
         }
       }
-      return { analysis: "Unexpected response format.", suggestions: [] };
+
+      return result;
     } catch (err) {
       console.error("analyzeAnswer error", err);
       return {
@@ -1891,6 +1911,17 @@ Respond ONLY in this JSON format:
     for (const file of Array.from(files)) {
       const content = await file.text();
       newDocs.push({ name: file.name, content, addedAt: new Date().toISOString() });
+      if (uid && initiativeId) {
+        try {
+          await triageEvidence(
+            uid,
+            initiativeId,
+            `Title: ${file.name}\n\n${content}`,
+          );
+        } catch (err) {
+          console.error("triageEvidence error", err);
+        }
+      }
     }
     setDocuments((prev) => {
       const updated = [...prev, ...newDocs];
