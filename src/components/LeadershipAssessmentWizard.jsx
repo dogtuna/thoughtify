@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
+  getFirestore,
   collection,
   query,
   where,
@@ -13,7 +14,7 @@ import {
   getDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import OrganizationalVisionMission from "./OrganizationalVisionMission";
 import StrategicBusinessDrivers from "./StrategicBusinessDrivers";
 import TeamStrategicAlignment from "./TeamStrategicAlignment";
@@ -33,8 +34,8 @@ const LeadershipAssessmentWizard = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [trainingPlan, setTrainingPlan] = useState("");
 
-  // Use shared Firebase instances
-  const functionsInstance = functions;
+  const db = getFirestore(app);
+  const functionsInstance = getFunctions(app);
 
   // Save responses for a given step and persist to Firestore.
   const handleStepSave = async (stepIndex, data) => {
