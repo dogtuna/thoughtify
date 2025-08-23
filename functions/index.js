@@ -1707,4 +1707,37 @@ export const seedInquiryMap = onCall(
   }
 );
 
+export const updateInquiryMap = onCall(
+  {
+    region: "us-central1",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    timeoutSeconds: 120,
+  },
+  async (req) => {
+    const { map, content } = req.data || {};
+    if (!map || !content) {
+      throw new HttpsError("invalid-argument", "map and content are required");
+    }
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) throw new HttpsError("internal", "No API key available.");
+    const ai = genkit({
+      plugins: [googleAI({ apiKey: key })],
+      model: gemini("gemini-1.5-pro"),
+    });
+    const prompt =
+      `Current map: ${JSON.stringify(map)}\n` +
+      `New evidence: ${content}\n` +
+      `Return JSON {"hypotheses":[{"id":"hId","confidence":0.5,"newQuestions":["q"]}],"newHypotheses":[{"text":"hyp","confidence":0.2,"questions":["q1"]}]}`;
+    const { text } = await ai.generate(prompt);
+    let data;
+    try {
+      data = parseJsonFromText(text);
+    } catch (err) {
+      console.error("Failed to parse inquiry map update", err, text);
+      throw new HttpsError("internal", "Invalid AI response format");
+    }
+    return data;
+  }
+);
+
 export { getEmailAuthUrl, emailOAuthCallback, sendQuestionEmail } from "./emailProviders.js";

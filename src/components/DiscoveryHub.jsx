@@ -17,6 +17,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
+import { processEvidence } from "../utils/inquiryMap";
 import ai, { generate } from "../ai";
 import {
   classifyTask,
@@ -161,6 +162,7 @@ const DiscoveryHub = () => {
   const [statusHistory, setStatusHistory] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
+  const [inquiryMapId, setInquiryMapId] = useState(null);
   const [viewingStatus, setViewingStatus] = useState("");
   const [qaModal, setQaModal] = useState(null);
   const navigate = useNavigate();
@@ -1424,6 +1426,11 @@ Respond ONLY in this JSON format:
       }
       return;
     }
+    if (inquiryMapId) {
+      processEvidence(inquiryMapId, text).catch((err) =>
+        console.error("processEvidence failed", err)
+      );
+    }
     setAnalyzing(true);
     setAnalysisModal({
       idx,
@@ -1483,6 +1490,7 @@ Respond ONLY in this JSON format:
           setBusinessGoal(init?.businessGoal || "");
           setAudienceProfile(init?.audienceProfile || "");
           setProjectConstraints(init?.projectConstraints || "");
+          setInquiryMapId(init?.inquiryMapId || null);
           const contactsInit = (init?.keyContacts || []).map((c, i) => ({
             ...c,
             color: colorPalette[i % colorPalette.length],
@@ -1899,6 +1907,13 @@ Respond ONLY in this JSON format:
       }
       return updated;
     });
+    if (inquiryMapId) {
+      for (const doc of newDocs) {
+        processEvidence(inquiryMapId, doc.content).catch((err) =>
+          console.error("processEvidence failed", err)
+        );
+      }
+    }
   };
 
   const handleDocInput = (e) => {
@@ -2268,6 +2283,9 @@ Respond ONLY in this JSON format:
             }}
           >
             Project Status
+          </li>
+          <li onClick={() => navigate(`/inquiry-map?initiativeId=${initiativeId}`)}>
+            Inquiry Map
           </li>
           {active === "status" && statusHistory.filter((u) => u.sent).length > 0 && (
             <ul className="sub-menu">
