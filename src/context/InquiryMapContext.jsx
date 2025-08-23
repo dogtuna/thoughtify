@@ -7,10 +7,12 @@ const InquiryMapContext = createContext();
 
 const defaultState = {
   hypotheses: [],
+  businessGoal: "",
 };
 
 export const InquiryMapProvider = ({ children }) => {
   const [hypotheses, setHypotheses] = useState(defaultState.hypotheses);
+  const [businessGoal, setBusinessGoal] = useState(defaultState.businessGoal);
   const unsubscribeRef = useRef(null);
 
   const loadHypotheses = useCallback((uid, initiativeId) => {
@@ -21,6 +23,7 @@ export const InquiryMapProvider = ({ children }) => {
     unsubscribeRef.current = onSnapshot(ref, (snap) => {
       const data = snap.data();
       setHypotheses(data?.inquiryMap?.hypotheses || []);
+      setBusinessGoal(data?.businessGoal || "");
     });
   }, []);
 
@@ -84,6 +87,7 @@ export const InquiryMapProvider = ({ children }) => {
 
   const value = {
     hypotheses,
+    businessGoal,
     loadHypotheses,
     addQuestion,
     addEvidence,

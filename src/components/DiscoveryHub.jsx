@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
 import {
@@ -2285,6 +2285,11 @@ Respond ONLY in this JSON format:
                 ))}
             </ul>
           )}
+          <li>
+            <Link to={`/inquiry-map?initiativeId=${initiativeId || ""}`}>
+              Inquiry Map
+            </Link>
+          </li>
         </ul>
       </aside>
       <div className="main-content">
