@@ -1670,4 +1670,41 @@ export const savePersona = onCall(async (request) => {
   return { id: personaId };
 });
 
+export const seedInquiryMap = onCall(
+  {
+    region: "us-central1",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    timeoutSeconds: 120,
+  },
+  async (req) => {
+    const { goal, sponsorInput = "" } = req.data || {};
+    if (!goal) {
+      throw new HttpsError("invalid-argument", "goal is required");
+    }
+
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) throw new HttpsError("internal", "No API key available.");
+
+    const ai = genkit({
+      plugins: [googleAI({ apiKey: key })],
+      model: gemini("gemini-1.5-pro"),
+    });
+
+    const prompt =
+      `Business goal: ${goal}\n` +
+      `Sponsor input: ${sponsorInput}\n` +
+      `Return JSON {"hypotheses":[{"text":"hypothesis","questions":["q1","q2"]}]}`;
+
+    const { text } = await ai.generate(prompt);
+    let data;
+    try {
+      data = parseJsonFromText(text);
+    } catch (err) {
+      console.error("Failed to parse hypothesis map", err, text);
+      throw new HttpsError("internal", "Invalid AI response format");
+    }
+    return data;
+  }
+);
+
 export { getEmailAuthUrl, emailOAuthCallback, sendQuestionEmail } from "./emailProviders.js";
