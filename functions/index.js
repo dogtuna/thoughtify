@@ -1604,7 +1604,11 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
 });
 
 export const generateInitialInquiryMap = onCall(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  {
+    region: "us-central1",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    cors: ["https://thoughtify.training"],
+  },
   async (request) => {
     const { projectId, brief, ownerId, name } = request.data || {};
     if (!projectId || !brief || !ownerId || !name) {
@@ -1666,6 +1670,22 @@ export const generateInitialInquiryMap = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
+
+    await db
+      .collection("projects")
+      .doc(projectId)
+      .set(
+        {
+          ownerId,
+          name,
+          brief,
+          inquiryMap: {
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            hypothesisCount: hypotheses.length,
+          },
+        },
+        { merge: true }
+      );
 
     await db
       .collection("projects")
