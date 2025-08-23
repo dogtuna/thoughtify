@@ -2,15 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getFirestore, collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import OrganizationalVisionMission from "./OrganizationalVisionMission";
 import StrategicBusinessDrivers from "./StrategicBusinessDrivers";
 import TeamStrategicAlignment from "./TeamStrategicAlignment";
 import CurrentStateVsDesiredState from "./CurrentStateVsDesiredState";
 import TrainingAndDevelopment from "./TrainingAndDevelopment";
 import { buildGeminiPrompt } from "./BuildPrompt"; // Function to build the prompt from progressData
-import { app } from "../firebase";
+import { db, functions } from "../firebase";
 import "./LeadershipAssessmentWizard.css";
 
 
@@ -23,8 +33,8 @@ const LeadershipAssessmentWizard = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [trainingPlan, setTrainingPlan] = useState("");
 
-  const db = getFirestore();
-  const functionsInstance = getFunctions(app);
+  // Use shared Firebase instances
+  const functionsInstance = functions;
 
   // Save responses for a given step and persist to Firestore.
   const handleStepSave = async (stepIndex, data) => {
