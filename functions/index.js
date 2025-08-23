@@ -1607,7 +1607,7 @@ export const generateInitialInquiryMap = onCall(
   {
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY"],
-    cors: ["https://thoughtify.training"],
+    invoker: "public"
   },
   async (request) => {
     const { projectId, brief, ownerId, name } = request.data || {};
