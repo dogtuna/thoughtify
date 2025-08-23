@@ -11,6 +11,8 @@ import { createAvatar } from "@dicebear/core";
 import { notionists } from "@dicebear/collection";
 import crypto from "crypto";
 import { Buffer } from "buffer";
+import express from "express";
+import cors from "cors";
 
 const FIREBASE_CONFIG = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
 const PROJECT_ID =
@@ -1581,7 +1583,6 @@ export const generateInitialInquiryMap = onCall(
     if (!brief) {
       throw new HttpsError("invalid-argument", "project brief is required.");
     }
-
     const key = process.env.GOOGLE_GENAI_API_KEY;
     if (!key) {
       throw new HttpsError("internal", "No API key available.");
@@ -1612,6 +1613,7 @@ export const generateInitialInquiryMap = onCall(
     return { hypotheses, count: hypotheses.length };
   },
 );
+
 
 // ---------------------------------------
 // AVATAR GENERATOR (CALLABLE, OPTION A)
