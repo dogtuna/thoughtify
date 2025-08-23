@@ -1574,13 +1574,15 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
     console.error("Error sending email:", error);
     return { success: false, error: error.message };
   }
-});
+  });
 
-const generateInitialInquiryMapApp = express();
-generateInitialInquiryMapApp.use(
-  cors({ origin: "https://thoughtify.training" })
-);
-generateInitialInquiryMapApp.use(express.json());
+export const generateInitialInquiryMap = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (request) => {
+    const { brief } = request.data || {};
+    if (!brief) {
+      throw new HttpsError("invalid-argument", "project brief is required.");
+    }
 
 generateInitialInquiryMapApp.post("/", async (req, res) => {
   const { brief } = req.body || {};
@@ -1618,12 +1620,8 @@ generateInitialInquiryMapApp.post("/", async (req, res) => {
     return;
   }
 
-  res.json({ hypotheses, count: hypotheses.length });
-});
-
-export const generateInitialInquiryMap = onRequest(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
-  generateInitialInquiryMapApp
+    return { hypotheses, count: hypotheses.length };
+  },
 );
 
 
