@@ -47,7 +47,7 @@ const InquiryMapContent = () => {
   }, [initiativeId, refreshInquiryMap]);
 
   return (
-    <main className="pt-24 pb-32">
+    <main className="min-h-screen pt-32 pb-40">
       <div className="flex items-center gap-4 mb-4">
         <button
           className="px-4 py-2 bg-green-500 text-white rounded"

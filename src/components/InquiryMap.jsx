@@ -4,22 +4,30 @@ import ReactFlow, {
   Controls,
   Background,
   useNodesState,
+  Handle,
+  Position,
 } from "reactflow";
 import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
 
-const ResizableNode = ({ data, selected }) => (
-  <div className="relative p-2 text-center">
+const ResizableNode = ({ data, selected, style }) => (
+  <div
+    className="relative p-2 text-center rounded border"
+    style={style}
+  >
     <NodeResizer minWidth={100} minHeight={40} isVisible={selected} />
     <div className="whitespace-pre-wrap">{data.label}</div>
+    <Handle type="target" position={Position.Top} />
+    <Handle type="source" position={Position.Bottom} />
   </div>
 );
 
 ResizableNode.propTypes = {
   data: PropTypes.shape({ label: PropTypes.string }),
   selected: PropTypes.bool,
+  style: PropTypes.object,
 };
 
 const nodeTypes = { resizable: ResizableNode };
@@ -82,6 +90,7 @@ const InquiryMap = ({
         type: "resizable",
         data: { label: businessGoal || "Business Goal" },
         position: { x: centerX, y: centerY },
+        style: { background: "#fff" },
       },
       ...hypoNodes,
     ];
@@ -172,7 +181,7 @@ const InquiryMap = ({
         <Controls />
         <Background />
       </ReactFlow>
-      <div className="mt-4 mb-8 flex gap-4 items-center">
+      <div className="mt-4 mb-20 flex gap-4 items-center">
         <button
           className="px-4 py-2 bg-blue-500 text-white rounded"
           onClick={() => setModalOpen(true)}
