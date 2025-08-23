@@ -971,8 +971,21 @@
   text-align: center;
 }
 
-.design-doc-panel .button-row {
-  margin-top: 20px;
+  .design-doc-panel .button-row {
+    margin-top: 20px;
+  }
+
+.toast {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  opacity: 0.9;
+  z-index: 1000;
 }
 
 @keyframes pulseGradient {

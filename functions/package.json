@@ -24,7 +24,9 @@
     "genkit": "^1.0.4",
     "nodemailer": "^6.10.0",
     "googleapis": "^140.0.0",
-    "@azure/msal-node": "^2.6.4"
+    "@azure/msal-node": "^2.6.4",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",
