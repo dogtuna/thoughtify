@@ -47,7 +47,7 @@ const InquiryMapContent = () => {
   }, [initiativeId, refreshInquiryMap]);
 
   return (
-    <div>
+    <main className="pt-24 pb-32">
       <div className="flex items-center gap-4 mb-4">
         <button
           className="px-4 py-2 bg-green-500 text-white rounded"
@@ -62,7 +62,7 @@ const InquiryMapContent = () => {
         hypotheses={parsedHypotheses}
         onUpdateConfidence={handleUpdateConfidence}
       />
-    </div>
+    </main>
   );
 };
 
