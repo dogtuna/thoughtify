@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getFirestore, collection, query, where, getDocs, updateDoc, doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import OrganizationalVisionMission from "./OrganizationalVisionMission";
 import StrategicBusinessDrivers from "./StrategicBusinessDrivers";
@@ -23,7 +34,7 @@ const LeadershipAssessmentWizard = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [trainingPlan, setTrainingPlan] = useState("");
 
-  const db = getFirestore();
+  const db = getFirestore(app);
   const functionsInstance = getFunctions(app);
 
   // Save responses for a given step and persist to Firestore.

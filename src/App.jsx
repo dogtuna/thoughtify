@@ -28,6 +28,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CookieConsent from "./components/CookieConsent";
 import Settings from "./components/Settings";
 import Tasks from "./components/Tasks";
+import InquiryMap from "./components/InquiryMap";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -96,6 +97,10 @@ export default function App() {
         <Route
           path="/tasks"
           element={user ? <Tasks /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/inquiry-map"
+          element={user ? <InquiryMap /> : <Navigate to="/login" />}
         />
         <Route path="/settings" element={<Settings />} />
         <Route
