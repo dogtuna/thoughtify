@@ -22,29 +22,30 @@ const firebaseConfig = {
 // ✅ HMR-safe singleton app
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// 🔧 Set debug token BEFORE initializing App Check (dev only)
-if (import.meta.env.DEV && import.meta.env.VITE_APPCHECK_DEBUG_TOKEN) {
-  // `self` works in both window and workers
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
-}
-
-// 🔐 Initialize App Check (prefer Enterprise if provided)
-const enterpriseKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
-const v3Key = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-
 let appCheck = null;
-if (enterpriseKey) {
-  appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaEnterpriseProvider(enterpriseKey),
-    isTokenAutoRefreshEnabled: true,
-  });
-} else if (v3Key) {
-  appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(v3Key),
-    isTokenAutoRefreshEnabled: true,
-  });
-} else {
-  console.warn("No reCAPTCHA site key found; App Check not initialized.");
+
+// 🔐 Initialize App Check in the browser only
+if (typeof window !== "undefined") {
+  if (import.meta.env.DEV && import.meta.env.VITE_APPCHECK_DEBUG_TOKEN) {
+    // `self` works in both window and workers
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
+  }
+
+  const enterpriseKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+  const v3Key = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+  if (enterpriseKey || v3Key) {
+    const provider = enterpriseKey
+      ? new ReCaptchaEnterpriseProvider(enterpriseKey)
+      : new ReCaptchaV3Provider(v3Key);
+
+    appCheck = initializeAppCheck(app, {
+      provider,
+      isTokenAutoRefreshEnabled: true,
+    });
+  } else {
+    console.warn("No reCAPTCHA site key found; App Check not initialized.");
+  }
 }
 
 // ⚠️ No manual getToken() needed — SDK will attach tokens automatically

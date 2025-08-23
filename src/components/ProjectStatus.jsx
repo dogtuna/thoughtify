@@ -10,14 +10,8 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
-import {
-  auth,
-  db,
-  functions,
-  appCheck,
-} from "../firebase";
+import { auth, db, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
-import { getToken as getAppCheckToken } from "firebase/app-check";
 import ai from "../ai";
 import PropTypes from "prop-types";
 
@@ -345,9 +339,6 @@ ${allOutstanding || "None"}`;
       return;
     }
     try {
-      if (appCheck) {
-        await getAppCheckToken(appCheck);
-      }
       await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
