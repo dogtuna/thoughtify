@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import ReactFlow, { MiniMap, Controls, Background } from "reactflow";
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+} from "reactflow";
 import "reactflow/dist/style.css";
 import PropTypes from "prop-types";
 
 const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
-  const [nodes, setNodes] = useState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges] = useState([]);
   const [selected, setSelected] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -13,6 +18,13 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
   const centerX = 250;
   const centerY = 250;
   const radius = 200;
+
+  const getColor = (confidence) => {
+    if (typeof confidence !== "number") return "#d1d5db"; // gray for unknown
+    if (confidence < 0.33) return "#f87171"; // red
+    if (confidence < 0.66) return "#fbbf24"; // amber
+    return "#4ade80"; // green
+  };
 
   const computedNodes = useMemo(() => {
     const hypoNodes = hypotheses.map((hypo, index) => {
@@ -27,13 +39,16 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
         typeof hypo === "object" && typeof hypo.confidence === "number"
           ? `${baseLabel} (${Math.round(hypo.confidence * 100)}%)`
           : baseLabel;
+      const confidence =
+        typeof hypo === "object" ? hypo.confidence : undefined;
       return {
         id: `hypothesis-${index}`,
-        data: { label, confidence: hypo.confidence },
+        data: { label, confidence },
         position: {
           x: centerX + radius * Math.cos(angle),
           y: centerY + radius * Math.sin(angle),
         },
+        style: { background: getColor(confidence) },
       };
     });
     return [
@@ -65,6 +80,29 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
     setSelected(node);
   };
 
+  const updateConfidence = (id, confidence) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: { ...n.data, confidence },
+              style: { ...n.style, background: getColor(confidence) },
+            }
+          : n
+      )
+    );
+    setSelected((sel) =>
+      sel && sel.id === id
+        ? {
+            ...sel,
+            data: { ...sel.data, confidence },
+            style: { ...sel.style, background: getColor(confidence) },
+          }
+        : sel
+    );
+  };
+
   const addHypothesis = (e) => {
     e.preventDefault();
     if (!newHypothesis.trim()) return;
@@ -77,6 +115,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
         x: centerX + radius * Math.cos(angle),
         y: centerY + radius * Math.sin(angle),
       },
+      style: { background: getColor(0) },
     };
     setNodes((nds) => [...nds, newNode]);
     setEdges((eds) => [
@@ -92,6 +131,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
         onNodeClick={onNodeClick}
         fitView
       >
@@ -99,7 +139,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
         <Controls />
         <Background />
       </ReactFlow>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex gap-4 items-center">
         <button
           className="px-4 py-2 bg-blue-500 text-white rounded"
           onClick={() => setModalOpen(true)}
@@ -107,7 +147,19 @@ const InquiryMap = ({ businessGoal, hypotheses = [] }) => {
           New Hypothesis
         </button>
         {selected && (
-          <div className="self-center">Selected: {selected.data.label}</div>
+          <div className="flex items-center gap-2">
+            <span>Selected: {selected.data.label}</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round((selected.data.confidence || 0) * 100)}
+              onChange={(e) =>
+                updateConfidence(selected.id, Number(e.target.value) / 100)
+              }
+            />
+            <span>{Math.round((selected.data.confidence || 0) * 100)}%</span>
+          </div>
         )}
       </div>
       {modalOpen && (
