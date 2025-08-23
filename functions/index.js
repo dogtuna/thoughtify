@@ -1626,6 +1626,7 @@ export const generateInitialInquiryMap = onRequest(
   generateInitialInquiryMapApp
 );
 
+
 // ---------------------------------------
 // AVATAR GENERATOR (CALLABLE, OPTION A)
 // ---------------------------------------
