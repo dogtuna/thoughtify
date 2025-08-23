@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { app, auth } from "../firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { app, auth, db } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 
@@ -16,6 +17,10 @@ const ProjectSetup = () => {
     functions,
     "generateClarifyingQuestions"
   );
+  const generateInitialInquiryMap = httpsCallable(
+    functions,
+    "generateInitialInquiryMap"
+  );
 
   const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
@@ -28,6 +33,13 @@ const ProjectSetup = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -187,7 +199,9 @@ const ProjectSetup = () => {
       });
       const qsRaw = (data.clarifyingQuestions || []).slice(0, 9);
       const qs = qsRaw.map((q) =>
-        typeof q === "string" ? { question: q, stakeholders: [], phase: "General" } : q
+        typeof q === "string"
+          ? { question: q, stakeholders: [], phase: "General" }
+          : q
       );
       const uid = auth.currentUser?.uid;
       if (uid) {
@@ -216,6 +230,32 @@ const ProjectSetup = () => {
           clarifyingAnswers: qs.map(() => ({})),
           clarifyingAsked,
         });
+
+        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints: ${projectConstraints}`;
+        try {
+          const mapResp = await generateInitialInquiryMap({
+            projectId: initiativeId,
+            brief,
+          });
+          const count = mapResp?.data?.count ?? 0;
+          await setDoc(
+            doc(db, "projects", initiativeId),
+            {
+              ownerId: uid,
+              name: projectName,
+              brief,
+              inquiryMap: {
+                createdAt: serverTimestamp(),
+                hypothesisCount: count,
+              },
+            },
+            { merge: true }
+          );
+          setToast(`Inquiry map created with ${count} hypotheses.`);
+          await new Promise((res) => setTimeout(res, 1000));
+        } catch (mapErr) {
+          console.error("Error generating inquiry map:", mapErr);
+        }
       }
       navigate(`/discovery?initiativeId=${initiativeId}`);
     } catch (err) {
@@ -365,6 +405,7 @@ const ProjectSetup = () => {
           {error && <p className="generator-error">{error}</p>}
         </form>
       </div>
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 };
