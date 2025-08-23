@@ -21,7 +21,7 @@ import TeamStrategicAlignment from "./TeamStrategicAlignment";
 import CurrentStateVsDesiredState from "./CurrentStateVsDesiredState";
 import TrainingAndDevelopment from "./TrainingAndDevelopment";
 import { buildGeminiPrompt } from "./BuildPrompt"; // Function to build the prompt from progressData
-import { app } from "../firebase";
+import { db, functions } from "../firebase";
 import "./LeadershipAssessmentWizard.css";
 
 
