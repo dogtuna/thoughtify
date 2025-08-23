@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { app, auth } from "../firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { app, auth, db } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 

@@ -183,13 +183,15 @@ function parseJsonFromText(text) {
   throw new Error("No complete JSON content found");
 }
 
-function getInquiryMapCollections(projectId) {
-  const base = db.collection("projects").doc(projectId).collection("inquiryMap");
+function getInquiryMapRefs(projectId) {
+  const projectRef = db.collection("projects").doc(projectId);
+  const mapDoc = projectRef.collection("inquiryMap").doc("root"); // ✅ document holder
   return {
-    hypotheses: base.collection("hypotheses"),
-    questions: base.collection("questions"),
-    evidence: base.collection("evidence"),
-    tasks: base.collection("tasks"),
+    mapDoc,
+    hypotheses: mapDoc.collection("hypotheses"),
+    questions:  mapDoc.collection("questions"),
+    evidence:   mapDoc.collection("evidence"),
+    tasks:      mapDoc.collection("tasks"),
   };
 }
 
@@ -1613,9 +1615,7 @@ export const generateInitialInquiryMap = onCall(
     }
 
     const key = process.env.GOOGLE_GENAI_API_KEY;
-    if (!key) {
-      throw new HttpsError("internal", "No API key available.");
-    }
+    if (!key) throw new HttpsError("internal", "No API key available.");
 
     const ai = genkit({
       plugins: [googleAI({ apiKey: key })],
@@ -1623,29 +1623,49 @@ export const generateInitialInquiryMap = onCall(
     });
 
     const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
-      const prompt = `Given the project brief below, generate 3 initial hypotheses as a JSON array. Each item must contain: title, parentHypothesisId (null), confidenceScore (0-1), status, links (empty array).\nProject brief: ${brief}`;
+      const prompt =
+        `Given the project brief below, generate EXACTLY 3 initial hypotheses as a JSON array of objects ` +
+        `with fields: title (string), confidenceScore (0..1, default 0), status ("unexplored"), links (array).\n` +
+        `Return ONLY JSON. Brief:\n${brief}`;
       const { text } = await ai.generate(prompt);
-      return parseJsonFromText(text);
+      const parsed = parseJsonFromText(text);
+      if (!Array.isArray(parsed)) throw new Error("AI did not return an array");
+      return parsed.map(h => ({
+        title: String(h.title || "").trim(),
+        confidenceScore: Number(h.confidenceScore || 0),
+        status: String(h.status || "unexplored"),
+        links: Array.isArray(h.links) ? h.links : [],
+      }));
     });
 
     let hypotheses;
     try {
       hypotheses = await flow();
-      if (!Array.isArray(hypotheses)) {
-        throw new Error("AI did not return an array");
-      }
-    } catch (error) {
-      console.error("AI generation failed:", error);
+    } catch (e) {
+      console.error("AI generation failed:", e);
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
 
-    const collections = getInquiryMapCollections(projectId);
+    const { mapDoc, hypotheses: hypCol } = getInquiryMapRefs(projectId);
     const batch = db.batch();
+
+    batch.set(mapDoc, {
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
     hypotheses.forEach((h) => {
-      const docRef = collections.hypotheses.doc();
-      batch.set(docRef, buildInquiryNode(h));
+      const docRef = hypCol.doc();
+      batch.set(docRef, {
+        title: h.title,
+        parentHypothesisId: null,
+        confidenceScore: h.confidenceScore || 0,
+        status: h.status || "unexplored",
+        links: h.links || [],
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
-    await batch.commit();
 
     await db
       .collection("projects")
@@ -1666,6 +1686,7 @@ export const generateInitialInquiryMap = onCall(
     return { count: hypotheses.length };
   }
 );
+
 
 // ---------------------------------------
 // AVATAR GENERATOR (CALLABLE, OPTION A)
