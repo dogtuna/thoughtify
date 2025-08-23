@@ -49,12 +49,6 @@ const InquiryMapContent = () => {
   return (
     <main className="min-h-screen pt-32 pb-40">
       <div className="flex items-center gap-4 mb-4">
-        <button
-          className="px-4 py-2 bg-green-500 text-white rounded"
-          onClick={handleRefresh}
-        >
-          Refresh Inquiry Map
-        </button>
         {isAnalyzing && <span>Analyzing evidence...</span>}
       </div>
       <InquiryMap

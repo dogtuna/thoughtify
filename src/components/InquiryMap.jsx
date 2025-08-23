@@ -5,11 +5,28 @@ import ReactFlow, {
   Background,
   Panel,
   useNodesState,
+  applyNodeChanges,
 } from "reactflow";
 import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
+
+function useCanvasHeight(defaultH = 600) {
+  const [h, setH] = useState(defaultH);
+  useEffect(() => {
+    const calc = () => {
+      const header = document.querySelector("header")?.offsetHeight || 0;
+      const footer = document.querySelector("footer")?.offsetHeight || 0;
+      const height = Math.max(320, window.innerHeight - header - footer);
+      setH(height);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
+  return h;
+}
 
 const CARD_W = 320;
 const CARD_H = 100;
@@ -22,18 +39,11 @@ const ResizableNode = ({ id, data, selected }) => (
       isVisible={selected}
       onResizeEnd={(_, p) => data.onResize?.(id, p.width, p.height)}
     />
-    {/* inherit background from node.style; enforce readable text + wrapping */}
-    <div className="px-3 py-2 rounded-2xl bg-transparent text-[#111827] break-words whitespace-pre-wrap max-w-[480px]">
+    <div className="px-3 py-2 rounded-2xl bg-transparent text-[#111827] break-words whitespace-pre-wrap max-w-[520px]">
       {data.label}
     </div>
   </div>
 );
-
-ResizableNode.propTypes = {
-  id: PropTypes.string,
-  data: PropTypes.shape({ label: PropTypes.string, onResize: PropTypes.func }),
-  selected: PropTypes.bool,
-};
 
 const nodeTypes = { resizable: ResizableNode };
 
@@ -46,112 +56,85 @@ const baseCardStyle = {
   height: CARD_H,
 };
 
-const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+const colorFor = (c) =>
+  typeof c !== "number" ? "#f87171" : c < 0.33 ? "#f87171" : c < 0.66 ? "#fbbf24" : "#4ade80";
+
+const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh, isAnalyzing }) => {
+  const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useState([]);
   const [selected, setSelected] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState("");
-  const sizesRef = useRef({}); // persist { [id]: {width, height} } across renders
+  const sizesRef = useRef({}); // { id: {width, height} }
+  const canvasHeight = useCanvasHeight();
 
-  // Layout center
-  const centerX = 400;
-  const centerY = 300;
+  // layout params
+  const centerX = 420;
+  const centerY = 280;
   const radius = 260;
 
-  const getColor = (confidence) => {
-    if (typeof confidence !== "number") return "#f87171"; // red
-    if (confidence < 0.33) return "#f87171"; // red
-    if (confidence < 0.66) return "#fbbf24"; // amber
-    return "#4ade80"; // green
-  };
-
-  const handleResizePersist = useCallback((id, width, height) => {
+  const persistSize = useCallback((id, width, height) => {
     sizesRef.current[id] = { width, height };
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, style: { ...n.style, width, height } } : n
-      )
-    );
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, style: { ...n.style, width, height } } : n)));
   }, [setNodes]);
 
-  // Build nodes, but merge any existing position / saved width/height to avoid resets
-  const computed = useMemo(() => {
-    const prevMap = new Map(nodes.map((n) => [n.id, n]));
-
+  const baseNodes = useMemo(() => {
     const goal = {
       id: "goal",
       type: "resizable",
-      data: { label: businessGoal || "Business Goal", onResize: handleResizePersist },
-      position: prevMap.get("goal")?.position ?? { x: centerX, y: centerY },
+      data: { label: businessGoal || "Business Goal", onResize: persistSize },
+      position: { x: centerX, y: centerY },
       style: {
         ...baseCardStyle,
         background: "#ffffff",
         fontWeight: 600,
-        width: prevMap.get("goal")?.style?.width ?? baseCardStyle.width,
-        height: prevMap.get("goal")?.style?.height ?? baseCardStyle.height,
+        width: sizesRef.current["goal"]?.width ?? baseCardStyle.width,
+        height: sizesRef.current["goal"]?.height ?? baseCardStyle.height,
       },
     };
 
-    const hypoNodes = hypotheses.map((hypo, index) => {
-      const angle = (index / Math.max(hypotheses.length, 1)) * 2 * Math.PI;
-      const id = typeof hypo === "object" && hypo.id ? hypo.id : `hypothesis-${index}`;
-      const confidence = typeof hypo === "object" ? hypo.confidence : undefined;
-
+    const hs = hypotheses.map((h, idx) => {
+      const id = typeof h === "object" && h.id ? h.id : `hypothesis-${idx}`;
+      const conf = typeof h === "object" ? h.confidence : undefined;
       const baseLabel =
-        typeof hypo === "string"
-          ? hypo
-          : `${hypo.id ? `${hypo.id}: ` : ""}${hypo.statement || hypo.label || ""}`;
-
-      const label =
-        typeof hypo === "object" && typeof confidence === "number"
-          ? `${baseLabel} (${Math.round(confidence * 100)}%)`
-          : baseLabel;
-
-      const prev = prevMap.get(id);
-      const size = sizesRef.current[id] || prev?.style || {};
+        typeof h === "string" ? h : `${h.id ? `${h.id}: ` : ""}${h.statement || h.label || ""}`;
+      const label = typeof conf === "number" ? `${baseLabel} (${Math.round(conf * 100)}%)` : baseLabel;
+      const angle = (idx / Math.max(hypotheses.length, 1)) * 2 * Math.PI;
 
       return {
         id,
         type: "resizable",
-        data: { label, confidence, onResize: handleResizePersist },
-        position:
-          prev?.position ??
-          {
-            x: centerX + radius * Math.cos(angle),
-            y: centerY + radius * Math.sin(angle),
-          },
+        data: { label, confidence: conf, onResize: persistSize },
+        position: { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) },
         style: {
           ...baseCardStyle,
-          background: getColor(confidence),
-          width: size.width ?? baseCardStyle.width,
-          height: size.height ?? baseCardStyle.height,
+          background: colorFor(conf),
+          width: sizesRef.current[id]?.width ?? baseCardStyle.width,
+          height: sizesRef.current[id]?.height ?? baseCardStyle.height,
         },
       };
     });
 
-    const edges = hypotheses.map((hypo, index) => ({
-      id: `edge-${index}`,
+    const es = hypotheses.map((h, idx) => ({
+      id: `edge-${idx}`,
       source: "goal",
-      target: typeof hypo === "object" && hypo.id ? hypo.id : `hypothesis-${index}`,
-      animated: false,
+      target: typeof h === "object" && h.id ? h.id : `hypothesis-${idx}`,
       style: { stroke: "rgba(0,0,0,0.25)" },
     }));
 
-    return { nodes: [goal, ...hypoNodes], edges };
+    return { nodes: [goal, ...hs], edges: es };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessGoal, hypotheses, handleResizePersist]); // <— don't depend on `nodes` here to avoid loops
+  }, [businessGoal, hypotheses]); // sizes are read from ref, positions will be merged below
 
   useEffect(() => {
     setNodes((prev) => {
-      // merge positions if we had any previous nodes with manual moves
       const prevMap = new Map(prev.map((n) => [n.id, n]));
-      return computed.nodes.map((n) => {
+      return baseNodes.nodes.map((n) => {
         const old = prevMap.get(n.id);
         return old
           ? {
               ...n,
-              position: old.position ?? n.position,
+              position: old.position ?? n.position, // preserve manual moves
               style: {
                 ...n.style,
                 width: old.style?.width ?? n.style.width,
@@ -161,23 +144,26 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence }) => {
           : n;
       });
     });
-    setEdges(computed.edges);
-  }, [computed, setNodes]);
+    setEdges(baseNodes.edges);
+  }, [baseNodes, setNodes]);
+
+  const onNodesChange = useCallback(
+    (changes) => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    },
+    [setNodes]
+  );
 
   const onNodeClick = (_, node) => setSelected(node);
 
   const updateConfidence = (id, confidence) => {
     setNodes((nds) =>
       nds.map((n) =>
-        n.id === id
-          ? { ...n, data: { ...n.data, confidence }, style: { ...n.style, background: getColor(confidence) } }
-          : n
+        n.id === id ? { ...n, data: { ...n.data, confidence }, style: { ...n.style, background: colorFor(confidence) } } : n
       )
     );
     setSelected((sel) =>
-      sel && sel.id === id
-        ? { ...sel, data: { ...sel.data, confidence }, style: { ...sel.style, background: getColor(confidence) } }
-        : sel
+      sel && sel.id === id ? { ...sel, data: { ...sel.data, confidence }, style: { ...sel.style, background: colorFor(confidence) } } : sel
     );
     onUpdateConfidence?.(id, confidence);
   };
@@ -185,29 +171,24 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence }) => {
   const addHypothesis = (e) => {
     e.preventDefault();
     if (!newHypothesis.trim()) return;
-    const index = nodes.filter((n) => n.id !== "goal").length + 1;
-    const angle = ((index - 1) / index) * 2 * Math.PI;
-    const id = `hypothesis-${index - 1}`;
-
-    const newNode = {
+    const idx = nodes.filter((n) => n.id !== "goal").length;
+    const angle = (idx / Math.max(idx || 1, 1)) * 2 * Math.PI;
+    const id = `hypothesis-${idx}`;
+    const node = {
       id,
       type: "resizable",
-      data: { label: newHypothesis, confidence: 0, onResize: handleResizePersist },
+      data: { label: newHypothesis, confidence: 0, onResize: persistSize },
       position: { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) },
-      style: { ...baseCardStyle, background: getColor(0) },
+      style: { ...baseCardStyle, background: colorFor(0) },
     };
-
-    setNodes((nds) => [...nds, newNode]);
-    setEdges((eds) => [...eds, { id: `edge-${index - 1}`, source: "goal", target: id }]);
+    setNodes((nds) => [...nds, node]);
+    setEdges((eds) => [...eds, { id: `edge-${idx}`, source: "goal", target: id }]);
     setNewHypothesis("");
     setModalOpen(false);
   };
 
   return (
-    <div
-      // Adjust the 6rem/7rem to your header/footer heights if different
-      className="w-full h-[calc(100vh-6rem-7rem)]"
-    >
+    <div className="w-full" style={{ height: `${canvasHeight}px` }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -221,7 +202,19 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence }) => {
         <MiniMap pannable zoomable />
         <Controls position="top-left" />
 
-        {/* Top-right panel: Add hypothesis */}
+        {/* Left panel: Refresh + status */}
+        <Panel position="top-left" className="flex items-center gap-2 bg-white/80 rounded-xl px-3 py-2 shadow">
+          <button
+            className="px-3 py-1.5 bg-green-600 text-white rounded"
+            onClick={onRefresh}
+            disabled={isAnalyzing}
+          >
+            Refresh Map
+          </button>
+          {isAnalyzing && <span className="text-sm">Analyzing…</span>}
+        </Panel>
+
+        {/* Right panel: New hypothesis */}
         <Panel position="top-right">
           <button
             className="px-4 py-2 bg-blue-500 text-white rounded shadow"
@@ -231,10 +224,10 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence }) => {
           </button>
         </Panel>
 
-        {/* Bottom-left panel: Selected node slider */}
+        {/* Bottom-left panel: confidence slider for selected */}
         {selected && (
-          <Panel position="bottom-left" className="bg-black/70 text-white rounded-xl px-3 py-2 shadow">
-            <div className="flex items-center gap-2 max-w-[40vw]">
+          <Panel position="bottom-left" className="bg-black/70 text-white rounded-xl px-3 py-2 shadow max-w-[40vw]">
+            <div className="flex items-center gap-2">
               <span className="truncate">Selected: {selected.data.label}</span>
               <input
                 type="range"
@@ -276,20 +269,23 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence }) => {
   );
 };
 
+ResizableNode.propTypes = {
+  id: PropTypes.string,
+  data: PropTypes.shape({ label: PropTypes.string, onResize: PropTypes.func, confidence: PropTypes.number }),
+  selected: PropTypes.bool,
+};
+
 InquiryMap.propTypes = {
   businessGoal: PropTypes.string,
   hypotheses: PropTypes.arrayOf(
     PropTypes.oneOfType([
       PropTypes.string,
-      PropTypes.shape({
-        id: PropTypes.string,
-        statement: PropTypes.string,
-        label: PropTypes.string,
-        confidence: PropTypes.number,
-      }),
+      PropTypes.shape({ id: PropTypes.string, statement: PropTypes.string, label: PropTypes.string, confidence: PropTypes.number }),
     ])
   ),
   onUpdateConfidence: PropTypes.func,
+  onRefresh: PropTypes.func,
+  isAnalyzing: PropTypes.bool,
 };
 
 export default InquiryMap;
