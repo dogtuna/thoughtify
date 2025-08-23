@@ -1577,7 +1577,7 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
   });
 
 export const generateInitialInquiryMap = onCall(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
   async (request) => {
     const {
       brief,
