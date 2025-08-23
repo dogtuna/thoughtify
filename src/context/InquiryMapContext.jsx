@@ -10,6 +10,7 @@ import PropTypes from "prop-types";
 import { db } from "../firebase";
 import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { generate } from "../ai";
+import { parseJsonFromText } from "../utils/json";
 
 const InquiryMapContext = createContext();
 
@@ -149,9 +150,14 @@ ${hypothesesList}
         let analysis;
         try {
           const { text } = await generate(prompt);
-          analysis = JSON.parse(text);
+          analysis = parseJsonFromText(text);
         } catch (err) {
           console.error("AI triage failed", err);
+          return;
+        }
+
+        if (!analysis || !Array.isArray(analysis.hypothesisLinks)) {
+          console.error("AI triage returned invalid format", analysis);
           return;
         }
 
