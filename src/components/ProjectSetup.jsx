@@ -238,11 +238,7 @@ const ProjectSetup = () => {
           await saveInitiative(uid, initiativeId, {
             brief,
             inquiryMap: {
-              hypotheses: hypotheses.map((h) => ({
-                ...h,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              })),
+              hypotheses,
               hypothesisCount: hypotheses.length,
               createdAt: serverTimestamp(),
             },
