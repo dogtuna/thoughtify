@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
-import { InquiryMapProvider, useInquiryMap } from "../context/InquiryMapContext";
+import { useInquiryMap } from "../context/InquiryMapContext";
 import { auth } from "../firebase";
 
 const InquiryMapContent = () => {
@@ -42,10 +42,6 @@ const InquiryMapContent = () => {
   );
 };
 
-const InquiryMapPage = () => (
-  <InquiryMapProvider>
-    <InquiryMapContent />
-  </InquiryMapProvider>
-);
+const InquiryMapPage = () => <InquiryMapContent />;
 
 export default InquiryMapPage;
