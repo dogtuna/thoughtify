@@ -21,9 +21,9 @@ const PROJECT_ID =
   "thoughtify-web-bb1ea";
 
 const BUCKET_NAME =
-  FIREBASE_CONFIG.storageBucket ||                 // ✅ best source
-  process.env.FIREBASE_STORAGE_BUCKET ||           // optional override
-  `${PROJECT_ID}.appspot.com`;                     // legacy fallback
+  FIREBASE_CONFIG.storageBucket ||                 
+  process.env.FIREBASE_STORAGE_BUCKET ||           
+  `${PROJECT_ID}.appspot.com`;                     
 
 if (!admin.apps.length) {
   admin.initializeApp({ storageBucket: BUCKET_NAME });
