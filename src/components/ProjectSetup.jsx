@@ -231,26 +231,15 @@ const ProjectSetup = () => {
           clarifyingAsked,
         });
 
-        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints: ${projectConstraints}`;
+        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
         try {
           const mapResp = await generateInitialInquiryMap({
             projectId: initiativeId,
             brief,
+            ownerId: uid,
+            name: projectName,
           });
           const count = mapResp?.data?.count ?? 0;
-          await setDoc(
-            doc(db, "projects", initiativeId),
-            {
-              ownerId: uid,
-              name: projectName,
-              brief,
-              inquiryMap: {
-                createdAt: serverTimestamp(),
-                hypothesisCount: count,
-              },
-            },
-            { merge: true }
-          );
           setToast(`Inquiry map created with ${count} hypotheses.`);
           await new Promise((res) => setTimeout(res, 1000));
         } catch (mapErr) {

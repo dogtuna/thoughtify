@@ -1606,9 +1606,12 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
 export const generateInitialInquiryMap = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
-    const { projectId, brief } = request.data || {};
-    if (!projectId || !brief) {
-      throw new HttpsError("invalid-argument", "projectId and project brief are required.");
+    const { projectId, brief, ownerId, name } = request.data || {};
+    if (!projectId || !brief || !ownerId || !name) {
+      throw new HttpsError(
+        "invalid-argument",
+        "projectId, ownerId, name and project brief are required."
+      );
     }
 
     const key = process.env.GOOGLE_GENAI_API_KEY;
@@ -1664,7 +1667,22 @@ export const generateInitialInquiryMap = onCall(
       });
     });
 
-    await batch.commit();
+    await db
+      .collection("projects")
+      .doc(projectId)
+      .set(
+        {
+          ownerId,
+          name,
+          brief,
+          inquiryMap: {
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            hypothesisCount: hypotheses.length,
+          },
+        },
+        { merge: true }
+      );
+
     return { count: hypotheses.length };
   }
 );
