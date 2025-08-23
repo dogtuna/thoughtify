@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { app, auth, db } from "../firebase";
+import { serverTimestamp } from "firebase/firestore";
+import { app, auth } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 
@@ -233,14 +233,21 @@ const ProjectSetup = () => {
 
         const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
         try {
-          const mapResp = await generateInitialInquiryMap({
-            projectId: initiativeId,
+          const mapResp = await generateInitialInquiryMap({ brief });
+          const hypotheses = mapResp?.data?.hypotheses || [];
+          await saveInitiative(uid, initiativeId, {
             brief,
-            ownerId: uid,
-            name: projectName,
+            inquiryMap: {
+              hypotheses: hypotheses.map((h) => ({
+                ...h,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              })),
+              hypothesisCount: hypotheses.length,
+              createdAt: serverTimestamp(),
+            },
           });
-          const count = mapResp?.data?.count ?? 0;
-          setToast(`Inquiry map created with ${count} hypotheses.`);
+          setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
           await new Promise((res) => setTimeout(res, 1000));
         } catch (mapErr) {
           console.error("Error generating inquiry map:", mapErr);

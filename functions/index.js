@@ -11,6 +11,8 @@ import { createAvatar } from "@dicebear/core";
 import { notionists } from "@dicebear/collection";
 import crypto from "crypto";
 import { Buffer } from "buffer";
+import express from "express";
+import cors from "cors";
 
 const FIREBASE_CONFIG = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
 const PROJECT_ID =
@@ -183,35 +185,6 @@ function parseJsonFromText(text) {
   throw new Error("No complete JSON content found");
 }
 
-function getInquiryMapRefs(projectId) {
-  const projectRef = db.collection("projects").doc(projectId);
-  const mapDoc = projectRef.collection("inquiryMap").doc("root"); // ✅ document holder
-  return {
-    mapDoc,
-    hypotheses: mapDoc.collection("hypotheses"),
-    questions:  mapDoc.collection("questions"),
-    evidence:   mapDoc.collection("evidence"),
-    tasks:      mapDoc.collection("tasks"),
-  };
-}
-
-function buildInquiryNode({
-  title,
-  parentHypothesisId = null,
-  confidenceScore = 0,
-  status = "open",
-  links = [],
-}) {
-  return {
-    title,
-    parentHypothesisId,
-    confidenceScore,
-    status,
-    links,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-}
 
 export const setCustomClaims = onRequest(async (req, res) => {
   // Expect a JSON body like: { id: "USER_UID", claims: { admin: true } }
@@ -1603,108 +1576,54 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
   }
 });
 
-export const generateInitialInquiryMap = onCall(
-  {
-    region: "us-central1",
-    secrets: ["GOOGLE_GENAI_API_KEY"],
-    invoker: "public"
-  },
-  async (request) => {
-    const { projectId, brief, ownerId, name } = request.data || {};
-    if (!projectId || !brief || !ownerId || !name) {
-      throw new HttpsError(
-        "invalid-argument",
-        "projectId, ownerId, name and project brief are required."
-      );
-    }
+const generateInitialInquiryMapApp = express();
+generateInitialInquiryMapApp.use(
+  cors({ origin: "https://thoughtify.training" })
+);
+generateInitialInquiryMapApp.use(express.json());
 
-    const key = process.env.GOOGLE_GENAI_API_KEY;
-    if (!key) throw new HttpsError("internal", "No API key available.");
-
-    const ai = genkit({
-      plugins: [googleAI({ apiKey: key })],
-      model: gemini("gemini-1.5-pro"),
-    });
-
-    const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
-      const prompt =
-        `Given the project brief below, generate EXACTLY 3 initial hypotheses as a JSON array of objects ` +
-        `with fields: title (string), confidenceScore (0..1, default 0), status ("unexplored"), links (array).\n` +
-        `Return ONLY JSON. Brief:\n${brief}`;
-      const { text } = await ai.generate(prompt);
-      const parsed = parseJsonFromText(text);
-      if (!Array.isArray(parsed)) throw new Error("AI did not return an array");
-      return parsed.map(h => ({
-        title: String(h.title || "").trim(),
-        confidenceScore: Number(h.confidenceScore || 0),
-        status: String(h.status || "unexplored"),
-        links: Array.isArray(h.links) ? h.links : [],
-      }));
-    });
-
-    let hypotheses;
-    try {
-      hypotheses = await flow();
-    } catch (e) {
-      console.error("AI generation failed:", e);
-      throw new HttpsError("internal", "Failed to generate hypotheses");
-    }
-
-    const { mapDoc, hypotheses: hypCol } = getInquiryMapRefs(projectId);
-    const batch = db.batch();
-
-    batch.set(mapDoc, {
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    hypotheses.forEach((h) => {
-      const docRef = hypCol.doc();
-      batch.set(docRef, {
-        title: h.title,
-        parentHypothesisId: null,
-        confidenceScore: h.confidenceScore || 0,
-        status: h.status || "unexplored",
-        links: h.links || [],
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
-
-    await db
-      .collection("projects")
-      .doc(projectId)
-      .set(
-        {
-          ownerId,
-          name,
-          brief,
-          inquiryMap: {
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            hypothesisCount: hypotheses.length,
-          },
-        },
-        { merge: true }
-      );
-
-    await db
-      .collection("projects")
-      .doc(projectId)
-      .set(
-        {
-          ownerId,
-          name,
-          brief,
-          inquiryMap: {
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            hypothesisCount: hypotheses.length,
-          },
-        },
-        { merge: true }
-      );
-
-    return { count: hypotheses.length };
+generateInitialInquiryMapApp.post("/", async (req, res) => {
+  const { brief } = req.body || {};
+  if (!brief) {
+    res.status(400).json({ error: "project brief is required." });
+    return;
   }
+
+  const key = process.env.GOOGLE_GENAI_API_KEY;
+  if (!key) {
+    res.status(500).json({ error: "No API key available." });
+    return;
+  }
+
+  const ai = genkit({
+    plugins: [googleAI({ apiKey: key })],
+    model: gemini("gemini-1.5-pro"),
+  });
+
+  const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
+    const prompt = `Given the project brief below, generate 3 initial hypotheses as a JSON array. Each item must contain: title, parentHypothesisId (null), confidenceScore (0-1), status, links (empty array).\nProject brief: ${brief}`;
+    const { text } = await ai.generate(prompt);
+    return parseJsonFromText(text);
+  });
+
+  let hypotheses;
+  try {
+    hypotheses = await flow();
+    if (!Array.isArray(hypotheses)) {
+      throw new Error("AI did not return an array");
+    }
+  } catch (error) {
+    console.error("AI generation failed:", error);
+    res.status(500).json({ error: "Failed to generate hypotheses" });
+    return;
+  }
+
+  res.json({ hypotheses, count: hypotheses.length });
+});
+
+export const generateInitialInquiryMap = onRequest(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  generateInitialInquiryMapApp
 );
 
 
