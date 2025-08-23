@@ -1594,23 +1594,45 @@ export const generateInitialInquiryMap = onCall(
     });
 
     const flow = ai.defineFlow("initialInquiryMapFlow", async () => {
-      const prompt = `Given the project brief below, generate 3 initial hypotheses as a JSON array. Each item must contain: title, parentHypothesisId (null), confidenceScore (0-1), status, links (empty array).\nProject brief: ${brief}`;
+      const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. Your primary goal is to analyze the initial project information and formulate a set of clear, testable hypotheses that will guide the discovery phase.
+
+Based on the Project Data provided below, perform the following steps:
+
+Formulate the Primary Hypothesis: Analyze the explicit statements, complaints, and suggested solutions in the initial request. Formulate a single, clear "Primary Hypothesis" that represents the client's initial diagnosis of the problem.
+
+Generate Alternative Hypotheses: Think beyond the initial request. Generate 2-4 "Alternative Hypotheses" that explore other common, potential root causes for the stated business problem. Frame these as competing theories that must be investigated. Consider systemic issues such as:
+
+Process or Workflow Inefficiencies
+Technology or Tooling Gaps
+Misaligned Incentives or Metrics
+Communication Breakdowns
+
+Structure the Output: Respond ONLY in a valid JSON object format. Create a root object called "hypotheses". Each hypothesis should be an object in an array, containing the following keys:
+
+id: A unique identifier (e.g., "A", "B", "C").
+type: "Primary" or "Alternative".
+statement: The full text of the hypothesis.
+supportingEvidence: An empty array.
+refutingEvidence: An empty array.
+status: "Unexplored".
+
+Project Data: ${brief}`;
       const { text } = await ai.generate(prompt);
       return parseJsonFromText(text);
     });
 
-    let hypotheses;
+    let result;
     try {
-      hypotheses = await flow();
-      if (!Array.isArray(hypotheses)) {
-        throw new Error("AI did not return an array");
+      result = await flow();
+      if (!result || !Array.isArray(result.hypotheses)) {
+        throw new Error("AI did not return hypotheses array");
       }
     } catch (error) {
       console.error("AI generation failed:", error);
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
 
-    return { hypotheses, count: hypotheses.length };
+    return { hypotheses: result.hypotheses, count: result.hypotheses.length };
   },
 );
 
