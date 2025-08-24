@@ -11,8 +11,7 @@ import { db } from "../firebase";
 import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { generate } from "../ai";
 import { parseJsonFromText } from "../utils/json";
-import { logisticConfidence } from "../utils/confidence";
-import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLogic"; // We will create this file next
+import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLogic";
 
 const InquiryMapContext = createContext();
 
@@ -25,15 +24,17 @@ const defaultState = {
 export const InquiryMapProvider = ({ children }) => {
   const [hypotheses, setHypotheses] = useState(defaultState.hypotheses);
   const [businessGoal, setBusinessGoal] = useState(defaultState.businessGoal);
-  const [recommendations, setRecommendations] = useState(
-    defaultState.recommendations,
-  );
+  const [recommendations, setRecommendations] = useState(defaultState.recommendations);
   const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
+  const [currentUser, setCurrentUser] = useState(null); // Assuming you have a way to set the current user
+  const [currentInitiative, setCurrentInitiative] = useState(null); // And the current initiative
 
   const isAnalyzing = activeTriages > 0;
 
   const loadHypotheses = useCallback((uid, initiativeId) => {
+    setCurrentUser(uid);
+    setCurrentInitiative(initiativeId);
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
     }
@@ -55,12 +56,13 @@ export const InquiryMapProvider = ({ children }) => {
   }, []);
 
   const triageEvidence = useCallback(
-    async (uid, initiativeId, evidenceText) => {
+    async (evidenceText) => {
+      if (!currentUser || !currentInitiative) return;
       setActiveTriages((c) => c + 1);
       try {
-        const ref = doc(db, "users", uid, "initiatives", initiativeId);
+        const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
         const snap = await getDoc(ref);
-        if (!snap.exists()) return;
+        if (!snap.exists()) throw new Error("Initiative not found");
 
         const data = snap.data();
         const currentHypotheses = data?.inquiryMap?.hypotheses || [];
@@ -72,7 +74,7 @@ export const InquiryMapProvider = ({ children }) => {
         const analysis = parseJsonFromText(text);
 
         if (!analysis?.hypothesisLinks?.length) {
-          console.error("AI triage returned invalid format");
+          console.error("AI triage returned invalid or empty format", analysis);
           return;
         }
 
@@ -107,12 +109,13 @@ export const InquiryMapProvider = ({ children }) => {
         setActiveTriages((c) => c - 1);
       }
     },
-    []
+    [currentUser, currentInitiative]
   );
 
   const refreshInquiryMap = useCallback(
-    async (uid, initiativeId) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+    async () => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
       try {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
@@ -126,21 +129,19 @@ export const InquiryMapProvider = ({ children }) => {
           (h.refutingEvidence || []).forEach((e) => existingEvidence.add(e.text));
         });
 
-        // Triage new documents
         for (const docItem of (data?.sourceMaterials || [])) {
           const text = `Document: ${docItem.name}\n\n${docItem.summary || docItem.content}`;
           if (!existingEvidence.has(text)) {
-            await triageEvidence(uid, initiativeId, text);
+            await triageEvidence(text);
           }
         }
 
-        // Triage new answers
         for (const q of (data?.questions || [])) {
           for (const ans of Object.values(q.answers || {})) {
             if (ans?.text && ans.text.trim()) {
               const combined = `Question: ${q.question}\nAnswer: ${ans.text}`;
               if (!existingEvidence.has(combined)) {
-                await triageEvidence(uid, initiativeId, combined);
+                await triageEvidence(combined);
               }
             }
           }
@@ -149,12 +150,56 @@ export const InquiryMapProvider = ({ children }) => {
         console.error("Error refreshing inquiry map:", err);
       }
     },
-    [triageEvidence]
+    [currentUser, currentInitiative, triageEvidence]
   );
   
+  const addQuestion = useCallback(
+    async (hypothesisId, question) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId
+            ? { ...h, questions: [...(h.questions || []), question] }
+            : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error adding question:", err);
+      }
+    },
+    [currentUser, currentInitiative]
+  );
+
+  const addEvidence = useCallback(
+    async (hypothesisId, evidence, supporting = true) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const key = supporting ? "supportingEvidence" : "refutingEvidence";
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId
+            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] } 
+            : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error adding evidence:", err);
+      }
+    },
+    [currentUser, currentInitiative]
+  );
+
   const updateConfidence = useCallback(
-    async (uid, initiativeId, hypothesisId, confidence) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+    async (hypothesisId, confidence) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
       try {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
@@ -168,7 +213,7 @@ export const InquiryMapProvider = ({ children }) => {
         console.error("Error updating confidence:", err);
       }
     },
-    []
+    [currentUser, currentInitiative]
   );
 
   const value = {
@@ -176,6 +221,8 @@ export const InquiryMapProvider = ({ children }) => {
     businessGoal,
     recommendations,
     loadHypotheses,
+    addQuestion,
+    addEvidence,
     triageEvidence,
     refreshInquiryMap,
     updateConfidence,
