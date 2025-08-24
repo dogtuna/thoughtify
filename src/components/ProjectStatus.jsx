@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
+import { useInquiryMap } from "../contexts/InquiryMapContext"; // Import the context
 import {
   collection,
   query,
@@ -17,14 +18,11 @@ import ai from "../ai";
 import PropTypes from "prop-types";
 
 const ProjectStatus = ({
-  questions = [],
-  documents = [],
   contacts = [],
   setContacts = () => {},
   emailConnected = false,
   onHistoryChange = () => {},
   initiativeId = "",
-  businessGoal = "",
 }) => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -35,8 +33,10 @@ const ProjectStatus = ({
   const [editing, setEditing] = useState(false);
   const [recipientModal, setRecipientModal] = useState(null);
   const [newContact, setNewContact] = useState(null);
-
-  // --- NEW STATE FOR HISTORY UI ---
+  
+  // Get the real-time data from our Inquiry Map!
+  const { hypotheses, businessGoal, recommendations } = useInquiryMap();
+  
   const [viewingAudience, setViewingAudience] = useState("client");
   const [selectedUpdate, setSelectedUpdate] = useState(null);
 
@@ -60,15 +60,12 @@ const ProjectStatus = ({
     if (!user || !initiativeId) return;
     const loadHistory = async () => {
       try {
-        const colRef = collection(
-          db, "users", user.uid, "initiatives", initiativeId, "statusUpdates"
-        );
+        const colRef = collection(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates");
         const qHist = query(colRef, orderBy("date", "desc"));
         const snap = await getDocs(qHist);
         const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         if (arr.length) {
           setHistory(arr);
-          // Set the initially viewed summary to be the latest one
           setSelectedUpdate(arr[0]);
           setSummary(arr[0].summary);
           onHistoryChange(arr);
@@ -84,87 +81,50 @@ const ProjectStatus = ({
     if (!user || !initiativeId) return;
     setLoading(true);
 
-    // **CRITICAL FIX:** Find the last update that matches the *current generation audience*.
     const lastUpdateForAudience = history.find(h => h.audience === audience);
-    const cutoff = lastUpdateForAudience ? new Date(lastUpdateForAudience.date) : null;
-
-    // --- Data Aggregation ---
-    const getAnswerTimestamp = (answer) => {
-      const ts = answer.timestamp || answer.answeredAt;
-      if (!ts) return null;
-      return ts.toDate ? ts.toDate() : new Date(ts);
-    };
-
-    const newStakeholderAnswers = questions
-      .map((q) => {
-        const newAnswers = Object.entries(q.answers || {})
-          .filter(([, answer]) => {
-            if (!answer || typeof answer.text !== 'string' || !answer.text.trim()) return false;
-            if (!cutoff) return true;
-            const answerTimestamp = getAnswerTimestamp(answer);
-            return answerTimestamp && answerTimestamp > cutoff;
-          })
-          .map(([name, answer]) => `${name}: ${answer.text}`)
-          .join("; ");
-        return newAnswers ? `- ${q.question} | ${newAnswers}` : null;
-      })
-      .filter(Boolean)
-      .join("\n");
-
-    const newDocuments = documents
-      .filter((d) => {
-        if (!cutoff) return true;
-        const added = d.addedAt || d.createdAt || d.uploadedAt;
-        if (!added) return true;
-        const t = typeof added === "string" ? new Date(added) : (added.toDate ? added.toDate() : new Date(added));
-        return t > cutoff;
-      })
-      .map((d) => `- ${d.name}: ${d.summary || (d.content ? d.content.slice(0, 200) : "")}`)
-      .join("\n");
-
-    const outstandingQuestionsArr = questions
-      .filter((q) => !Object.values(q.answers || {}).some((a) => a && a.text && a.text.trim()))
-      .map((q) => `- ${q.question}`);
-
-    const taskListArr = tasks.map((t) => `- ${t.message || ""} (${t.status || "open"})`);
-    const allOutstanding = [...outstandingQuestionsArr, ...taskListArr].join("\n");
-
-    const sponsor = contacts.find((c) => /sponsor/i.test(c.role || ""));
-    const formatContacts = (arr) => arr.map((c) => (c.role ? `${c.name} (${c.role})` : c.name)).join("; ");
-    const projectBaseline = `Goal: ${businessGoal || "Unknown"}\nSponsor: ${sponsor ? `${sponsor.name}${sponsor.role ? ` (${sponsor.role})` : ""}` : "Unknown"}\nKey Contacts: ${formatContacts(contacts) || "None"}`;
-
     const previous = lastUpdateForAudience ? lastUpdateForAudience.summary : "None";
     const today = new Date().toDateString();
 
     const audiencePrompt = audience === "client" 
-      ? "Use a client-facing tone that is professional and strategically focused." 
-      : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
+      ? "Use a client-facing tone..." 
+      : "Use an internal tone...";
 
-    const prompt = `Your role is an expert Performance Consultant...
+    // **CRITICAL FIX: The prompt now receives the synthesized analysis from the Inquiry Map.**
+    const prompt = `Your role is an expert Performance Consultant. Draft a project status update based on the current state of the Inquiry Map.
+
+Your primary task is to **synthesize the Inquiry Map's analysis** into a compelling narrative for the specified audience. Do not re-analyze the raw evidence; your job is to report on the *conclusions* that have already been reached.
+
+**IF \`Previous Update\` is "None":**
+This is the **initial project brief**. Summarize the initial hypotheses and explain the discovery plan.
+
+**IF \`Previous Update\` exists:**
+This is a **follow-up brief**. Analyze the **change in hypothesis confidence scores**.
+1.  In the \`Situation Analysis\`, explain which hypothesis has gained the most confidence and why this represents a strategic pivot for the project.
+2.  In the \`Key Findings\`, summarize the new, high-impact evidence that caused the confidence scores to change.
+3.  In the \`Strategic Recommendations\`, propose next actions that logically follow from the updated analysis.
+
 ---
 ### Project Data
 
 **Previous Update:**
 ${previous}
 
+**Current Inquiry Map State (Hypotheses, Confidence Scores, and linked evidence summaries):**
+${JSON.stringify(hypotheses)} 
+
 **Project Baseline:**
-${projectBaseline}
+Goal: ${businessGoal}
+Sponsor: ${(contacts.find(c => /sponsor/i.test(c.role)) || {}).name || 'Unknown'}
 
-**New Stakeholder Answers (since last update):**
-${newStakeholderAnswers || "None"}
-
-**New Documents (since last update):**
-${newDocuments || "None"}
-
-**All Outstanding Questions & Tasks:**
-${allOutstanding || "None"}`;
+**Current Recommendations & Outstanding Tasks:**
+${JSON.stringify({recommendations, tasks})}
+`;
     
     try {
       const { text } = await ai.generate(prompt);
       const clean = text.trim();
       
       const now = new Date().toISOString();
-      // **NEW:** Save the audience with the summary
       const entry = { date: now, summary: clean, sent: false, audience: audience };
       
       const colRef = collection(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates");
@@ -173,7 +133,7 @@ ${allOutstanding || "None"}`;
       
       const updatedHistory = [entryWithId, ...history];
       setHistory(updatedHistory);
-      setSelectedUpdate(entryWithId); // Select the newly created update
+      setSelectedUpdate(entryWithId);
       setSummary(clean);
       onHistoryChange(updatedHistory);
     } catch (err) {
@@ -182,7 +142,6 @@ ${allOutstanding || "None"}`;
     setLoading(false);
   };
   
-  // --- NEW UI LOGIC ---
   const clientHistory = useMemo(() => history.filter(h => h.audience === 'client'), [history]);
   const internalHistory = useMemo(() => history.filter(h => h.audience === 'internal'), [history]);
 

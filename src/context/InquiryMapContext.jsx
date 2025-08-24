@@ -30,9 +30,6 @@ export const InquiryMapProvider = ({ children }) => {
 
   const isAnalyzing = activeTriages > 0;
 
-  /**
-   * Loads and subscribes to real-time updates for the inquiry map of a specific initiative.
-   */
   const loadHypotheses = useCallback((uid, initiativeId) => {
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
@@ -46,7 +43,6 @@ export const InquiryMapProvider = ({ children }) => {
     });
   }, []);
 
-  // Cleanup subscription on unmount
   useEffect(() => {
     return () => {
       if (unsubscribeRef.current) {
@@ -55,57 +51,6 @@ export const InquiryMapProvider = ({ children }) => {
     };
   }, []);
 
-  /**
-   * Manually adds a question to a specific hypothesis in Firestore.
-   */
-  const addQuestion = useCallback(
-    async (uid, initiativeId, hypothesisId, question) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      try {
-        const snap = await getDoc(ref);
-        if (!snap.exists()) throw new Error("Initiative not found");
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
-        const updatedHypotheses = currentHypotheses.map((h) =>
-          h.id === hypothesisId
-            ? { ...h, questions: [...(h.questions || []), question] }
-            : h
-        );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
-      } catch (err) {
-        console.error("Error adding question:", err);
-      }
-    },
-    []
-  );
-
-  /**
-   * Manually adds a piece of evidence to a specific hypothesis in Firestore.
-   * This is a simpler version for manual linking, not using the AI triage.
-   */
-  const addEvidence = useCallback(
-    async (uid, initiativeId, hypothesisId, evidence, supporting = true) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      try {
-        const snap = await getDoc(ref);
-        if (!snap.exists()) throw new Error("Initiative not found");
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
-        const key = supporting ? "supportingEvidence" : "refutingEvidence";
-        const updatedHypotheses = currentHypotheses.map((h) =>
-          h.id === hypothesisId
-            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] } // Store as an object
-            : h
-        );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
-      } catch (err) {
-        console.error("Error adding evidence:", err);
-      }
-    },
-    []
-  );
-
-  /**
-   * The core AI-powered function to analyze a new piece of evidence and update the inquiry map.
-   */
   const triageEvidence = useCallback(
     async (uid, initiativeId, evidenceText) => {
       setActiveTriages((c) => c + 1);
@@ -133,7 +78,7 @@ export const InquiryMapProvider = ({ children }) => {
 
         analysis.hypothesisLinks.forEach((link) => {
           const targetIndex = updatedHypotheses.findIndex(h => h.id === link.hypothesisId);
-          if (targetIndex === -1) return; // Skip if hypothesis ID is invalid
+          if (targetIndex === -1) return;
 
           const { updatedHypothesis, extraRecommendations } = calculateNewConfidence(
             updatedHypotheses[targetIndex],
@@ -162,9 +107,6 @@ export const InquiryMapProvider = ({ children }) => {
     []
   );
 
-  /**
-   * Triggers a refresh to triage any untriaged documents or answers.
-   */
   const refreshInquiryMap = useCallback(
     async (uid, initiativeId) => {
       const ref = doc(db, "users", uid, "initiatives", initiativeId);
@@ -175,7 +117,6 @@ export const InquiryMapProvider = ({ children }) => {
         const data = snap.data();
         const currentHypotheses = data?.inquiryMap?.hypotheses || [];
         
-        // Create a set of all existing evidence text to avoid re-triaging
         const existingEvidence = new Set();
         currentHypotheses.forEach((h) => {
           (h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
@@ -208,9 +149,6 @@ export const InquiryMapProvider = ({ children }) => {
     [triageEvidence]
   );
   
-  /**
-   * Manually updates the confidence of a hypothesis.
-   */
   const updateConfidence = useCallback(
     async (uid, initiativeId, hypothesisId, confidence) => {
       const ref = doc(db, "users", uid, "initiatives", initiativeId);
@@ -235,8 +173,6 @@ export const InquiryMapProvider = ({ children }) => {
     businessGoal,
     recommendations,
     loadHypotheses,
-    addQuestion,
-    addEvidence,
     triageEvidence,
     refreshInquiryMap,
     updateConfidence,
