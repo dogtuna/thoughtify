@@ -30,6 +30,7 @@ const InquiryMapContent = () => {
     supportingEvidence: h.supportingEvidence || [],
     refutingEvidence: h.refutingEvidence || [],
     sourceContributions: h.sourceContributions || [],
+    contested: h.contested || false,
   }));
 
   const handleUpdateConfidence = useCallback(
