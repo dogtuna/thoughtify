@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useInquiryMap } from "../context/InquiryMapContext"; // Import the context
+import { useInquiryMap } from "../contexts/InquiryMapContext"; // Corrected path assuming standard structure
 import {
   collection,
   query,
@@ -34,7 +34,7 @@ const ProjectStatus = ({
   const [recipientModal, setRecipientModal] = useState(null);
   const [newContact, setNewContact] = useState(null);
   
-  // Get the real-time data from our Inquiry Map!
+  // Get the real-time, analyzed data from our Inquiry Map!
   const { hypotheses, businessGoal, recommendations } = useInquiryMap();
   
   const [viewingAudience, setViewingAudience] = useState("client");
@@ -86,10 +86,9 @@ const ProjectStatus = ({
     const today = new Date().toDateString();
 
     const audiencePrompt = audience === "client" 
-      ? "Use a client-facing tone..." 
-      : "Use an internal tone...";
+      ? "Use a client-facing tone that is professional and strategically focused." 
+      : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
 
-    // **CRITICAL FIX: The prompt now receives the synthesized analysis from the Inquiry Map.**
     const prompt = `Your role is an expert Performance Consultant. Draft a project status update based on the current state of the Inquiry Map.
 
 Your primary task is to **synthesize the Inquiry Map's analysis** into a compelling narrative for the specified audience. Do not re-analyze the raw evidence; your job is to report on the *conclusions* that have already been reached.
@@ -152,23 +151,14 @@ ${JSON.stringify({recommendations, tasks})}
   };
 
   const saveEdit = async () => {
-    if (!user || !history.length) return;
-    const first = history[0];
+    if (!user || !selectedUpdate) return;
     try {
-      const ref = doc(
-        db,
-        "users",
-        user.uid,
-        "initiatives",
-        initiativeId,
-        "statusUpdates",
-        first.id
-      );
+      const ref = doc(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates", selectedUpdate.id);
       await updateDoc(ref, { summary });
-      const updatedFirst = { ...first, summary };
-      const updated = [updatedFirst, ...history.slice(1)];
-      setHistory(updated);
-      onHistoryChange(updated);
+      const updatedHistory = history.map(h => h.id === selectedUpdate.id ? { ...h, summary } : h);
+      setHistory(updatedHistory);
+      setSelectedUpdate(prev => ({ ...prev, summary }));
+      onHistoryChange(updatedHistory);
     } catch (err) {
       console.error("saveEdit error", err);
     }
@@ -176,28 +166,17 @@ ${JSON.stringify({recommendations, tasks})}
   };
 
   const markSent = async () => {
-    if (!user || !history.length) return;
-    const first = history[0];
+    if (!user || !selectedUpdate) return;
     try {
-      const ref = doc(
-        db,
-        "users",
-        user.uid,
-        "initiatives",
-        initiativeId,
-        "statusUpdates",
-        first.id
-      );
+      const ref = doc(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates", selectedUpdate.id);
       await updateDoc(ref, { sent: true });
-      const updatedFirst = { ...first, sent: true };
-      const updated = [updatedFirst, ...history.slice(1)];
-      setHistory(updated);
-      onHistoryChange(updated);
+      const updatedHistory = history.map(h => h.id === selectedUpdate.id ? { ...h, sent: true } : h);
+      setHistory(updatedHistory);
+      setSelectedUpdate(prev => ({ ...prev, sent: true }));
+      onHistoryChange(updatedHistory);
     } catch (err) {
       console.error("markSent error", err);
     }
-    setSummary("");
-    setEditing(false);
   };
 
   const copySummary = () => {
@@ -263,7 +242,7 @@ ${JSON.stringify({recommendations, tasks})}
   
   // Omitted saveEdit, markSent, email functions for brevity as they remain the same
 
-  return (
+ return (
     <div className="project-status-container">
       <div className="status-sidebar">
         <h3>History</h3>
@@ -279,6 +258,7 @@ ${JSON.stringify({recommendations, tasks})}
               onClick={() => handleSelectUpdate(update)}
             >
               {new Date(update.date).toLocaleString()}
+              {update.sent && <span style={{ marginLeft: '8px', color: 'green' }}>✓</span>}
             </div>
           ))}
         </div>
@@ -298,12 +278,16 @@ ${JSON.stringify({recommendations, tasks})}
           </button>
         </div>
 
-        {selectedUpdate && (
+        {selectedUpdate ? (
           editing ? (
             <>
               <textarea rows={15} value={summary} onChange={(e) => setSummary(e.target.value)} style={{ width: "100%" }} />
               <div className="status-actions">
-                 {/* saveEdit and cancel buttons */}
+                 <button className="generator-button" onClick={saveEdit}>Save</button>
+                 <button className="generator-button" onClick={() => {
+                   setSummary(selectedUpdate.summary);
+                   setEditing(false);
+                 }}>Cancel</button>
               </div>
             </>
           ) : (
@@ -317,6 +301,8 @@ ${JSON.stringify({recommendations, tasks})}
               </div>
             </>
           )
+        ) : (
+          <p>Generate a new summary or select one from the history.</p>
         )}
       </div>
     </div>
