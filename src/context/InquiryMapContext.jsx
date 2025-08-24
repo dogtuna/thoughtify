@@ -11,7 +11,7 @@ import { db } from "../firebase";
 import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { generate } from "../ai";
 import { parseJsonFromText } from "../utils/json";
-import { logisticConfidence } from "../utils/confidence";
+import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLogic";
 
 const InquiryMapContext = createContext();
 
@@ -21,48 +21,18 @@ const defaultState = {
   recommendations: [],
 };
 
-const normalizeConfidence = (c) => Math.min(1, Math.max(0, c));
-
-const scoreFromImpact = (impact) => {
-  switch (impact) {
-    case "High":
-      return 0.2;
-    case "Medium":
-      return 0.1;
-    default:
-      return 0.05;
-  }
-};
-
-const AUTHORITY_WEIGHT = {
-  High: 1.5,
-  Medium: 1.0,
-  Low: 0.5,
-};
-
-const EVIDENCE_TYPE_WEIGHT = {
-  Quantitative: 1.2,
-  Qualitative: 0.8,
-};
-
-const DIRECTNESS_WEIGHT = {
-  Direct: 1.3,
-  Indirect: 0.7,
-};
-
-const CORROBORATION_MULTIPLIER = 2.0;
-
 export const InquiryMapProvider = ({ children }) => {
   const [hypotheses, setHypotheses] = useState(defaultState.hypotheses);
   const [businessGoal, setBusinessGoal] = useState(defaultState.businessGoal);
-  const [recommendations, setRecommendations] = useState(
-    defaultState.recommendations,
-  );
+  const [recommendations, setRecommendations] = useState(defaultState.recommendations);
   const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
 
   const isAnalyzing = activeTriages > 0;
 
+  /**
+   * Loads and subscribes to real-time updates for the inquiry map of a specific initiative.
+   */
   const loadHypotheses = useCallback((uid, initiativeId) => {
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
@@ -76,6 +46,7 @@ export const InquiryMapProvider = ({ children }) => {
     });
   }, []);
 
+  // Cleanup subscription on unmount
   useEffect(() => {
     return () => {
       if (unsubscribeRef.current) {
@@ -84,322 +55,177 @@ export const InquiryMapProvider = ({ children }) => {
     };
   }, []);
 
+  /**
+   * Manually adds a question to a specific hypothesis in Firestore.
+   */
   const addQuestion = useCallback(
     async (uid, initiativeId, hypothesisId, question) => {
       const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const current = data?.inquiryMap?.hypotheses || [];
-      const updated = current.map((h) =>
-        h.id === hypothesisId
-          ? { ...h, questions: [...(h.questions || []), question] }
-          : h
-      );
-      await updateDoc(ref, { "inquiryMap.hypotheses": updated });
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId
+            ? { ...h, questions: [...(h.questions || []), question] }
+            : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error adding question:", err);
+      }
     },
     []
   );
 
+  /**
+   * Manually adds a piece of evidence to a specific hypothesis in Firestore.
+   * This is a simpler version for manual linking, not using the AI triage.
+   */
   const addEvidence = useCallback(
     async (uid, initiativeId, hypothesisId, evidence, supporting = true) => {
       const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const current = data?.inquiryMap?.hypotheses || [];
-      const key = supporting ? "supportingEvidence" : "refutingEvidence";
-      const updated = current.map((h) =>
-        h.id === hypothesisId
-          ? { ...h, [key]: [...(h[key] || []), evidence] }
-          : h
-      );
-      await updateDoc(ref, { "inquiryMap.hypotheses": updated });
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const key = supporting ? "supportingEvidence" : "refutingEvidence";
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId
+            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] } // Store as an object
+            : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error adding evidence:", err);
+      }
     },
     []
   );
 
+  /**
+   * The core AI-powered function to analyze a new piece of evidence and update the inquiry map.
+   */
   const triageEvidence = useCallback(
     async (uid, initiativeId, evidenceText) => {
       setActiveTriages((c) => c + 1);
       try {
         const ref = doc(db, "users", uid, "initiatives", initiativeId);
         const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          return;
-        }
+        if (!snap.exists()) throw new Error("Initiative not found");
+
         const data = snap.data();
-        const current = data?.inquiryMap?.hypotheses || [];
-        const hypothesesList = current
-          .map(
-            (h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`,
-          )
-          .join("\n");
+        const currentHypotheses = data?.inquiryMap?.hypotheses || [];
+        const contacts = data?.contacts || [];
+        const currentRecommendations = data?.inquiryMap?.recommendations || [];
 
-          const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. A new piece of evidence has been added to the project. Your task is to analyze this evidence in the context of our current working hypotheses.
+        const prompt = generateTriagePrompt(evidenceText, currentHypotheses, contacts);
+        const { text } = await generate(prompt);
+        const analysis = parseJsonFromText(text);
 
-Assess Relevance: Determine which of the Existing Hypotheses this new Evidence most strongly supports or refutes.
-
-Analyze Impact: Evaluate the strategic impact of this new evidence. Is it a minor detail or a game-changing insight that significantly alters our understanding of the project?
-
-Classify the Evidence: For each relevant hypothesis, classify the evidence along three axes:
-- Source Authority (High | Medium | Low)
-- Evidence Type (Quantitative | Qualitative)
-- Directness (Direct | Indirect)
-Identify the specific source (stakeholder name or document).
-
-Recommend Actions: Based on your analysis, recommend the next logical step. Should we refine a hypothesis? Consider a new one? Or does this evidence confirm a hypothesis, allowing us to move on?
-
-Respond ONLY in the following JSON format:
-
-{
-  "analysisSummary": "A brief, one-sentence summary of what this new evidence reveals.",
-  "hypothesisLinks": [
-    {
-      "hypothesisId": "The ID of the most relevant hypothesis (e.g., 'A')",
-      "relationship": "Supports" | "Refutes",
-      "impact": "High" | "Medium" | "Low",
-      "source": "Name or description of the source",
-      "sourceAuthority": "High" | "Medium" | "Low",
-      "evidenceType": "Quantitative" | "Qualitative",
-      "directness": "Direct" | "Indirect"
-    }
-  ],
-  "strategicRecommendations": [
-    "Actionable suggestions based on the analysis. For example: 'Suggest new hypothesis: ...', 'Refine Hypothesis A to focus on...', or 'Mark Hypothesis C as validated.'"
-  ]
-}
-
-Project Data
-New Evidence:
-${evidenceText}
-
-Existing Hypotheses:
-${hypothesesList}
-`;
-
-        let analysis;
-        try {
-          const { text } = await generate(prompt);
-          analysis = parseJsonFromText(text);
-        } catch (err) {
-          console.error("AI triage failed", err);
+        if (!analysis?.hypothesisLinks?.length) {
+          console.error("AI triage returned invalid or empty format", analysis);
           return;
         }
 
-        if (!analysis || !Array.isArray(analysis.hypothesisLinks)) {
-          console.error("AI triage returned invalid format", analysis);
-          return;
-        }
+        let updatedHypotheses = [...currentHypotheses];
+        let allNewRecommendations = [...(analysis.strategicRecommendations || [])];
 
-        let updatedHypotheses = current;
-        const extraRecommendations = [];
         analysis.hypothesisLinks.forEach((link) => {
-          const key =
-            link.relationship === "Supports"
-              ? "supportingEvidence"
-              : "refutingEvidence";
+          const targetIndex = updatedHypotheses.findIndex(h => h.id === link.hypothesisId);
+          if (targetIndex === -1) return; // Skip if hypothesis ID is invalid
 
-          const authorityWeight = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
-          const typeWeight = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
-          const directWeight = DIRECTNESS_WEIGHT[link.directness] || 1;
-          const weightedImpact =
-            scoreFromImpact(link.impact) * authorityWeight * typeWeight * directWeight;
-          const delta =
-            (link.relationship === "Supports" ? 1 : -1) * weightedImpact;
-
-          updatedHypotheses = updatedHypotheses.map((h) => {
-            if (h.id !== link.hypothesisId) return h;
-
-            const baseScore = h.confidenceScore ?? h.confidence ?? 0;
-
-            const entry = {
-              text: evidenceText,
-              analysisSummary: analysis.analysisSummary,
-              impact: link.impact,
-              delta,
-              source: link.source,
-              sourceAuthority: link.sourceAuthority,
-              evidenceType: link.evidenceType,
-              directness: link.directness,
-            };
-
-            // Corroboration check
-            const existingSup = h.supportingEvidence || [];
-            const beforeHasQuant = existingSup.some(
-              (e) => e.evidenceType === "Quantitative",
-            );
-            const beforeHasQual = existingSup.some(
-              (e) => e.evidenceType === "Qualitative",
-            );
-            const beforeSources = new Set(existingSup.map((e) => e.source));
-            const beforeCorroboration =
-              beforeHasQuant && beforeHasQual && beforeSources.size > 1;
-
-            const afterSup =
-              link.relationship === "Supports"
-                ? [...existingSup, entry]
-                : existingSup;
-            const afterHasQuant = afterSup.some(
-              (e) => e.evidenceType === "Quantitative",
-            );
-            const afterHasQual = afterSup.some(
-              (e) => e.evidenceType === "Qualitative",
-            );
-            const afterSources = new Set(afterSup.map((e) => e.source));
-            const afterCorroboration =
-              afterHasQuant && afterHasQual && afterSources.size > 1;
-
-            let newScore = baseScore + delta;
-            if (
-              link.relationship === "Supports" &&
-              afterCorroboration &&
-              !beforeCorroboration
-            ) {
-              newScore *= CORROBORATION_MULTIPLIER;
-            }
-
-            // Conflict flag
-            let contested = h.contested || false;
-            if (link.sourceAuthority === "High") {
-              const oppositeKey =
-                link.relationship === "Supports"
-                  ? "refutingEvidence"
-                  : "supportingEvidence";
-              const opposite = h[oppositeKey] || [];
-              const highOpp = opposite.find(
-                (e) => e.sourceAuthority === "High",
-              );
-              if (highOpp) {
-                contested = true;
-                extraRecommendations.push(
-                  `Schedule a root cause alignment meeting with ${
-                    highOpp.source || "Stakeholder A"
-                  } and ${
-                    link.source || "Stakeholder B"
-                  } to resolve the conflicting perspectives on ${
-                    h.statement || h.label || h.id
-                  }.`,
-                );
-              }
-            }
-
-            const newHypothesis = {
-              ...h,
-              [key]: [...(h[key] || []), entry],
-              confidenceScore: newScore,
-              confidence: logisticConfidence(newScore),
-              contested,
-            };
-
-            const evidences = [
-              ...(newHypothesis.supportingEvidence || []).map((e) => ({
-                ...e,
-                _sign: 1,
-              })),
-              ...(newHypothesis.refutingEvidence || []).map((e) => ({
-                ...e,
-                _sign: -1,
-              })),
-            ];
-
-            const contribMap = evidences.reduce((acc, e) => {
-              const contribution =
-                e.delta ?? scoreFromImpact(e.impact) * e._sign;
-              const src = e.text;
-              acc[src] = (acc[src] || 0) + contribution;
-              return acc;
-            }, {});
-
-            const total = Object.values(contribMap).reduce(
-              (sum, val) => sum + Math.abs(val),
-              0,
-            );
-
-            newHypothesis.sourceContributions = Object.entries(contribMap).map(
-              ([source, val]) => ({
-                source,
-                percent: total ? val / total : 0,
-              }),
-            );
-
-            return newHypothesis;
-          });
+          const { updatedHypothesis, extraRecommendations } = calculateNewConfidence(
+            updatedHypotheses[targetIndex],
+            link,
+            evidenceText,
+            analysis.analysisSummary
+          );
+          
+          updatedHypotheses[targetIndex] = updatedHypothesis;
+          allNewRecommendations.push(...extraRecommendations);
         });
 
-        const updatedRecommendations = [
-          ...(data?.inquiryMap?.recommendations || []),
-          ...(analysis.strategicRecommendations || []),
-          ...extraRecommendations,
-        ];
+        const finalRecommendations = [...currentRecommendations, ...allNewRecommendations];
 
         await updateDoc(ref, {
           "inquiryMap.hypotheses": updatedHypotheses,
-          "inquiryMap.recommendations": updatedRecommendations,
+          "inquiryMap.recommendations": finalRecommendations,
         });
+
+      } catch (err) {
+        console.error("Triage evidence process failed:", err);
       } finally {
         setActiveTriages((c) => c - 1);
       }
     },
-    [],
+    []
   );
 
+  /**
+   * Triggers a refresh to triage any untriaged documents or answers.
+   */
   const refreshInquiryMap = useCallback(
     async (uid, initiativeId) => {
       const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const current = data?.inquiryMap?.hypotheses || [];
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
 
-      const existing = new Set();
-      current.forEach((h) => {
-        (h.supportingEvidence || []).forEach((e) => existing.add(e.text));
-        (h.refutingEvidence || []).forEach((e) => existing.add(e.text));
-      });
+        const data = snap.data();
+        const currentHypotheses = data?.inquiryMap?.hypotheses || [];
+        
+        // Create a set of all existing evidence text to avoid re-triaging
+        const existingEvidence = new Set();
+        currentHypotheses.forEach((h) => {
+          (h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
+          (h.refutingEvidence || []).forEach((e) => existingEvidence.add(e.text));
+        });
 
-      const materials = data?.sourceMaterials || [];
-      for (const docItem of materials) {
-        const text = `Title: ${docItem.name}\n\n${docItem.content}`;
-        if (!existing.has(text)) {
-          await triageEvidence(uid, initiativeId, text);
-          existing.add(text);
+        // Triage new documents
+        for (const docItem of (data?.sourceMaterials || [])) {
+          const text = `Document: ${docItem.name}\n\n${docItem.summary || docItem.content}`;
+          if (!existingEvidence.has(text)) {
+            await triageEvidence(uid, initiativeId, text);
+          }
         }
-      }
 
-      const questions = data?.clarifyingQuestions || [];
-      const answers = data?.clarifyingAnswers || [];
-      for (let i = 0; i < questions.length; i += 1) {
-        const q = questions[i]?.question;
-        const ansObj = answers[i] || {};
-        for (const ans of Object.values(ansObj)) {
-          const ansText = ans?.text;
-          if (q && ansText && ansText.trim()) {
-            const combined = `Question: ${q}\nAnswer: ${ansText}`;
-            if (!existing.has(combined)) {
-              await triageEvidence(uid, initiativeId, combined);
-              existing.add(combined);
+        // Triage new answers
+        for (const q of (data?.questions || [])) {
+          for (const ans of Object.values(q.answers || {})) {
+            if (ans?.text && ans.text.trim()) {
+              const combined = `Question: ${q.question}\nAnswer: ${ans.text}`;
+              if (!existingEvidence.has(combined)) {
+                await triageEvidence(uid, initiativeId, combined);
+              }
             }
           }
         }
+      } catch (err) {
+        console.error("Error refreshing inquiry map:", err);
       }
     },
-    [triageEvidence],
+    [triageEvidence]
   );
-
+  
+  /**
+   * Manually updates the confidence of a hypothesis.
+   */
   const updateConfidence = useCallback(
     async (uid, initiativeId, hypothesisId, confidence) => {
       const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const current = data?.inquiryMap?.hypotheses || [];
-      const updated = current.map((h) =>
-        h.id === hypothesisId
-          ? { ...h, confidence: normalizeConfidence(confidence) }
-          : h
-      );
-      await updateDoc(ref, { "inquiryMap.hypotheses": updated });
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId ? { ...h, confidence: Math.min(1, Math.max(0, confidence)) } : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error updating confidence:", err);
+      }
     },
     []
   );
@@ -427,6 +253,3 @@ InquiryMapProvider.propTypes = {
 };
 
 export const useInquiryMap = () => useContext(InquiryMapContext);
-
-export { normalizeConfidence };
-
