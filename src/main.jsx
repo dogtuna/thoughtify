@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import App from "./App.jsx";
 import { ProjectProvider } from "./context/ProjectContext.jsx";
-import { InquiryMapProvider } from "./context/InquiryMapContext.jsx";
+import { InquiryMapProvider } from "./context/InquiryMapContext";
 import PropTypes from "prop-types";
 import { initAnalytics, getAnalyticsConsent } from "./utils/analytics.js";
 import { onAuthStateChanged } from "firebase/auth";
