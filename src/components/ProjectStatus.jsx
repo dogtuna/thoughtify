@@ -88,35 +88,26 @@ const ProjectStatus = ({
     if (!user || !initiativeId) return;
     setLoading(true);
 
-    // **FIXED LOGIC**
-    // Use the local 'history' state as the single source of truth for the last update.
-    // This avoids any potential race conditions with Firestore.
     const lastUpdateFromState = history.length > 0 ? history[0] : null;
 
     // --- Data Aggregation ---
     const cutoff = lastUpdateFromState ? new Date(lastUpdateFromState.date) : null;
 
-    // Helper function to reliably get a timestamp from an answer object.
+    // **FIXED LOGIC HERE**
+    // This function now correctly checks for 'answeredAt' from your data structure.
     const getAnswerTimestamp = (answer) => {
-      // **CRITICAL:** Your answer object *must* have a `timestamp` field.
-      // When you save an answer, it should be an object like:
-      // { text: "The answer...", timestamp: serverTimestamp() }
-      if (!answer || !answer.timestamp) return null;
-      const ts = answer.timestamp;
-      // Handle both Firestore Timestamps and ISO strings
+      const ts = answer.timestamp || answer.answeredAt; // Check for both keys
+      if (!ts) return null;
       return ts.toDate ? ts.toDate() : new Date(ts);
     };
 
-    // This logic now correctly filters for *new* answers using the cutoff date.
     const newStakeholderAnswers = questions
       .map((q) => {
         const newAnswers = Object.entries(q.answers || {})
           .filter(([, answer]) => {
-            // Ensure the answer object is valid and has text
             if (!answer || typeof answer.text !== 'string' || !answer.text.trim()) return false;
-            if (!cutoff) return true; // If it's the first run, all answers are new
+            if (!cutoff) return true;
             const answerTimestamp = getAnswerTimestamp(answer);
-            // The magic is here: only include answers with a timestamp after the last update
             return answerTimestamp && answerTimestamp > cutoff;
           })
           .map(([name, answer]) => `${name}: ${answer.text}`)
@@ -130,7 +121,7 @@ const ProjectStatus = ({
       .filter((d) => {
         if (!cutoff) return true;
         const added = d.addedAt || d.createdAt || d.uploadedAt;
-        if (!added) return true; // Default to including if no timestamp
+        if (!added) return true;
         const t =
           typeof added === "string"
             ? new Date(added)
@@ -242,7 +233,6 @@ ${allOutstanding || "None"}`;
         initiativeId,
         "statusUpdates"
       );
-      // The write to the database still happens, but we no longer depend on its timing for the next run
       const docRef = await addDoc(colRef, entry);
       const entryWithId = { id: docRef.id, ...entry };
       const updated = [entryWithId, ...history];
