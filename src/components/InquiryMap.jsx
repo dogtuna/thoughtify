@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -162,6 +163,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       const contribs = typeof h === "object" ? h.sourceContributions : undefined;
       const sup = typeof h === "object" ? h.supportingEvidence : undefined;
       const ref = typeof h === "object" ? h.refutingEvidence : undefined;
+      const contested = typeof h === "object" ? h.contested : undefined;
       const baseLabel =
         typeof h === "string"
           ? h
@@ -186,11 +188,12 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
           sourceContributions: contribs,
           supportingEvidence: sup,
           refutingEvidence: ref,
+          contested,
         },
         position: { x: offset, y: rowYHypos },
         style: {
           ...baseCardStyle,
-          background: colorFor(conf),
+          background: contested ? "#fb923c" : colorFor(conf),
           width: sizesRef.current[id]?.width ?? baseCardStyle.width,
           height: sizesRef.current[id]?.height ?? baseCardStyle.height,
         },
@@ -238,13 +241,27 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
     setNodes((nds) =>
       nds.map((n) =>
         n.id === id
-          ? { ...n, data: { ...n.data, confidence }, style: { ...n.style, background: colorFor(confidence) } }
+          ? {
+              ...n,
+              data: { ...n.data, confidence },
+              style: {
+                ...n.style,
+                background: n.data.contested ? "#fb923c" : colorFor(confidence),
+              },
+            }
           : n
       )
     );
     setSelected((sel) =>
       sel && sel.id === id
-        ? { ...sel, data: { ...sel.data, confidence }, style: { ...sel.style, background: colorFor(confidence) } }
+        ? {
+            ...sel,
+            data: { ...sel.data, confidence },
+            style: {
+              ...sel.style,
+              background: sel.data.contested ? "#fb923c" : colorFor(confidence),
+            },
+          }
         : sel
     );
     onUpdateConfidence?.(id, confidence);
@@ -307,13 +324,21 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
           </button>
         </Panel>
 
-        {selected && (
-          <Panel
-            position="bottom-left"
-            className="bg-black/70 text-white rounded-xl px-3 py-2 shadow max-w-[42vw] space-y-2"
+      </ReactFlow>
+      {selected &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[1000] bg-black/50"
+            onClick={() => setSelected(null)}
           >
+            <div
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md w-[min(520px,90vw)] space-y-2"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="flex items-center gap-2">
-              <span className="truncate">Selected: {selected.data.label}</span>
+              <span className="font-semibold truncate flex-1">
+                {selected.data.label}
+              </span>
               <input
                 type="range"
                 min="0"
@@ -350,7 +375,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                 <ul className="ml-4 space-y-1">
                   {selected.data.supportingEvidence?.map((e, idx) => (
                     <li key={`sup-${idx}`} className="flex items-start gap-1">
-                      <span className="text-green-400 font-bold">+</span>
+                      <span className="text-green-600 font-bold">+</span>
                       <span>
                         {e.analysisSummary ||
                           (e.text.length > 60
@@ -361,7 +386,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                   ))}
                   {selected.data.refutingEvidence?.map((e, idx) => (
                     <li key={`ref-${idx}`} className="flex items-start gap-1">
-                      <span className="text-red-500 font-bold">-</span>
+                      <span className="text-red-600 font-bold">-</span>
                       <span>
                         {e.analysisSummary ||
                           (e.text.length > 60
@@ -373,13 +398,30 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                 </ul>
               </details>
             ) : null}
-          </Panel>
+            <div className="flex justify-end">
+              <button
+                className="px-3 py-1 bg-blue-500 text-white rounded"
+                onClick={() => setSelected(null)}
+              >
+                Close
+              </button>
+            </div>
+            </div>
+          </div>,
+          document.body
         )}
-      </ReactFlow>
 
-      {modalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <form onSubmit={addHypothesis} className="bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]">
+      {modalOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[1000] bg-black/50"
+            onClick={() => setModalOpen(false)}
+          >
+            <form
+              onSubmit={addHypothesis}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]"
+              onClick={(e) => e.stopPropagation()}
+            >
             <label className="block">
               <span className="text-sm font-medium">Hypothesis</span>
               <input
@@ -394,9 +436,10 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
               </button>
               <button type="submit" className="px-3 py-1 bg-blue-500 text-white rounded">Add</button>
             </div>
-          </form>
-        </div>
-      )}
+            </form>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
@@ -433,6 +476,7 @@ InquiryMap.propTypes = {
             percent: PropTypes.number,
           })
         ),
+        contested: PropTypes.bool,
       }),
     ])
   ),

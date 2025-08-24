@@ -34,6 +34,24 @@ const scoreFromImpact = (impact) => {
   }
 };
 
+const AUTHORITY_WEIGHT = {
+  High: 1.5,
+  Medium: 1.0,
+  Low: 0.5,
+};
+
+const EVIDENCE_TYPE_WEIGHT = {
+  Quantitative: 1.2,
+  Qualitative: 0.8,
+};
+
+const DIRECTNESS_WEIGHT = {
+  Direct: 1.3,
+  Indirect: 0.7,
+};
+
+const CORROBORATION_MULTIPLIER = 2.0;
+
 export const InquiryMapProvider = ({ children }) => {
   const [hypotheses, setHypotheses] = useState(defaultState.hypotheses);
   const [businessGoal, setBusinessGoal] = useState(defaultState.businessGoal);
@@ -118,11 +136,17 @@ export const InquiryMapProvider = ({ children }) => {
           )
           .join("\n");
 
-        const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. A new piece of evidence has been added to the project. Your task is to analyze this evidence in the context of our current working hypotheses.
+          const prompt = `Your role is an expert Performance Consultant and Strategic Analyst. A new piece of evidence has been added to the project. Your task is to analyze this evidence in the context of our current working hypotheses.
 
 Assess Relevance: Determine which of the Existing Hypotheses this new Evidence most strongly supports or refutes.
 
 Analyze Impact: Evaluate the strategic impact of this new evidence. Is it a minor detail or a game-changing insight that significantly alters our understanding of the project?
+
+Classify the Evidence: For each relevant hypothesis, classify the evidence along three axes:
+- Source Authority (High | Medium | Low)
+- Evidence Type (Quantitative | Qualitative)
+- Directness (Direct | Indirect)
+Identify the specific source (stakeholder name or document).
 
 Recommend Actions: Based on your analysis, recommend the next logical step. Should we refine a hypothesis? Consider a new one? Or does this evidence confirm a hypothesis, allowing us to move on?
 
@@ -134,7 +158,11 @@ Respond ONLY in the following JSON format:
     {
       "hypothesisId": "The ID of the most relevant hypothesis (e.g., 'A')",
       "relationship": "Supports" | "Refutes",
-      "impact": "High" | "Medium" | "Low"
+      "impact": "High" | "Medium" | "Low",
+      "source": "Name or description of the source",
+      "sourceAuthority": "High" | "Medium" | "Low",
+      "evidenceType": "Quantitative" | "Qualitative",
+      "directness": "Direct" | "Indirect"
     }
   ],
   "strategicRecommendations": [
@@ -165,33 +193,103 @@ ${hypothesesList}
         }
 
         let updatedHypotheses = current;
+        const extraRecommendations = [];
         analysis.hypothesisLinks.forEach((link) => {
           const key =
             link.relationship === "Supports"
               ? "supportingEvidence"
               : "refutingEvidence";
+
+          const authorityWeight = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
+          const typeWeight = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
+          const directWeight = DIRECTNESS_WEIGHT[link.directness] || 1;
+          const weightedImpact =
+            scoreFromImpact(link.impact) * authorityWeight * typeWeight * directWeight;
           const delta =
-            (link.relationship === "Supports" ? 1 : -1) *
-            scoreFromImpact(link.impact);
+            (link.relationship === "Supports" ? 1 : -1) * weightedImpact;
 
           updatedHypotheses = updatedHypotheses.map((h) => {
             if (h.id !== link.hypothesisId) return h;
 
             const baseScore = h.confidenceScore ?? h.confidence ?? 0;
-            const newScore = baseScore + delta;
 
             const entry = {
               text: evidenceText,
               analysisSummary: analysis.analysisSummary,
               impact: link.impact,
               delta,
+              source: link.source,
+              sourceAuthority: link.sourceAuthority,
+              evidenceType: link.evidenceType,
+              directness: link.directness,
             };
+
+            // Corroboration check
+            const existingSup = h.supportingEvidence || [];
+            const beforeHasQuant = existingSup.some(
+              (e) => e.evidenceType === "Quantitative",
+            );
+            const beforeHasQual = existingSup.some(
+              (e) => e.evidenceType === "Qualitative",
+            );
+            const beforeSources = new Set(existingSup.map((e) => e.source));
+            const beforeCorroboration =
+              beforeHasQuant && beforeHasQual && beforeSources.size > 1;
+
+            const afterSup =
+              link.relationship === "Supports"
+                ? [...existingSup, entry]
+                : existingSup;
+            const afterHasQuant = afterSup.some(
+              (e) => e.evidenceType === "Quantitative",
+            );
+            const afterHasQual = afterSup.some(
+              (e) => e.evidenceType === "Qualitative",
+            );
+            const afterSources = new Set(afterSup.map((e) => e.source));
+            const afterCorroboration =
+              afterHasQuant && afterHasQual && afterSources.size > 1;
+
+            let newScore = baseScore + delta;
+            if (
+              link.relationship === "Supports" &&
+              afterCorroboration &&
+              !beforeCorroboration
+            ) {
+              newScore *= CORROBORATION_MULTIPLIER;
+            }
+
+            // Conflict flag
+            let contested = h.contested || false;
+            if (link.sourceAuthority === "High") {
+              const oppositeKey =
+                link.relationship === "Supports"
+                  ? "refutingEvidence"
+                  : "supportingEvidence";
+              const opposite = h[oppositeKey] || [];
+              const highOpp = opposite.find(
+                (e) => e.sourceAuthority === "High",
+              );
+              if (highOpp) {
+                contested = true;
+                extraRecommendations.push(
+                  `Schedule a root cause alignment meeting with ${
+                    highOpp.source || "Stakeholder A"
+                  } and ${
+                    link.source || "Stakeholder B"
+                  } to resolve the conflicting perspectives on ${
+                    h.statement || h.label || h.id
+                  }.`,
+                );
+              }
+            }
 
             const newHypothesis = {
               ...h,
               [key]: [...(h[key] || []), entry],
               confidenceScore: newScore,
               confidence: logisticConfidence(newScore),
+              contested,
             };
 
             const evidences = [
@@ -232,6 +330,7 @@ ${hypothesesList}
         const updatedRecommendations = [
           ...(data?.inquiryMap?.recommendations || []),
           ...(analysis.strategicRecommendations || []),
+          ...extraRecommendations,
         ];
 
         await updateDoc(ref, {
