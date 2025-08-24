@@ -101,7 +101,6 @@ const InquiryMap = () => {
   const height = useVisibleHeight(wrapperRef);
   const marginTop = useHeaderOverlap(wrapperRef);
 
-  // **CRITICAL FIX: Consume the context directly in the UI component**
   const { hypotheses, businessGoal, isAnalyzing, refreshInquiryMap, updateConfidence: updateConfidenceInDb } = useInquiryMap();
 
   const [nodes, setNodes] = useNodesState([]);
@@ -165,21 +164,13 @@ const InquiryMap = () => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, [setNodes]);
 
-  const updateConfidenceInUI = (id, confidence) => {
-    // Optimistically update the UI
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, confidence }, style: { ...n.style, background: n.data.contested ? "#fb923c" : colorFor(confidence) } } : n
-      )
-    );
-    setSelected((sel) => sel && sel.id === id ? { ...sel, data: { ...sel.data, confidence }, style: { ...sel.style, background: sel.data.contested ? "#fb923c" : colorFor(confidence) } } : sel);
-    // Debounce the call to Firestore if needed, or call directly
+  const handleConfidenceChange = (id, confidence) => {
     updateConfidenceInDb(id, confidence);
   };
 
   const addHypothesis = (e) => {
     e.preventDefault();
-    // This function would need to be implemented in the context, e.g., `addHypothesis(newHypothesis)`
+    // This would call a function in the context to add the hypothesis to Firestore
     console.log("Adding new hypothesis:", newHypothesis); 
     setNewHypothesis("");
     setModalOpen(false);
@@ -207,11 +198,7 @@ const InquiryMap = () => {
           <button
             type="button"
             className="px-3 py-1.5 bg-green-600 text-white rounded"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              refreshInquiryMap(); // Directly call the function from the context
-            }}
+            onClick={refreshInquiryMap} // This now works correctly
             disabled={isAnalyzing}
           >
             {isAnalyzing ? "Analyzing..." : "Refresh Map"}
@@ -224,7 +211,6 @@ const InquiryMap = () => {
           </button>
         </Panel>
       </ReactFlow>
-      {/* Portals for modals (unchanged) */}
     </div>
   );
 };

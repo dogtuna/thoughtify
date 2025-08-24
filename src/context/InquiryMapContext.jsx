@@ -27,14 +27,18 @@ export const InquiryMapProvider = ({ children }) => {
   const [recommendations, setRecommendations] = useState(defaultState.recommendations);
   const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
-  const [currentUser, setCurrentUser] = useState(null); // Assuming you have a way to set the current user
-  const [currentInitiative, setCurrentInitiative] = useState(null); // And the current initiative
+  
+  // **CRITICAL FIX: Store the current context internally**
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentInitiative, setCurrentInitiative] = useState(null);
 
   const isAnalyzing = activeTriages > 0;
 
   const loadHypotheses = useCallback((uid, initiativeId) => {
+    // Set the context for all other functions to use
     setCurrentUser(uid);
     setCurrentInitiative(initiativeId);
+
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
     }
@@ -109,7 +113,7 @@ export const InquiryMapProvider = ({ children }) => {
         setActiveTriages((c) => c - 1);
       }
     },
-    [currentUser, currentInitiative]
+    [currentUser, currentInitiative] // Depend on the internal state
   );
 
   const refreshInquiryMap = useCallback(
@@ -150,7 +154,7 @@ export const InquiryMapProvider = ({ children }) => {
         console.error("Error refreshing inquiry map:", err);
       }
     },
-    [currentUser, currentInitiative, triageEvidence]
+    [currentUser, currentInitiative, triageEvidence] // Depend on internal state
   );
   
   const addQuestion = useCallback(
