@@ -110,6 +110,67 @@ export const InquiryMapProvider = ({ children }) => {
     []
   );
 
+  const refreshInquiryMap = useCallback(
+    async (uid, initiativeId) => {
+      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+
+        const data = snap.data();
+        const currentHypotheses = data?.inquiryMap?.hypotheses || [];
+        
+        const existingEvidence = new Set();
+        currentHypotheses.forEach((h) => {
+          (h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
+          (h.refutingEvidence || []).forEach((e) => existingEvidence.add(e.text));
+        });
+
+        // Triage new documents
+        for (const docItem of (data?.sourceMaterials || [])) {
+          const text = `Document: ${docItem.name}\n\n${docItem.summary || docItem.content}`;
+          if (!existingEvidence.has(text)) {
+            await triageEvidence(uid, initiativeId, text);
+          }
+        }
+
+        // Triage new answers
+        for (const q of (data?.questions || [])) {
+          for (const ans of Object.values(q.answers || {})) {
+            if (ans?.text && ans.text.trim()) {
+              const combined = `Question: ${q.question}\nAnswer: ${ans.text}`;
+              if (!existingEvidence.has(combined)) {
+                await triageEvidence(uid, initiativeId, combined);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error refreshing inquiry map:", err);
+      }
+    },
+    [triageEvidence]
+  );
+  
+  const updateConfidence = useCallback(
+    async (uid, initiativeId, hypothesisId, confidence) => {
+      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId ? { ...h, confidence: Math.min(1, Math.max(0, confidence)) } : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error updating confidence:", err);
+      }
+    },
+    []
+  );
+
   const value = {
     hypotheses,
     businessGoal,
