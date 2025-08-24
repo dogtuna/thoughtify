@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useInquiryMap } from "../contexts/InquiryMapContext"; // Corrected path assuming standard structure
+import { useInquiryMap } from "../context/InquiryMapContext"; // Corrected path assuming standard structure
 import {
   collection,
   query,
