@@ -122,6 +122,13 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
   const [modalOpen, setModalOpen] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState("");
 
+  const selectedPct = selected
+    ? Math.min(
+        100,
+        Math.max(0, Math.round((selected.data.confidence || 0) * 100)),
+      )
+    : 0;
+
   const sizesRef = useRef({}); // remember manual resizes across renders
 
   const persistSize = useCallback((id, width, height) => {
@@ -152,8 +159,16 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
     const hs = hypotheses.map((h, i) => {
       const id = typeof h === "object" && h.id ? h.id : `hypothesis-${i}`;
       const conf = typeof h === "object" ? h.confidence : undefined;
-      const baseLabel = typeof h === "string" ? h : `${h.id ? `${h.id}: ` : ""}${h.statement || h.label || ""}`;
-      const label = typeof conf === "number" ? `${baseLabel} (${Math.round(conf * 100)}%)` : baseLabel;
+      const baseLabel =
+        typeof h === "string"
+          ? h
+          : `${h.id ? `${h.id}: ` : ""}${h.statement || h.label || ""}`;
+      const pct = Math.min(
+        100,
+        Math.max(0, Math.round((conf || 0) * 100)),
+      );
+      const label =
+        typeof conf === "number" ? `${baseLabel} (${pct}%)` : baseLabel;
 
       // place evenly around x=0, spacing by card width + margin
       const offset = (i - (hypotheses.length - 1) / 2) * (CARD_W + marginX);
@@ -283,17 +298,22 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         </Panel>
 
         {selected && (
-          <Panel position="bottom-left" className="bg-black/70 text-white rounded-xl px-3 py-2 shadow max-w-[42vw]">
+          <Panel
+            position="bottom-left"
+            className="bg-black/70 text-white rounded-xl px-3 py-2 shadow max-w-[42vw]"
+          >
             <div className="flex items-center gap-2">
               <span className="truncate">Selected: {selected.data.label}</span>
               <input
                 type="range"
                 min="0"
                 max="100"
-                value={Math.round((selected.data.confidence || 0) * 100)}
-                onChange={(e) => updateConfidence(selected.id, Number(e.target.value) / 100)}
+                value={selectedPct}
+                onChange={(e) =>
+                  updateConfidence(selected.id, Number(e.target.value) / 100)
+                }
               />
-              <span>{Math.round((selected.data.confidence || 0) * 100)}%</span>
+              <span>{selectedPct}%</span>
             </div>
           </Panel>
         )}
