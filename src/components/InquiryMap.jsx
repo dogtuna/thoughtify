@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -324,15 +325,16 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         </Panel>
 
       </ReactFlow>
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setSelected(null)}
-        >
+      {selected &&
+        createPortal(
           <div
-            className="bg-white p-4 rounded shadow-md w-[min(520px,90vw)] space-y-2"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[1000] bg-black/50"
+            onClick={() => setSelected(null)}
           >
+            <div
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md w-[min(520px,90vw)] space-y-2"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="flex items-center gap-2">
               <span className="font-semibold truncate flex-1">
                 {selected.data.label}
@@ -384,7 +386,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                   ))}
                   {selected.data.refutingEvidence?.map((e, idx) => (
                     <li key={`ref-${idx}`} className="flex items-start gap-1">
-                      <span className="text-red-500 font-bold">-</span>
+                      <span className="text-red-600 font-bold">-</span>
                       <span>
                         {e.analysisSummary ||
                           (e.text.length > 60
@@ -404,13 +406,22 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                 Close
               </button>
             </div>
-          </div>
-        </div>
-      )}
+            </div>
+          </div>,
+          document.body
+        )}
 
-      {modalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <form onSubmit={addHypothesis} className="bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]">
+      {modalOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[1000] bg-black/50"
+            onClick={() => setModalOpen(false)}
+          >
+            <form
+              onSubmit={addHypothesis}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]"
+              onClick={(e) => e.stopPropagation()}
+            >
             <label className="block">
               <span className="text-sm font-medium">Hypothesis</span>
               <input
@@ -425,9 +436,10 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
               </button>
               <button type="submit" className="px-3 py-1 bg-blue-500 text-white rounded">Add</button>
             </div>
-          </form>
-        </div>
-      )}
+            </form>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
