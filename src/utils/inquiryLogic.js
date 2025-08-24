@@ -1,9 +1,10 @@
 import { logisticConfidence } from "./confidence";
 
 // --- Constants for Weighting ---
-const AUTHORITY_WEIGHT = { High: 1.5, Medium: 1.0, Low: 0.5 };
-const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.2, Qualitative: 0.8 };
-const DIRECTNESS_WEIGHT = { Direct: 1.3, Indirect: 0.7 };
+// These are now more aggressive to prioritize objective proof.
+const AUTHORITY_WEIGHT = { High: 2.0, Medium: 1.0, Low: 0.5 };
+const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.5, Qualitative: 0.8 };
+const DIRECTNESS_WEIGHT = { Direct: 1.5, Indirect: 0.7 };
 const CORROBORATION_MULTIPLIER = 2.0;
 
 const scoreFromImpact = (impact) => {
@@ -16,10 +17,6 @@ const scoreFromImpact = (impact) => {
 
 /**
  * Generates the AI prompt for triaging a new piece of evidence.
- * @param {string} evidenceText - The new evidence to analyze.
- * @param {Array} hypotheses - The current list of project hypotheses.
- * @param {Array} contacts - The list of known project stakeholders.
- * @returns {string} The complete prompt for the AI.
  */
 export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
   const hypothesesList = hypotheses
@@ -30,43 +27,31 @@ export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
     .map((c) => `${c.name} (${c.role || "Unknown Role"})`)
     .join(", ");
 
-  return `Your role is an expert Performance Consultant and Strategic Analyst. A new piece of evidence has been added to the project. Your task is to analyze this evidence in the context of our current working hypotheses.
+  // This revised prompt is more direct in asking the AI to check for refutations.
+    return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
 
-Assess Relevance: Determine which of the Existing Hypotheses this new Evidence most strongly supports or refutes.
-
-Analyze Impact: Evaluate the strategic impact of this new evidence. Is it a minor detail or a game-changing insight?
-
-Classify the Evidence: For each relevant hypothesis, classify the evidence along three axes:
-- Source Authority (High | Medium | Low)
-- Evidence Type (Quantitative | Qualitative)
-- Directness (Direct | Indirect)
-Identify the specific source (stakeholder name or document).
-
-Recommend Actions: Based on your analysis, recommend the next logical step.
+1.  **Analyze the Relationship:** For each hypothesis, determine if the new evidence directly **Supports**, directly **Refutes**, or is **Unrelated** to it. Be extremely critical. If a stakeholder says "the training was fine, but the tool is the problem," that *refutes* a hypothesis about training and *supports* a hypothesis about the tool. Do not just match keywords.
+2.  **Determine the Impact:** Classify the evidence's strategic impact (High, Medium, Low).
+3.  **Classify the Source:** Identify the source and classify its authority, type, and directness.
 
 Respond ONLY in the following JSON format:
-
 {
-  "analysisSummary": "A brief, one-sentence summary of what this new evidence reveals.",
+  "analysisSummary": "A brief summary of the evidence's strategic meaning.",
   "hypothesisLinks": [
     {
-      "hypothesisId": "The ID of the most relevant hypothesis (e.g., 'A')",
-      "relationship": "Supports" | "Refutes",
-      "impact": "High" | "Medium" | "Low",
-      "source": "Name or description of the source",
-      "sourceAuthority": "High" | "Medium" | "Low",
-      "evidenceType": "Quantitative" | "Qualitative",
-      "directness": "Direct" | "Indirect"
+      "hypothesisId": "A",
+      "relationship": "Refutes",
+      "impact": "High",
+      "source": "Chloe Zhao",
+      "sourceAuthority": "Medium",
+      "evidenceType": "Qualitative",
+      "directness": "Direct"
     }
-  ],
-  "strategicRecommendations": [
-    "Actionable suggestions..."
   ]
 }
 
 ---
 ### Project Data
-
 **New Evidence:**
 ${evidenceText}
 
@@ -80,11 +65,6 @@ ${contactsList}
 
 /**
  * Calculates the new confidence score for a hypothesis based on new evidence.
- * @param {object} hypothesis - The current hypothesis object.
- * @param {object} link - The hypothesisLink object from the AI's response.
- * @param {string} evidenceText - The text of the new evidence.
- * @param {string} analysisSummary - The AI's summary of the evidence.
- * @returns {object} An object containing the updated hypothesis and any new recommendations.
  */
 export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisSummary) => {
   const baseScore = hypothesis.confidenceScore ?? 0;
@@ -96,7 +76,10 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
   const directWeight = DIRECTNESS_WEIGHT[link.directness] || 1;
 
   const weightedImpact = scoreFromImpact(link.impact) * authorityWeight * typeWeight * directWeight;
-  const delta = (link.relationship === "Supports" ? 1 : -1) * weightedImpact * diminishingFactor;
+  
+  // A more aggressive penalty for refuting evidence.
+  const multiplier = link.relationship === "Refutes" ? -1.5 : 1;
+  const delta = weightedImpact * diminishingFactor * multiplier;
 
   const newEvidenceEntry = {
     text: evidenceText,
@@ -107,6 +90,7 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
     sourceAuthority: link.sourceAuthority,
     evidenceType: link.evidenceType,
     directness: link.directness,
+    relationship: link.relationship,
   };
 
   const key = link.relationship === "Supports" ? "supportingEvidence" : "refutingEvidence";
@@ -153,5 +137,5 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
     contested,
   };
 
-  return { updatedHypothesis, extraRecommendations };
+  return { updatedHypothesis, extraRecommendations: [] };
 };
