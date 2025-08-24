@@ -12,6 +12,7 @@ import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
+import "./AIToolsGenerators.css";
 
 /* --------- robust viewport sizing (no assumptions about <header>) --------- */
 function useVisibleHeight(containerRef) {
@@ -309,13 +310,21 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         {/* Panels live INSIDE the canvas, never under header/footer */}
         <Panel position="top-left" className="flex items-center gap-2 bg-white/85 rounded-xl px-3 py-2 shadow">
           <button
+            type="button"
             className="px-3 py-1.5 bg-green-600 text-white rounded"
-            onClick={onRefresh}
+            onPointerDownCapture={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDownCapture={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRefresh?.();
+            }}
             disabled={isAnalyzing}
           >
             Refresh Map
           </button>
-          {isAnalyzing && <span className="text-sm">Analyzing…</span>}
+            {isAnalyzing && <span className="text-sm">Analyzing…</span>}
         </Panel>
 
         <Panel position="top-right">
@@ -328,11 +337,28 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       {selected &&
         createPortal(
           <div
-            className="fixed inset-0 z-[1000] bg-black/50"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1000,
+              background: "rgba(0,0,0,0.5)",
+            }}
             onClick={() => setSelected(null)}
           >
             <div
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md w-[min(520px,90vw)] space-y-2"
+              className="initiative-card"
+              style={{
+                position: "fixed",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "min(520px, 90vw)",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center gap-2">
@@ -414,12 +440,29 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       {modalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[1000] bg-black/50"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1000,
+              background: "rgba(0,0,0,0.5)",
+            }}
             onClick={() => setModalOpen(false)}
           >
             <form
               onSubmit={addHypothesis}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]"
+              className="initiative-card"
+              style={{
+                position: "fixed",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "min(520px, 90vw)",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
               onClick={(e) => e.stopPropagation()}
             >
             <label className="block">

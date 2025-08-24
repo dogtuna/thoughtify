@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
-import { useInquiryMap } from "../context/InquiryMapContext";
+import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { auth } from "../firebase";
 
 const InquiryMapContent = () => {

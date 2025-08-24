@@ -18,7 +18,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
-import { useInquiryMap } from "../context/InquiryMapContext";
+import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import {
   classifyTask,
   dedupeByMessage,
@@ -2216,6 +2216,7 @@ Respond ONLY in this JSON format:
       <aside className="sidebar">
         <h2>Discovery Hub</h2>
         <ul>
+          <li className="subheading">Client Facing</li>
           <li
             className={active === "documents" ? "active" : ""}
             onClick={() => setActive("documents")}
@@ -2255,6 +2256,7 @@ Respond ONLY in this JSON format:
               </ul>
             )}
           </li>
+          <li className="subheading">Internal</li>
           <li className={active === "tasks" ? "active" : ""}>
             <span
               onClick={() => setActive("tasks")}
