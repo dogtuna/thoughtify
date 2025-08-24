@@ -20,14 +20,16 @@ const defaultState = {
   recommendations: [],
 };
 
+const normalizeConfidence = (c) => Math.min(1, Math.max(0, c));
+
 const scoreFromImpact = (impact) => {
   switch (impact) {
     case "High":
-      return 20;
+      return 0.2;
     case "Medium":
-      return 10;
+      return 0.1;
     default:
-      return 5;
+      return 0.05;
   }
 };
 
@@ -182,7 +184,7 @@ ${hypothesesList}
                       impact: link.impact,
                     },
                   ],
-                  confidence: (h.confidence || 0) + delta,
+                  confidence: normalizeConfidence((h.confidence || 0) + delta),
                 }
               : h,
           );
@@ -255,7 +257,9 @@ ${hypothesesList}
       const data = snap.data();
       const current = data?.inquiryMap?.hypotheses || [];
       const updated = current.map((h) =>
-        h.id === hypothesisId ? { ...h, confidence } : h
+        h.id === hypothesisId
+          ? { ...h, confidence: normalizeConfidence(confidence) }
+          : h
       );
       await updateDoc(ref, { "inquiryMap.hypotheses": updated });
     },
@@ -285,4 +289,6 @@ InquiryMapProvider.propTypes = {
 };
 
 export const useInquiryMap = () => useContext(InquiryMapContext);
+
+export { normalizeConfidence };
 
