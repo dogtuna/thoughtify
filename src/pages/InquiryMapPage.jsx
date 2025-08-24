@@ -27,6 +27,9 @@ const InquiryMapContent = () => {
     id: h.id,
     statement: h.statement || h.text || h.label || h.id,
     confidence: typeof h.confidence === "number" ? h.confidence : 0,
+    supportingEvidence: h.supportingEvidence || [],
+    refutingEvidence: h.refutingEvidence || [],
+    sourceContributions: h.sourceContributions || [],
   }));
 
   const handleUpdateConfidence = useCallback(
