@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeConfidence } from '../InquiryMapContext.jsx';
+import { normalizeConfidence } from '../InquiryMapContext';
 
 describe('normalizeConfidence', () => {
   it('clamps values below 0 to 0', () => {
