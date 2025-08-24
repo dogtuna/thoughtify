@@ -13,7 +13,7 @@ import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
-import { useInquiryMap } from "../contexts/InquiryMapContext"; // Import the context hook
+import { useInquiryMap } from "../context/InquiryMapContext"; // Import the context hook
 
 // --- Helper Functions for Sizing (Unchanged) ---
 function useVisibleHeight(containerRef) {
