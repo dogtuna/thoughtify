@@ -11,6 +11,7 @@ import { db } from "../firebase";
 import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { generate } from "../ai";
 import { parseJsonFromText } from "../utils/json";
+import { logisticConfidence } from "../utils/confidence";
 
 const InquiryMapContext = createContext();
 
@@ -184,7 +185,7 @@ ${hypothesesList}
                       impact: link.impact,
                     },
                   ],
-                  confidence: normalizeConfidence((h.confidence || 0) + delta),
+                  confidence: logisticConfidence((h.confidence || 0) + delta),
                 }
               : h,
           );
