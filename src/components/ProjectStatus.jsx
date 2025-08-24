@@ -148,8 +148,118 @@ ${JSON.stringify({recommendations, tasks})}
   const handleSelectUpdate = (update) => {
     setSelectedUpdate(update);
     setSummary(update.summary);
+    setEditing(false);  
+  };
+
+  const saveEdit = async () => {
+    if (!user || !history.length) return;
+    const first = history[0];
+    try {
+      const ref = doc(
+        db,
+        "users",
+        user.uid,
+        "initiatives",
+        initiativeId,
+        "statusUpdates",
+        first.id
+      );
+      await updateDoc(ref, { summary });
+      const updatedFirst = { ...first, summary };
+      const updated = [updatedFirst, ...history.slice(1)];
+      setHistory(updated);
+      onHistoryChange(updated);
+    } catch (err) {
+      console.error("saveEdit error", err);
+    }
     setEditing(false);
   };
+
+  const markSent = async () => {
+    if (!user || !history.length) return;
+    const first = history[0];
+    try {
+      const ref = doc(
+        db,
+        "users",
+        user.uid,
+        "initiatives",
+        initiativeId,
+        "statusUpdates",
+        first.id
+      );
+      await updateDoc(ref, { sent: true });
+      const updatedFirst = { ...first, sent: true };
+      const updated = [updatedFirst, ...history.slice(1)];
+      setHistory(updated);
+      onHistoryChange(updated);
+    } catch (err) {
+      console.error("markSent error", err);
+    }
+    setSummary("");
+    setEditing(false);
+  };
+
+  const copySummary = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(summary);
+    }
+  };
+
+  const openSendModal = () => {
+    if (!emailConnected) {
+      alert("Connect your Gmail account in settings.");
+      return;
+    }
+    if (!auth.currentUser) {
+      alert("Please log in to send emails.");
+      return;
+    }
+    setRecipientModal({ selected: [] });
+  };
+
+  const sendEmail = async (names) => {
+    const emails = names
+      .map((n) => contacts.find((c) => c.name === n)?.email)
+      .filter((e) => e);
+    if (!emails.length) {
+      alert("Missing email address for selected contact");
+      return;
+    }
+    try {
+      if (appCheck) {
+        await getAppCheckToken(appCheck);
+      }
+      await auth.currentUser.getIdToken(true);
+      const callable = httpsCallable(functions, "sendQuestionEmail");
+      await callable({
+        provider: "gmail",
+        recipientEmail: emails.join(","),
+        subject: `Project Status Update - ${new Date().toDateString()}`,
+        message: summary,
+        questionId: `status-${Date.now()}`,
+      });
+      alert("Email sent");
+      markSent();
+    } catch (err) {
+      console.error("sendStatusEmail error", err);
+      alert("Error sending email");
+    }
+  };
+
+  const confirmRecipients = () => {
+    sendEmail(recipientModal.selected);
+    setRecipientModal(null);
+  };
+
+  const saveContact = () => {
+    const updated = [...contacts, newContact];
+    setContacts(updated);
+    setNewContact(null);
+    setRecipientModal((m) =>
+      m ? { ...m, selected: [...m.selected, newContact.name] } : m
+    );
+  };  
   
   // Omitted saveEdit, markSent, email functions for brevity as they remain the same
 

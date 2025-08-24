@@ -28,11 +28,11 @@ export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
     .join(", ");
 
   // This revised prompt is more direct in asking the AI to check for refutations.
-  return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
+    return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
 
-1.  **Analyze the Relationship:** For each hypothesis, determine if the new evidence directly **Supports**, directly **Refutes**, or is **Unrelated** to it. Be critical. If a stakeholder's statement contradicts a hypothesis, it should be marked as "Refutes".
-2.  **Analyze Impact:** Classify the evidence's strategic impact (High, Medium, Low).
-3.  **Classify the Source:** Identify the source and classify its authority, type, and directness based on the provided stakeholder list and the nature of the evidence.
+1.  **Analyze the Relationship:** For each hypothesis, determine if the new evidence directly **Supports**, directly **Refutes**, or is **Unrelated** to it. Be extremely critical. If a stakeholder says "the training was fine, but the tool is the problem," that *refutes* a hypothesis about training and *supports* a hypothesis about the tool. Do not just match keywords.
+2.  **Determine the Impact:** Classify the evidence's strategic impact (High, Medium, Low).
+3.  **Classify the Source:** Identify the source and classify its authority, type, and directness.
 
 Respond ONLY in the following JSON format:
 {
@@ -40,12 +40,12 @@ Respond ONLY in the following JSON format:
   "hypothesisLinks": [
     {
       "hypothesisId": "A",
-      "relationship": "Supports" | "Refutes",
-      "impact": "High" | "Medium" | "Low",
-      "source": "Name or description of the source",
-      "sourceAuthority": "High" | "Medium" | "Low",
-      "evidenceType": "Quantitative" | "Qualitative",
-      "directness": "Direct" | "Indirect"
+      "relationship": "Refutes",
+      "impact": "High",
+      "source": "Chloe Zhao",
+      "sourceAuthority": "Medium",
+      "evidenceType": "Qualitative",
+      "directness": "Direct"
     }
   ]
 }
@@ -137,5 +137,5 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
     contested,
   };
 
-  return { updatedHypothesis, extraRecommendations };
+  return { updatedHypothesis, extraRecommendations: [] };
 };
