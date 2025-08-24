@@ -1,9 +1,9 @@
 import { logisticConfidence } from "./confidence";
 
 // --- Constants for Weighting ---
-const AUTHORITY_WEIGHT = { High: 1.5, Medium: 1.0, Low: 0.5 };
-const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.2, Qualitative: 0.8 };
-const DIRECTNESS_WEIGHT = { Direct: 1.3, Indirect: 0.7 };
+const AUTHORITY_WEIGHT = { High: 2.0, Medium: 1.0, Low: 0.5 }; // Boost High-Authority
+const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.5, Qualitative: 0.8 }; // Boost Quantitative
+const DIRECTNESS_WEIGHT = { Direct: 1.5, Indirect: 0.7 }; // Boost Direct
 const CORROBORATION_MULTIPLIER = 2.0;
 
 const scoreFromImpact = (impact) => {
