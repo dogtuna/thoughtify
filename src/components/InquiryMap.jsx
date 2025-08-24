@@ -160,6 +160,8 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       const id = typeof h === "object" && h.id ? h.id : `hypothesis-${i}`;
       const conf = typeof h === "object" ? h.confidence : undefined;
       const contribs = typeof h === "object" ? h.sourceContributions : undefined;
+      const sup = typeof h === "object" ? h.supportingEvidence : undefined;
+      const ref = typeof h === "object" ? h.refutingEvidence : undefined;
       const baseLabel =
         typeof h === "string"
           ? h
@@ -177,7 +179,14 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       return {
         id,
         type: "resizable",
-        data: { label, confidence: conf, onResize: persistSize, sourceContributions: contribs },
+        data: {
+          label,
+          confidence: conf,
+          onResize: persistSize,
+          sourceContributions: contribs,
+          supportingEvidence: sup,
+          refutingEvidence: ref,
+        },
         position: { x: offset, y: rowYHypos },
         style: {
           ...baseCardStyle,
@@ -332,6 +341,38 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                   </ul>
                 </details>
               )}
+            {(Array.isArray(selected.data.supportingEvidence) &&
+              selected.data.supportingEvidence.length > 0) ||
+            (Array.isArray(selected.data.refutingEvidence) &&
+              selected.data.refutingEvidence.length > 0) ? (
+              <details>
+                <summary className="cursor-pointer">Evidence</summary>
+                <ul className="ml-4 space-y-1">
+                  {selected.data.supportingEvidence?.map((e, idx) => (
+                    <li key={`sup-${idx}`} className="flex items-start gap-1">
+                      <span className="text-green-400 font-bold">+</span>
+                      <span>
+                        {e.analysisSummary ||
+                          (e.text.length > 60
+                            ? `${e.text.slice(0, 60)}…`
+                            : e.text)}
+                      </span>
+                    </li>
+                  ))}
+                  {selected.data.refutingEvidence?.map((e, idx) => (
+                    <li key={`ref-${idx}`} className="flex items-start gap-1">
+                      <span className="text-red-500 font-bold">-</span>
+                      <span>
+                        {e.analysisSummary ||
+                          (e.text.length > 60
+                            ? `${e.text.slice(0, 60)}…`
+                            : e.text)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </Panel>
         )}
       </ReactFlow>
@@ -370,6 +411,28 @@ InquiryMap.propTypes = {
         statement: PropTypes.string,
         label: PropTypes.string,
         confidence: PropTypes.number,
+        supportingEvidence: PropTypes.arrayOf(
+          PropTypes.shape({
+            text: PropTypes.string,
+            analysisSummary: PropTypes.string,
+            impact: PropTypes.string,
+            delta: PropTypes.number,
+          })
+        ),
+        refutingEvidence: PropTypes.arrayOf(
+          PropTypes.shape({
+            text: PropTypes.string,
+            analysisSummary: PropTypes.string,
+            impact: PropTypes.string,
+            delta: PropTypes.number,
+          })
+        ),
+        sourceContributions: PropTypes.arrayOf(
+          PropTypes.shape({
+            source: PropTypes.string,
+            percent: PropTypes.number,
+          })
+        ),
       }),
     ])
   ),
