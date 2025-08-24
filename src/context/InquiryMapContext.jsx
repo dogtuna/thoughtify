@@ -173,22 +173,60 @@ ${hypothesesList}
           const delta =
             (link.relationship === "Supports" ? 1 : -1) *
             scoreFromImpact(link.impact);
-          updatedHypotheses = updatedHypotheses.map((h) =>
-            h.id === link.hypothesisId
-              ? {
-                  ...h,
-                  [key]: [
-                    ...(h[key] || []),
-                    {
-                      text: evidenceText,
-                      analysisSummary: analysis.analysisSummary,
-                      impact: link.impact,
-                    },
-                  ],
-                  confidence: logisticConfidence((h.confidence || 0) + delta),
-                }
-              : h,
-          );
+
+          updatedHypotheses = updatedHypotheses.map((h) => {
+            if (h.id !== link.hypothesisId) return h;
+
+            const baseScore = h.confidenceScore ?? h.confidence ?? 0;
+            const newScore = baseScore + delta;
+
+            const entry = {
+              text: evidenceText,
+              analysisSummary: analysis.analysisSummary,
+              impact: link.impact,
+              delta,
+            };
+
+            const newHypothesis = {
+              ...h,
+              [key]: [...(h[key] || []), entry],
+              confidenceScore: newScore,
+              confidence: logisticConfidence(newScore),
+            };
+
+            const evidences = [
+              ...(newHypothesis.supportingEvidence || []).map((e) => ({
+                ...e,
+                _sign: 1,
+              })),
+              ...(newHypothesis.refutingEvidence || []).map((e) => ({
+                ...e,
+                _sign: -1,
+              })),
+            ];
+
+            const contribMap = evidences.reduce((acc, e) => {
+              const contribution =
+                e.delta ?? scoreFromImpact(e.impact) * e._sign;
+              const src = e.text;
+              acc[src] = (acc[src] || 0) + contribution;
+              return acc;
+            }, {});
+
+            const total = Object.values(contribMap).reduce(
+              (sum, val) => sum + Math.abs(val),
+              0,
+            );
+
+            newHypothesis.sourceContributions = Object.entries(contribMap).map(
+              ([source, val]) => ({
+                source,
+                percent: total ? val / total : 0,
+              }),
+            );
+
+            return newHypothesis;
+          });
         });
 
         const updatedRecommendations = [

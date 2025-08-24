@@ -159,6 +159,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
     const hs = hypotheses.map((h, i) => {
       const id = typeof h === "object" && h.id ? h.id : `hypothesis-${i}`;
       const conf = typeof h === "object" ? h.confidence : undefined;
+      const contribs = typeof h === "object" ? h.sourceContributions : undefined;
       const baseLabel =
         typeof h === "string"
           ? h
@@ -176,7 +177,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       return {
         id,
         type: "resizable",
-        data: { label, confidence: conf, onResize: persistSize },
+        data: { label, confidence: conf, onResize: persistSize, sourceContributions: contribs },
         position: { x: offset, y: rowYHypos },
         style: {
           ...baseCardStyle,
@@ -300,7 +301,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         {selected && (
           <Panel
             position="bottom-left"
-            className="bg-black/70 text-white rounded-xl px-3 py-2 shadow max-w-[42vw]"
+            className="bg-black/70 text-white rounded-xl px-3 py-2 shadow max-w-[42vw] space-y-2"
           >
             <div className="flex items-center gap-2">
               <span className="truncate">Selected: {selected.data.label}</span>
@@ -315,6 +316,22 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
               />
               <span>{selectedPct}%</span>
             </div>
+            {Array.isArray(selected.data.sourceContributions) &&
+              selected.data.sourceContributions.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">Source contributions</summary>
+                  <ul className="list-disc ml-4">
+                    {selected.data.sourceContributions.map((s, idx) => (
+                      <li key={idx}>
+                        {s.source.length > 60
+                          ? `${s.source.slice(0, 60)}…`
+                          : s.source}
+                        : {(s.percent * 100).toFixed(1)}%
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
           </Panel>
         )}
       </ReactFlow>
