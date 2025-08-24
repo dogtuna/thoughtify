@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useInquiryMap } from "../contexts/InquiryMapContext"; // Import the context
+import { useInquiryMap } from "../context/InquiryMapContext"; // Import the context
 import {
   collection,
   query,
