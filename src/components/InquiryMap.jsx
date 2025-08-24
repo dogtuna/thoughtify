@@ -310,7 +310,10 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         <Panel position="top-left" className="flex items-center gap-2 bg-white/85 rounded-xl px-3 py-2 shadow">
           <button
             className="px-3 py-1.5 bg-green-600 text-white rounded"
-            onClick={onRefresh}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRefresh?.();
+            }}
             disabled={isAnalyzing}
           >
             Refresh Map
@@ -328,11 +331,18 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       {selected &&
         createPortal(
           <div
-            className="fixed inset-0 z-[1000] bg-black/50"
+            className="bg-black/50"
+            style={{ position: "fixed", inset: 0, zIndex: 1000 }}
             onClick={() => setSelected(null)}
           >
             <div
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md w-[min(520px,90vw)] space-y-2"
+              className="bg-white p-4 rounded shadow-md w-[min(520px,90vw)] space-y-2"
+              style={{
+                position: "fixed",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+              }}
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center gap-2">
@@ -414,12 +424,19 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       {modalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[1000] bg-black/50"
+            className="bg-black/50"
+            style={{ position: "fixed", inset: 0, zIndex: 1000 }}
             onClick={() => setModalOpen(false)}
           >
             <form
               onSubmit={addHypothesis}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]"
+              className="bg-white p-4 rounded shadow-md space-y-2 w-[min(520px,90vw)]"
+              style={{
+                position: "fixed",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+              }}
               onClick={(e) => e.stopPropagation()}
             >
             <label className="block">
