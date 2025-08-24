@@ -15,10 +15,15 @@ Each hypothesis in the inquiry map is represented with the following properties:
   - `analysisSummary` (string): Summary from the triage analysis.
   - `impact` ("High" | "Medium" | "Low"): Impact assessment.
   - `delta` (number): Contribution of the evidence toward confidence.
+  - `source` (string): Name or description of the source.
+  - `sourceAuthority` ("High" | "Medium" | "Low"): Authority level of the source.
+  - `evidenceType` ("Quantitative" | "Qualitative"): Nature of the evidence.
+  - `directness` ("Direct" | "Indirect"): How directly the evidence relates to the hypothesis.
 - `refutingEvidence` (array): Evidence items that refute the hypothesis with the same shape as `supportingEvidence`.
 - `sourceContributions` (array): Breakdown of confidence contributions per evidence source. Each entry contains:
   - `source` (string): Text of the evidence source.
   - `percent` (number): Signed fractional contribution of that source to the overall confidence. Positive values indicate supporting evidence while negative values indicate refuting evidence.
+- `contested` (boolean, optional): Indicates whether high-authority sources provide conflicting views on the hypothesis.
 
 `percent` values sum to 1 when considering absolute values. They are intended for display purposes to show how much each piece of evidence contributes to the hypothesis confidence.
 
