@@ -124,6 +124,29 @@ export const InquiryMapProvider = ({ children }) => {
           allNewRecommendations.push(...extraRecommendations);
         });
 
+        if (analysis.newHypothesis?.statement) {
+          const newConf = Math.min(1, Math.max(0, analysis.newHypothesis.confidence || 0));
+          const lowest = updatedHypotheses.reduce(
+            (min, h) => Math.min(min, h.confidence || 0),
+            1,
+          );
+          if (newConf > lowest) {
+            const add = window.confirm(
+              `AI suggests a new hypothesis with ${(newConf * 100).toFixed(0)}% confidence:\n"${analysis.newHypothesis.statement}"\nAdd this hypothesis?`
+            );
+            if (add) {
+              updatedHypotheses.push({
+                id: `hyp-${Date.now()}`,
+                statement: analysis.newHypothesis.statement,
+                confidence: newConf,
+                supportingEvidence: [],
+                refutingEvidence: [],
+                sourceContributions: [],
+              });
+            }
+          }
+        }
+
         const finalRecommendations = [...currentRecommendations, ...allNewRecommendations];
 
         await updateDoc(ref, {
