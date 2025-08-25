@@ -9,6 +9,7 @@ import ReactFlow, {
   applyNodeChanges,
   addEdge,
   applyEdgeChanges,
+  Handle,
 } from "reactflow";
 import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
@@ -77,13 +78,25 @@ const colorFor = (c) =>
 
 const ResizableNode = ({ id, data, selected }) => (
   <div className="relative">
+    <Handle type="target" position="left" />
+    <Handle type="source" position="right" />
     <NodeResizer
       minWidth={240}
       minHeight={72}
       isVisible={selected}
       onResizeEnd={(_, p) => data.onResize?.(id, p.width, p.height)}
     />
-    <div style={{ padding: 12, lineHeight: 1.25, background: "transparent", color: "#111827", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+    <div
+      style={{
+        padding: 12,
+        lineHeight: 1.25,
+        background: "transparent",
+        color: "#111827",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "anywhere",
+      }}
+    >
       {data.label}
     </div>
   </div>
@@ -118,6 +131,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
 
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useState(storedLayout.edges || []);
+  const edgesRef = useRef(edges);
   const [selected, setSelected] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState("");
@@ -146,11 +160,11 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       sizesRef.current[id] = { width, height };
       setNodes((nds) => {
         const next = nds.map((n) => (n.id === id ? { ...n, style: { ...n.style, width, height } } : n));
-        saveLayout(next, edges);
+        saveLayout(next, edgesRef.current);
         return next;
       });
     },
-    [setNodes, edges, saveLayout]
+    [setNodes, saveLayout]
   );
 
   const baseLayout = useMemo(() => {
@@ -195,13 +209,15 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
     });
     setEdges((eds) => {
       const existing = new Set(eds.map((e) => e.id));
-      const merged = [...eds];
-      baseLayout.edges.forEach((e) => {
-        if (!existing.has(e.id)) merged.push(e);
-      });
-      return merged;
+      const toAdd = baseLayout.edges.filter((e) => !existing.has(e.id));
+      if (toAdd.length === 0) return eds;
+      return [...eds, ...toAdd];
     });
   }, [baseLayout, setNodes]);
+
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
   const onNodesChange = useCallback(
     (changes) => {
