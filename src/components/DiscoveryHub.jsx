@@ -24,6 +24,7 @@ import {
   dedupeByMessage,
   normalizeAssigneeName,
 } from "../utils/taskUtils";
+import { getPriority } from "../utils/priorityMatrix";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import "./AIToolsGenerators.css";
@@ -109,6 +110,8 @@ const DiscoveryHub = () => {
   const [contacts, setContacts] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [projectTasks, setProjectTasks] = useState([]);
+  const projectTasksRef = useRef([]);
+  const prevHypothesisConfidence = useRef({});
   const [contactFilter, setContactFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
@@ -815,7 +818,12 @@ Respond ONLY in this JSON format:
                   tag,
                   hypothesisId: existing.hypothesisId ?? null,
                   taskType: existing.taskType ?? "explore",
-                  priority: existing.priority ?? "low",
+                  priority:
+                    existing.priority ??
+                    getPriority(
+                      existing.taskType ?? "explore",
+                      hypotheses.find((h) => h.id === existing.hypothesisId)?.confidence || 0,
+                    ),
                 }
               );
             }
@@ -862,6 +870,10 @@ Respond ONLY in this JSON format:
               ruleId: s.ruleId || s.templateId || null,
             },
           ];
+          const hypoConf = s.hypothesisId
+            ? hypotheses.find((h) => h.id === s.hypothesisId)?.confidence || 0
+            : 0;
+          const priority = getPriority(taskType, hypoConf);
           tasksToAdd.push({
             name,
             message: s.text,
@@ -874,7 +886,7 @@ Respond ONLY in this JSON format:
             provenance,
             hypothesisId: s.hypothesisId || null,
             taskType,
-            priority: "low",
+            priority,
           });
           addedCount += 1;
         }
@@ -932,12 +944,17 @@ Respond ONLY in this JSON format:
       );
       const snap = await getDoc(taskRef);
       const current = snap.data() || {};
+      const conf =
+        hypotheses.find((h) => h.id === current.hypothesisId)?.confidence || 0;
+      const priority =
+        current.priority ??
+        getPriority(current.taskType ?? "explore", conf);
       const data = {
         status,
         statusChangedAt: serverTimestamp(),
         hypothesisId: current.hypothesisId ?? null,
         taskType: current.taskType ?? "explore",
-        priority: current.priority ?? "low",
+        priority,
         ...extra,
       };
       if (status === "completed") {
@@ -1045,6 +1062,10 @@ Respond ONLY in this JSON format:
       })
     );
     if (uid && initiativeId && newAssignees.length) {
+      const conf =
+        hypotheses.find((h) => h.id === task.hypothesisId)?.confidence || 0;
+      const priority =
+        task.priority ?? getPriority(task.taskType ?? "explore", conf);
       updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
         {
@@ -1052,7 +1073,7 @@ Respond ONLY in this JSON format:
           assignee: newAssignees[0],
           hypothesisId: task.hypothesisId ?? null,
           taskType: task.taskType ?? "explore",
-          priority: task.priority ?? "low",
+          priority,
         }
       ).catch((err) => console.error("addAssigneeToTask error", err));
     }
@@ -1075,6 +1096,10 @@ Respond ONLY in this JSON format:
       })
     );
     if (uid && initiativeId) {
+      const conf =
+        hypotheses.find((h) => h.id === task.hypothesisId)?.confidence || 0;
+      const priority =
+        task.priority ?? getPriority(task.taskType ?? "explore", conf);
       updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
         {
@@ -1082,7 +1107,7 @@ Respond ONLY in this JSON format:
           assignee: newAssignees[0] || "",
           hypothesisId: task.hypothesisId ?? null,
           taskType: task.taskType ?? "explore",
-          priority: task.priority ?? "low",
+          priority,
         }
       ).catch((err) => console.error("removeAssigneeFromTask error", err));
     }
@@ -1117,7 +1142,12 @@ Respond ONLY in this JSON format:
           subTasks: updated,
           hypothesisId: task.hypothesisId ?? null,
           taskType: task.taskType ?? "explore",
-          priority: task.priority ?? "low",
+          priority:
+            task.priority ??
+            getPriority(
+              task.taskType ?? "explore",
+              hypotheses.find((h) => h.id === task.hypothesisId)?.confidence || 0,
+            ),
         }
       );
       setProjectTasks((prev) =>
@@ -1143,7 +1173,15 @@ Respond ONLY in this JSON format:
   };
 
   const updateEditTaskField = (field, value) => {
-    setEditTask((prev) => ({ ...prev, [field]: value }));
+    setEditTask((prev) => {
+      const updated = { ...prev, [field]: value };
+      if (field === "taskType" || field === "hypothesisId") {
+        const conf =
+          hypotheses.find((h) => h.id === (field === "hypothesisId" ? value : updated.hypothesisId))?.confidence || 0;
+        updated.priority = getPriority(updated.taskType || "explore", conf);
+      }
+      return updated;
+    });
   };
 
   const addEditSubTask = () => {
@@ -1176,6 +1214,9 @@ Respond ONLY in this JSON format:
         ? editTask.assignees
         : [currentUserName];
     try {
+      const conf =
+        hypotheses.find((h) => h.id === editTask.hypothesisId)?.confidence || 0;
+      const priority = getPriority(editTask.taskType ?? "explore", conf);
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", editTask.id),
         {
@@ -1186,7 +1227,7 @@ Respond ONLY in this JSON format:
           subTasks: editTask.subTasks,
           hypothesisId: editTask.hypothesisId ?? null,
           taskType: editTask.taskType ?? "explore",
-          priority: editTask.priority ?? "low",
+          priority,
         }
       );
       setProjectTasks((prev) =>
@@ -1201,6 +1242,7 @@ Respond ONLY in this JSON format:
                 subTasks: editTask.subTasks,
                 hypothesisId: editTask.hypothesisId ?? null,
                 taskType: editTask.taskType ?? "explore",
+                priority,
               }
             : t
         )
@@ -1313,7 +1355,12 @@ Respond ONLY in this JSON format:
         provenance,
         hypothesisId: first.hypothesisId ?? null,
         taskType: first.taskType ?? "explore",
-        priority: first.priority ?? "low",
+        priority:
+          first.priority ??
+          getPriority(
+            first.taskType ?? "explore",
+            hypotheses.find((h) => h.id === first.hypothesisId)?.confidence || 0,
+          ),
       }
     );
     for (const t of rest) {
@@ -1367,13 +1414,18 @@ Respond ONLY in this JSON format:
   const savePrioritized = async () => {
     if (!uid || !initiativeId || !prioritized) return;
     for (let i = 0; i < prioritized.length; i++) {
+      const conf =
+        hypotheses.find((h) => h.id === prioritized[i].hypothesisId)?.confidence || 0;
+      const priority =
+        prioritized[i].priority ??
+        getPriority(prioritized[i].taskType ?? "explore", conf);
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", prioritized[i].id),
         {
           order: i,
           hypothesisId: prioritized[i].hypothesisId ?? null,
           taskType: prioritized[i].taskType ?? "explore",
-          priority: prioritized[i].priority ?? "low",
+          priority,
         }
       );
     }
@@ -1651,6 +1703,68 @@ Respond ONLY in this JSON format:
     });
     return () => unsub();
   }, [uid, initiativeId, currentUserName, normalizeAssignee]);
+
+  useEffect(() => {
+    projectTasksRef.current = projectTasks;
+  }, [projectTasks]);
+
+  useEffect(() => {
+    if (!uid || !initiativeId) return;
+    const ref = doc(db, "users", uid, "initiatives", initiativeId);
+    const unsub = onSnapshot(ref, (snap) => {
+      const data = snap.data();
+      if (!data) return;
+      const toArray = (val) =>
+        Array.isArray(val)
+          ? val
+          : val && typeof val === "object"
+            ? Object.values(val)
+            : [];
+      const hyps = toArray(data?.inquiryMap?.hypotheses ?? data?.hypotheses);
+      const prev = prevHypothesisConfidence.current;
+      hyps.forEach((h) => {
+        const conf = typeof h.confidence === "number" ? h.confidence : 0;
+        if (prev[h.id] !== conf) {
+          prev[h.id] = conf;
+          const related = projectTasksRef.current.filter(
+            (t) => t.hypothesisId === h.id,
+          );
+          const updates = [];
+          related.forEach((task) => {
+            const priority = getPriority(task.taskType || "explore", conf);
+            if (priority !== task.priority) {
+              updateDoc(
+                doc(
+                  db,
+                  "users",
+                  uid,
+                  "initiatives",
+                  initiativeId,
+                  "tasks",
+                  task.id,
+                ),
+                {
+                  priority,
+                  taskType: task.taskType ?? "explore",
+                  hypothesisId: task.hypothesisId ?? null,
+                },
+              ).catch((err) => console.error("update priority error", err));
+              updates.push({ id: task.id, priority });
+            }
+          });
+          if (updates.length) {
+            setProjectTasks((prevTasks) =>
+              prevTasks.map((t) => {
+                const found = updates.find((u) => u.id === t.id);
+                return found ? { ...t, priority: found.priority } : t;
+              }),
+            );
+          }
+        }
+      });
+    });
+    return () => unsub();
+  }, [uid, initiativeId]);
 
   const updateAnswer = (idx, name, value) => {
     const now = new Date().toISOString();
