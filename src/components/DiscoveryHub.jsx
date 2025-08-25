@@ -381,7 +381,9 @@ const DiscoveryHub = () => {
         open++;
       } else {
         q.contacts.forEach((name) => {
-          if ((q.answers?.[name]?.text || "").trim()) {
+          const ans = q.answers?.[name];
+          const text = typeof ans === "string" ? ans : ans?.text;
+          if (typeof text === "string" && text.trim()) {
             answered++;
           } else {
             open++;
@@ -2310,13 +2312,19 @@ Respond ONLY in this JSON format:
     if (toAskNames.length || q.contacts.length === 0) {
       items.push({ ...q, idx, contacts: toAskNames, status: "toask" });
     }
-    const askedNames = q.contacts.filter(
-      (n) => q.asked[n] && !(q.answers[n]?.text || "").trim()
-    );
+    const askedNames = q.contacts.filter((n) => {
+      const ans = q.answers?.[n];
+      const text = typeof ans === "string" ? ans : ans?.text;
+      return q.asked[n] && !(typeof text === "string" && text.trim());
+    });
     if (askedNames.length) {
       items.push({ ...q, idx, contacts: askedNames, status: "asked" });
     }
-    const answeredNames = q.contacts.filter((n) => (q.answers[n]?.text || "").trim());
+    const answeredNames = q.contacts.filter((n) => {
+      const ans = q.answers?.[n];
+      const text = typeof ans === "string" ? ans : ans?.text;
+      return typeof text === "string" && text.trim();
+    });
     if (answeredNames.length) {
       items.push({ ...q, idx, contacts: answeredNames, status: "answered" });
     }
