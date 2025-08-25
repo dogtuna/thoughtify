@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
@@ -17,14 +17,20 @@ const InquiryMapContent = () => {
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
 
+  const [user, setUser] = useState(() => auth.currentUser);
+
+  // Track auth state separately so we only load data when a user is available
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && initiativeId) {
-        loadHypotheses(user.uid, initiativeId);
-      }
-    });
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
-  }, [initiativeId, loadHypotheses]);
+  }, []);
+
+  // Load hypotheses once both user and initiative ID are known
+  useEffect(() => {
+    if (user && initiativeId) {
+      loadHypotheses(user.uid, initiativeId);
+    }
+  }, [user, initiativeId, loadHypotheses]);
 
   const parsedHypotheses = (Array.isArray(hypotheses) ? hypotheses : []).map((h) => ({
     id: h.id,
