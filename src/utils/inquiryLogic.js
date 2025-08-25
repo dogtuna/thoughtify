@@ -27,12 +27,14 @@ export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
     .map((c) => `${c.name} (${c.role || "Unknown Role"})`)
     .join(", ");
 
-  // This revised prompt is more direct in asking the AI to check for refutations.
+  // This revised prompt is more direct in asking the AI to check for refutations
+  // and to propose new hypotheses when warranted.
     return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
 
 1.  **Analyze the Relationship:** For each hypothesis, determine if the new evidence directly **Supports**, directly **Refutes**, or is **Unrelated** to it. Be extremely critical. If a stakeholder says "the training was fine, but the tool is the problem," that *refutes* a hypothesis about training and *supports* a hypothesis about the tool. Do not just match keywords.
 2.  **Determine the Impact:** Classify the evidence's strategic impact (High, Medium, Low).
 3.  **Classify the Source:** Identify the source and classify its authority, type, and directness.
+4.  **Suggest New Hypothesis:** If this evidence implies a new hypothesis that could have a higher confidence than the current lowest confidence hypothesis, include it.
 
 Respond ONLY in the following JSON format:
 {
@@ -47,7 +49,11 @@ Respond ONLY in the following JSON format:
       "evidenceType": "Qualitative",
       "directness": "Direct"
     }
-  ]
+  ],
+  "newHypothesis": {
+    "statement": "Possible new hypothesis",
+    "confidence": 0.4
+  }
 }
 
 ---

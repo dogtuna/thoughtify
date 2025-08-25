@@ -640,10 +640,17 @@ const DiscoveryHub = () => {
       const taskSet = new Set(projectTasks.map((t) => t.message.toLowerCase()));
       const questionSet = new Set(questions.map((q) => q.question.toLowerCase()));
 
+      const hypothesisList = hypotheses
+        .map((h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`)
+        .join("\n");
+
       const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 
 Project Context:
 ${projectContext}
+
+Existing Hypotheses:
+${hypothesisList}
 
 Discovery Question:
 ${question}
@@ -655,13 +662,15 @@ Avoid suggesting tasks or questions that already exist in the provided lists.
 
 Please provide a JSON object with two fields:
 - "analysis": a concise summary of what this answer reveals about the question in the context of the project.
-- "suggestions": An array of objects for follow-up actions. Each object must have three string fields:
+- "suggestions": An array of objects for follow-up actions. Each object must have these fields:
     1. "text": The follow-up action. Do not include any names in this text.
     2. "category": One of "question", "meeting", "email", "research", or "instructional-design". Use "instructional-design" for tasks involving designing or creating instructional materials.
     3. "who": The person or group to work with. This must be either a project contact, someone explicitly mentioned in the provided materials, or the current user.
+    4. "hypothesisId": The ID of the related hypothesis, or null if exploring a new idea.
+    5. "taskType": One of "validate", "refute", or "explore".
 
 Respond ONLY in this JSON format:
-{"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "..."}, ...]}`;
+{"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "...", "hypothesisId": "A", "taskType": "validate"}, ...]}`;
 
       const { text: res } = await ai.generate(prompt);
 
@@ -679,6 +688,7 @@ Respond ONLY in this JSON format:
           "research",
           "instructional-design",
         ];
+        const allowedTaskTypes = ["validate", "refute", "explore"];
         const suggestions = Array.isArray(parsed.suggestions)
           ? parsed.suggestions
               .filter(
@@ -695,6 +705,15 @@ Respond ONLY in this JSON format:
                 text: s.text,
                 category: s.category.toLowerCase(),
                 who: s.who,
+                hypothesisId:
+                  typeof s.hypothesisId === "string" && s.hypothesisId.trim()
+                    ? s.hypothesisId.trim()
+                    : null,
+                taskType: allowedTaskTypes.includes(
+                  (s.taskType || "").toLowerCase(),
+                )
+                  ? s.taskType.toLowerCase()
+                  : "explore",
               }))
           : [];
 
@@ -722,12 +741,42 @@ Respond ONLY in this JSON format:
         result = { analysis: "Unexpected response format.", suggestions: [] };
       }
 
+      let triageRes = null;
       if (uid && initiativeId) {
         try {
-          await triageEvidence(`Question: ${question}\nAnswer: ${text}`);
+          triageRes = await triageEvidence(
+            `Question: ${question}\nAnswer: ${text}`
+          );
         } catch (err) {
           console.error("triageEvidence error", err);
         }
+      }
+
+      if (triageRes?.hypothesisLinks?.length) {
+        const firstSupport = triageRes.hypothesisLinks.find(
+          (l) => l.relationship === "Supports",
+        );
+        const firstRefute = triageRes.hypothesisLinks.find(
+          (l) => l.relationship === "Refutes",
+        );
+        const first = triageRes.hypothesisLinks[0];
+        result.suggestions = result.suggestions.map((s) => {
+          if (s.hypothesisId) return s;
+          if (s.taskType === "validate" && firstSupport) {
+            return { ...s, hypothesisId: firstSupport.hypothesisId };
+          }
+          if (s.taskType === "refute" && firstRefute) {
+            return { ...s, hypothesisId: firstRefute.hypothesisId };
+          }
+          if (
+            s.taskType === "explore" &&
+            first &&
+            first.relationship !== "Unrelated"
+          ) {
+            return { ...s, hypothesisId: first.hypothesisId };
+          }
+          return s;
+        });
       }
 
       return result;
@@ -860,12 +909,7 @@ Respond ONLY in this JSON format:
           existingQuestionSet.add(lowerText);
         } else {
           const tag = await classifyTask(s.text);
-          let taskType;
-          try {
-            taskType = await classifyTask(s.text);
-          } catch {
-            taskType = "explore";
-          }
+          const taskType = s.taskType || "explore";
           const finalAssignees = assigneeNames.length
             ? assigneeNames
             : [currentUserName];
