@@ -45,20 +45,34 @@ export const InquiryMapProvider = ({ children }) => {
   const isAnalyzing = activeTriages > 0;
 
   const loadHypotheses = useCallback((uid, initiativeId) => {
+    console.log("loadHypotheses called", uid, initiativeId);
     setCurrentUser(uid);
     setCurrentInitiative(initiativeId);
 
     if (unsubscribeRef.current) {
+      console.log("Unsubscribing previous listener");
       unsubscribeRef.current();
     }
     const ref = doc(db, "users", uid, "initiatives", initiativeId);
-    unsubscribeRef.current = onSnapshot(ref, (snap) => {
-      const data = snap.data();
-      const { hypotheses: hyps, recommendations: recs } = getInquiryData(data);
-      setHypotheses(hyps);
-      setBusinessGoal(data?.businessGoal || "");
-      setRecommendations(recs);
-    });
+    unsubscribeRef.current = onSnapshot(
+      ref,
+      (snap) => {
+        console.log("onSnapshot triggered", snap.exists());
+        if (!snap.exists()) {
+          console.warn("Initiative document missing");
+          return;
+        }
+        const data = snap.data();
+        const { hypotheses: hyps, recommendations: recs } = getInquiryData(data);
+        console.log("Snapshot data", { hyps, recs, businessGoal: data?.businessGoal });
+        setHypotheses(hyps);
+        setBusinessGoal(data?.businessGoal || "");
+        setRecommendations(recs);
+      },
+      (error) => {
+        console.error("onSnapshot error", error);
+      }
+    );
   }, []);
 
   useEffect(() => {
