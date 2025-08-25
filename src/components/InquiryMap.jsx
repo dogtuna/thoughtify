@@ -13,7 +13,6 @@ import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
-import { useInquiryMap } from "../context/InquiryMapContext"; 
 
 // --- Helper Functions for Sizing (Unchanged) ---
 function useVisibleHeight(containerRef) {
@@ -95,8 +94,8 @@ ResizableNode.propTypes = {
 
 const nodeTypes = { resizable: ResizableNode };
 
-// --- Main Component ---
-const InquiryMap = () => {
+/* --------------------------------- main ---------------------------------- */
+const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh = () => {}, isAnalyzing }) => {
   const wrapperRef = useRef(null);
   const height = useVisibleHeight(wrapperRef);
   const marginTop = useHeaderOverlap(wrapperRef);
@@ -176,6 +175,14 @@ const InquiryMap = () => {
     setModalOpen(false);
   };
 
+  const handleRefresh = useCallback(
+    (e) => {
+      e.stopPropagation();
+      onRefresh();
+    },
+    [onRefresh]
+  );
+
   return (
     <div ref={wrapperRef} className="w-full" style={{ marginTop, height }}>
       <ReactFlow
@@ -202,10 +209,7 @@ const InquiryMap = () => {
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDownCapture={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRefresh?.();
-            }}
+            onClick={handleRefresh}
             disabled={isAnalyzing}
           >
             {isAnalyzing ? "Analyzing..." : "Refresh Map"}
