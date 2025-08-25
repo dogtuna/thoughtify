@@ -741,12 +741,42 @@ Respond ONLY in this JSON format:
         result = { analysis: "Unexpected response format.", suggestions: [] };
       }
 
+      let triageRes = null;
       if (uid && initiativeId) {
         try {
-          await triageEvidence(`Question: ${question}\nAnswer: ${text}`);
+          triageRes = await triageEvidence(
+            `Question: ${question}\nAnswer: ${text}`
+          );
         } catch (err) {
           console.error("triageEvidence error", err);
         }
+      }
+
+      if (triageRes?.hypothesisLinks?.length) {
+        const firstSupport = triageRes.hypothesisLinks.find(
+          (l) => l.relationship === "Supports",
+        );
+        const firstRefute = triageRes.hypothesisLinks.find(
+          (l) => l.relationship === "Refutes",
+        );
+        const first = triageRes.hypothesisLinks[0];
+        result.suggestions = result.suggestions.map((s) => {
+          if (s.hypothesisId) return s;
+          if (s.taskType === "validate" && firstSupport) {
+            return { ...s, hypothesisId: firstSupport.hypothesisId };
+          }
+          if (s.taskType === "refute" && firstRefute) {
+            return { ...s, hypothesisId: firstRefute.hypothesisId };
+          }
+          if (
+            s.taskType === "explore" &&
+            first &&
+            first.relationship !== "Unrelated"
+          ) {
+            return { ...s, hypothesisId: first.hypothesisId };
+          }
+          return s;
+        });
       }
 
       return result;

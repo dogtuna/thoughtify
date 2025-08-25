@@ -103,7 +103,7 @@ export const InquiryMapProvider = ({ children }) => {
 
         if (!analysis?.hypothesisLinks?.length) {
           console.error("AI triage returned invalid or empty format", analysis);
-          return;
+          return null;
         }
 
         let updatedHypotheses = [...currentHypotheses];
@@ -156,8 +156,10 @@ export const InquiryMapProvider = ({ children }) => {
           recommendations: finalRecommendations,
         });
 
+        return analysis;
       } catch (err) {
         console.error("Triage evidence process failed:", err);
+        return null;
       } finally {
         setActiveTriages((c) => c - 1);
       }
