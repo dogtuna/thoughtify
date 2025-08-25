@@ -155,6 +155,32 @@ export const InquiryMapProvider = ({ children }) => {
     [currentUser, currentInitiative, triageEvidence]
   );
 
+  const addHypothesis = useCallback(
+    async (statement) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const newHypothesis = {
+          id: `hyp-${Date.now()}`,
+          statement,
+          confidence: 0,
+          supportingEvidence: [],
+          refutingEvidence: [],
+          sourceContributions: [],
+        };
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": [...currentHypotheses, newHypothesis],
+        });
+      } catch (err) {
+        console.error("Error adding hypothesis:", err);
+      }
+    },
+    [currentUser, currentInitiative]
+  );
+
   const addQuestion = useCallback(
     async (hypothesisId, question) => {
       if (!currentUser || !currentInitiative) return;
@@ -223,6 +249,7 @@ export const InquiryMapProvider = ({ children }) => {
     businessGoal,
     recommendations,
     loadHypotheses,
+    addHypothesis,
     addQuestion,
     addEvidence,
     triageEvidence,

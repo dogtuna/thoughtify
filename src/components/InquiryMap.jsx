@@ -7,6 +7,8 @@ import ReactFlow, {
   Panel,
   useNodesState,
   applyNodeChanges,
+  addEdge,
+  applyEdgeChanges,
 } from "reactflow";
 import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
@@ -96,24 +98,60 @@ ResizableNode.propTypes = {
 const nodeTypes = { resizable: ResizableNode };
 
 /* --------------------------------- main ---------------------------------- */
-const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh = () => {}, isAnalyzing, refreshInquiryMap }) => {
+const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh = () => {}, isAnalyzing }) => {
   const wrapperRef = useRef(null);
   const height = useVisibleHeight(wrapperRef);
   const marginTop = useHeaderOverlap(wrapperRef);
 
+  const layoutKey = "inquiry-map-layout";
+  const storedLayout = useMemo(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(localStorage.getItem(layoutKey)) || {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const positionsRef = useRef(storedLayout.positions || {});
+  const sizesRef = useRef(storedLayout.sizes || {});
+
   const [nodes, setNodes] = useNodesState([]);
-  const [edges, setEdges] = useState([]);
+  const [edges, setEdges] = useState(storedLayout.edges || []);
   const [selected, setSelected] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState("");
 
   const selectedPct = selected ? Math.min(100, Math.max(0, Math.round((selected.data.confidence || 0) * 100))) : 0;
-  const sizesRef = useRef({});
+  const { addHypothesis: addHypothesisToDb } = useInquiryMap();
 
-  const persistSize = useCallback((id, width, height) => {
-    sizesRef.current[id] = { width, height };
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, style: { ...n.style, width, height } } : n)));
-  }, [setNodes]);
+  const saveLayout = useCallback((currentNodes, currentEdges) => {
+    const pos = {};
+    currentNodes.forEach((n) => {
+      pos[n.id] = n.position;
+    });
+    positionsRef.current = { ...pos };
+    try {
+      localStorage.setItem(
+        layoutKey,
+        JSON.stringify({ positions: pos, sizes: sizesRef.current, edges: currentEdges })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistSize = useCallback(
+    (id, width, height) => {
+      sizesRef.current[id] = { width, height };
+      setNodes((nds) => {
+        const next = nds.map((n) => (n.id === id ? { ...n, style: { ...n.style, width, height } } : n));
+        saveLayout(next, edges);
+        return next;
+      });
+    },
+    [setNodes, edges, saveLayout]
+  );
 
   const baseLayout = useMemo(() => {
     const marginX = 48;
@@ -124,7 +162,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       id: "goal",
       type: "resizable",
       data: { label: businessGoal || "Business Goal", onResize: persistSize },
-      position: { x: 0, y: rowYGoal },
+      position: positionsRef.current["goal"] || { x: 0, y: rowYGoal },
       style: { ...baseCardStyle, background: "#ffffff", fontWeight: 600, width: sizesRef.current["goal"]?.width ?? CARD_W, height: sizesRef.current["goal"]?.height ?? CARD_H },
     };
 
@@ -138,7 +176,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         id,
         type: "resizable",
         data: { ...h, label, onResize: persistSize },
-        position: { x: offset, y: rowYHypos },
+        position: positionsRef.current[id] || { x: offset, y: rowYHypos },
         style: { ...baseCardStyle, background: h.contested ? "#fb923c" : colorFor(conf), width: sizesRef.current[id]?.width ?? CARD_W, height: sizesRef.current[id]?.height ?? CARD_H },
       };
     });
@@ -155,21 +193,59 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         return old ? { ...n, position: old.position, style: { ...n.style, width: old.style.width, height: old.style.height } } : n;
       });
     });
-    setEdges(baseLayout.edges);
+    setEdges((eds) => {
+      const existing = new Set(eds.map((e) => e.id));
+      const merged = [...eds];
+      baseLayout.edges.forEach((e) => {
+        if (!existing.has(e.id)) merged.push(e);
+      });
+      return merged;
+    });
   }, [baseLayout, setNodes]);
 
-  const onNodesChange = useCallback((changes) => {
-    setNodes((nds) => applyNodeChanges(changes, nds));
-  }, [setNodes]);
+  const onNodesChange = useCallback(
+    (changes) => {
+      setNodes((nds) => {
+        const next = applyNodeChanges(changes, nds);
+        changes.forEach((c) => {
+          if (c.type === "position" && !c.dragging) {
+            const node = next.find((n) => n.id === c.id);
+            if (node) positionsRef.current[c.id] = node.position;
+          }
+        });
+        return next;
+      });
+    },
+    [setNodes]
+  );
+
+  const onEdgesChange = useCallback(
+    (changes) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+    },
+    []
+  );
+
+  const onConnect = useCallback(
+    (connection) => {
+      setEdges((eds) => addEdge(connection, eds));
+    },
+    []
+  );
+
+  useEffect(() => {
+    saveLayout(nodes, edges);
+  }, [nodes, edges, saveLayout]);
 
   const handleConfidenceChange = (id, confidence) => {
-    updateConfidenceInDb(id, confidence);
+    onUpdateConfidence(id, confidence);
   };
 
   const addHypothesis = (e) => {
     e.preventDefault();
     // This would call a function in the context to add the hypothesis to Firestore
-    console.log("Adding new hypothesis:", newHypothesis);
+    if (!newHypothesis.trim()) return;
+    addHypothesisToDb(newHypothesis.trim());
     setNewHypothesis("");
     setModalOpen(false);
   };
@@ -188,6 +264,8 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
         onNodeClick={(_, n) => setSelected(n)}
         nodeTypes={nodeTypes}
         fitView
@@ -205,7 +283,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
             type="button"
             className="px-3 py-1.5 bg-green-600 text-white rounded"
             // **CRITICAL FIX: This now calls the function directly from the context.**
-            onClick={refreshInquiryMap}
+            onClick={handleRefresh}
             disabled={isAnalyzing}
           >
             {isAnalyzing ? "Analyzing..." : "Refresh Map"}
@@ -339,6 +417,12 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
   );
 };
 
-InquiryMap.propTypes = {};
+InquiryMap.propTypes = {
+  businessGoal: PropTypes.string,
+  hypotheses: PropTypes.arrayOf(PropTypes.object),
+  onUpdateConfidence: PropTypes.func,
+  onRefresh: PropTypes.func,
+  isAnalyzing: PropTypes.bool,
+};
 
 export default InquiryMap;
