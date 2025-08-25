@@ -23,7 +23,7 @@ const InquiryMapContent = () => {
     }
   }, [initiativeId, loadHypotheses]);
 
-  const parsedHypotheses = hypotheses.map((h) => ({
+  const parsedHypotheses = (Array.isArray(hypotheses) ? hypotheses : []).map((h) => ({
     id: h.id,
     statement: h.statement || h.text || h.label || h.id,
     confidence: typeof h.confidence === "number" ? h.confidence : 0,

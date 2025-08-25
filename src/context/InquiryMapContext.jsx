@@ -15,10 +15,15 @@ import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLo
 
 const InquiryMapContext = createContext();
 
+// Normalize potential object maps from Firestore into arrays to avoid runtime errors
+const toArray = (val) =>
+  Array.isArray(val) ? val : val && typeof val === "object" ? Object.values(val) : [];
+
 const getInquiryData = (data) => ({
-  hypotheses: data?.inquiryMap?.hypotheses || data?.hypotheses || [],
-  recommendations:
-    data?.inquiryMap?.recommendations || data?.recommendations || [],
+  hypotheses: toArray(data?.inquiryMap?.hypotheses ?? data?.hypotheses),
+  recommendations: toArray(
+    data?.inquiryMap?.recommendations ?? data?.recommendations
+  ),
 });
 
 const defaultState = {
