@@ -2993,7 +2993,7 @@ Respond ONLY in this JSON format:
       )}
   </div>
         ) : active === "actionDashboard" ? (
-          <ActionDashboard tasks={projectTasks} hypotheses={hypotheses} />
+          <ActionDashboard />
         ) : (
           <>
             <div className="filter-bar">
