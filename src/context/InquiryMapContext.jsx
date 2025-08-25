@@ -166,10 +166,22 @@ export const InquiryMapProvider = ({ children }) => {
           }
         }
 
-        for (const q of (data?.questions || [])) {
-          for (const ans of Object.values(q.answers || {})) {
-            if (ans?.text && ans.text.trim()) {
-              const combined = `Question: ${q.question}\nAnswer: ${ans.text}`;
+        const qList = data?.clarifyingQuestions || data?.questions || [];
+        const aList = data?.clarifyingAnswers || [];
+        for (let i = 0; i < qList.length; i++) {
+          const qItem = qList[i];
+          const questionText =
+            typeof qItem === "string" ? qItem : qItem.question || "";
+          const answerMap = aList[i] || (qItem?.answers || {});
+          for (const ans of Object.values(answerMap)) {
+            const ansText =
+              typeof ans === "string" ? ans : ans?.text || "";
+            if (
+              ansText &&
+              ansText.trim() &&
+              !/^[A-Za-z0-9]{20,}$/.test(ansText.trim())
+            ) {
+              const combined = `Question: ${questionText}\nAnswer: ${ansText}`;
               if (!existingEvidence.has(combined)) {
                 await triageEvidence(combined);
               }

@@ -158,7 +158,7 @@ const DiscoveryHub = () => {
   const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const { triageEvidence } = useInquiryMap();
+  const { triageEvidence, loadHypotheses } = useInquiryMap();
   const [businessGoal, setBusinessGoal] = useState("");
   const [statusHistory, setStatusHistory] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -199,6 +199,12 @@ const DiscoveryHub = () => {
     },
     [focusQuestionCard],
   );
+
+  useEffect(() => {
+    if (uid && initiativeId) {
+      loadHypotheses(uid, initiativeId);
+    }
+  }, [uid, initiativeId, loadHypotheses]);
 
   useEffect(() => {
     const interval = setInterval(() => {
