@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
   doc,
@@ -20,6 +20,8 @@ import { useInquiryMap } from "../context/InquiryMapContext";
 // the `overridePriority` field.
 export default function ActionDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initiativeId = searchParams.get("initiativeId");
   const [user, setUser] = useState(() => auth.currentUser);
   const [tasks, setTasks] = useState([]);
   // Gracefully handle missing InquiryMap context
@@ -33,11 +35,13 @@ export default function ActionDashboard() {
 
   // Listen in real time for task changes.
   useEffect(() => {
-    if (!user) {
+    if (!user || !initiativeId) {
       setTasks([]);
       return;
     }
-    const q = query(collection(db, "profiles", user.uid, "taskQueue"));
+    const q = query(
+      collection(db, "users", user.uid, "initiatives", initiativeId, "tasks"),
+    );
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -55,7 +59,7 @@ export default function ActionDashboard() {
       },
     );
     return () => unsubscribe();
-  }, [user]);
+  }, [user, initiativeId]);
 
   const handleDragStart = (e, id) => {
     e.dataTransfer.setData("text/plain", id);
@@ -69,8 +73,16 @@ export default function ActionDashboard() {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
     const user = auth.currentUser;
-    if (!id || !user) return;
-    const taskRef = doc(db, "profiles", user.uid, "taskQueue", id);
+    if (!id || !user || !initiativeId) return;
+    const taskRef = doc(
+      db,
+      "users",
+      user.uid,
+      "initiatives",
+      initiativeId,
+      "tasks",
+      id,
+    );
     try {
       await updateDoc(taskRef, { overridePriority: newPriority });
     } catch (error) {
