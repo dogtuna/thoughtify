@@ -96,7 +96,7 @@ ResizableNode.propTypes = {
 const nodeTypes = { resizable: ResizableNode };
 
 /* --------------------------------- main ---------------------------------- */
-const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh = () => {}, isAnalyzing }) => {
+const InquiryMap = () => {
   const wrapperRef = useRef(null);
   const height = useVisibleHeight(wrapperRef);
   const marginTop = useHeaderOverlap(wrapperRef);
