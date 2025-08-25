@@ -1,41 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, updateDoc, collection, query, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import PropTypes from "prop-types";
 import { getPriority } from "../utils/priorityMatrix";
-import { useInquiryMap } from "../context/InquiryMapContext"; // Assuming context is in this path
 
-export default function ActionDashboard() {
+export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  
-  // Get hypotheses directly from the context
-  const { hypotheses } = useInquiryMap();
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsub();
-  }, []);
-
-  // **CRITICAL FIX #1: Use a real-time listener for tasks.**
-  // This ensures the component's state is always synchronized with Firestore,
-  // preventing the "No document to update" error.
-  useEffect(() => {
-    if (!user) {
-      setTasks([]);
-      return;
-    }
-    const q = query(collection(db, "profiles", user.uid, "taskQueue"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setTasks(tasksData.filter(t => t.status !== 'done')); // Only show non-done tasks
-    });
-    // Cleanup the listener when the component unmounts
-    return () => unsubscribe();
-  }, [user]);
 
   const handleDragStart = (e, id) => {
     e.dataTransfer.setData("text/plain", id);
@@ -48,6 +19,7 @@ export default function ActionDashboard() {
   const handleDrop = async (e, newPriority) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
+    const user = auth.currentUser;
     if (!id || !user) return;
     try {
       // Update the task in Firestore with the new, manually set priority.
@@ -158,12 +130,6 @@ export default function ActionDashboard() {
     </div>
   );
 }
-
-// **CRITICAL FIX #3: Removed props that are now consumed from context**
-ActionDashboard.propTypes = {
-  // tasks: PropTypes.arrayOf(PropTypes.object), // No longer needed
-  // hypotheses: PropTypes.arrayOf(PropTypes.object), // No longer needed
-};
 
 ActionDashboard.propTypes = {
   tasks: PropTypes.arrayOf(PropTypes.object),
