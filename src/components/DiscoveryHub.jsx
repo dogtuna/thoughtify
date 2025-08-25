@@ -754,12 +754,14 @@ Respond ONLY in this JSON format:
 
       if (triageRes?.hypothesisLinks?.length) {
         const firstSupport = triageRes.hypothesisLinks.find(
-          (l) => l.relationship === "Supports",
+          (l) => l.relationship?.toLowerCase() === "supports",
         );
         const firstRefute = triageRes.hypothesisLinks.find(
-          (l) => l.relationship === "Refutes",
+          (l) => l.relationship?.toLowerCase() === "refutes",
         );
-        const first = triageRes.hypothesisLinks[0];
+        const firstRelevant = triageRes.hypothesisLinks.find(
+          (l) => l.relationship?.toLowerCase() !== "unrelated",
+        );
         result.suggestions = result.suggestions.map((s) => {
           if (s.hypothesisId) return s;
           if (s.taskType === "validate" && firstSupport) {
@@ -768,12 +770,8 @@ Respond ONLY in this JSON format:
           if (s.taskType === "refute" && firstRefute) {
             return { ...s, hypothesisId: firstRefute.hypothesisId };
           }
-          if (
-            s.taskType === "explore" &&
-            first &&
-            first.relationship !== "Unrelated"
-          ) {
-            return { ...s, hypothesisId: first.hypothesisId };
+          if (s.taskType === "explore" && firstRelevant) {
+            return { ...s, hypothesisId: firstRelevant.hypothesisId };
           }
           return s;
         });
@@ -909,7 +907,10 @@ Respond ONLY in this JSON format:
           existingQuestionSet.add(lowerText);
         } else {
           const tag = await classifyTask(s.text);
-          const taskType = s.taskType || "explore";
+          const allowedTaskTypes = ["validate", "refute", "explore"];
+          const taskType = allowedTaskTypes.includes((s.taskType || "").toLowerCase())
+            ? s.taskType.toLowerCase()
+            : "explore";
           const finalAssignees = assigneeNames.length
             ? assigneeNames
             : [currentUserName];
@@ -1873,7 +1874,18 @@ Respond ONLY in this JSON format:
     let updatedContacts = [...contacts];
     const known = new Set(updatedContacts.map((c) => c.name.toLowerCase()));
     const resolved = [];
-    for (const s of suggestions) {
+    const allowedTaskTypes = ["validate", "refute", "explore"];
+    for (const raw of suggestions) {
+      const s = {
+        ...raw,
+        taskType: allowedTaskTypes.includes((raw.taskType || "").toLowerCase())
+          ? raw.taskType.toLowerCase()
+          : "explore",
+        hypothesisId:
+          typeof raw.hypothesisId === "string" && raw.hypothesisId.trim()
+            ? raw.hypothesisId.trim()
+            : null,
+      };
       const names = parseContactNames(s.who || "");
       if (!names.length) {
         resolved.push({ ...s, assignees: [] });
