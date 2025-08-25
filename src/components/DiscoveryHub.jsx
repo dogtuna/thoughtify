@@ -18,7 +18,7 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
-import { useInquiryMap } from "../context/InquiryMapContext";
+import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import {
   classifyTask,
   dedupeByMessage,

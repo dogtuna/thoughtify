@@ -27,13 +27,18 @@ export const InquiryMapProvider = ({ children }) => {
   const [recommendations, setRecommendations] = useState(defaultState.recommendations);
   const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
+  
+  // **CRITICAL FIX: Store the current context internally**
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentInitiative, setCurrentInitiative] = useState(null);
 
   const isAnalyzing = activeTriages > 0;
 
-  /**
-   * Loads and subscribes to real-time updates for the inquiry map of a specific initiative.
-   */
   const loadHypotheses = useCallback((uid, initiativeId) => {
+    // Set the context for all other functions to use
+    setCurrentUser(uid);
+    setCurrentInitiative(initiativeId);
+
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
     }
@@ -46,7 +51,6 @@ export const InquiryMapProvider = ({ children }) => {
     });
   }, []);
 
-  // Cleanup subscription on unmount
   useEffect(() => {
     return () => {
       if (unsubscribeRef.current) {
@@ -55,62 +59,12 @@ export const InquiryMapProvider = ({ children }) => {
     };
   }, []);
 
-  /**
-   * Manually adds a question to a specific hypothesis in Firestore.
-   */
-  const addQuestion = useCallback(
-    async (uid, initiativeId, hypothesisId, question) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      try {
-        const snap = await getDoc(ref);
-        if (!snap.exists()) throw new Error("Initiative not found");
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
-        const updatedHypotheses = currentHypotheses.map((h) =>
-          h.id === hypothesisId
-            ? { ...h, questions: [...(h.questions || []), question] }
-            : h
-        );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
-      } catch (err) {
-        console.error("Error adding question:", err);
-      }
-    },
-    []
-  );
-
-  /**
-   * Manually adds a piece of evidence to a specific hypothesis in Firestore.
-   * This is a simpler version for manual linking, not using the AI triage.
-   */
-  const addEvidence = useCallback(
-    async (uid, initiativeId, hypothesisId, evidence, supporting = true) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
-      try {
-        const snap = await getDoc(ref);
-        if (!snap.exists()) throw new Error("Initiative not found");
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
-        const key = supporting ? "supportingEvidence" : "refutingEvidence";
-        const updatedHypotheses = currentHypotheses.map((h) =>
-          h.id === hypothesisId
-            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] } // Store as an object
-            : h
-        );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
-      } catch (err) {
-        console.error("Error adding evidence:", err);
-      }
-    },
-    []
-  );
-
-  /**
-   * The core AI-powered function to analyze a new piece of evidence and update the inquiry map.
-   */
   const triageEvidence = useCallback(
-    async (uid, initiativeId, evidenceText) => {
+    async (evidenceText) => {
+      if (!currentUser || !currentInitiative) return;
       setActiveTriages((c) => c + 1);
       try {
-        const ref = doc(db, "users", uid, "initiatives", initiativeId);
+        const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
 
@@ -133,7 +87,7 @@ export const InquiryMapProvider = ({ children }) => {
 
         analysis.hypothesisLinks.forEach((link) => {
           const targetIndex = updatedHypotheses.findIndex(h => h.id === link.hypothesisId);
-          if (targetIndex === -1) return; // Skip if hypothesis ID is invalid
+          if (targetIndex === -1) return;
 
           const { updatedHypothesis, extraRecommendations } = calculateNewConfidence(
             updatedHypotheses[targetIndex],
@@ -159,15 +113,13 @@ export const InquiryMapProvider = ({ children }) => {
         setActiveTriages((c) => c - 1);
       }
     },
-    []
+    [currentUser, currentInitiative] // Depend on the internal state
   );
 
-  /**
-   * Triggers a refresh to triage any untriaged documents or answers.
-   */
   const refreshInquiryMap = useCallback(
-    async (uid, initiativeId) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+    async () => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
       try {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
@@ -175,28 +127,25 @@ export const InquiryMapProvider = ({ children }) => {
         const data = snap.data();
         const currentHypotheses = data?.inquiryMap?.hypotheses || [];
         
-        // Create a set of all existing evidence text to avoid re-triaging
         const existingEvidence = new Set();
         currentHypotheses.forEach((h) => {
           (h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
           (h.refutingEvidence || []).forEach((e) => existingEvidence.add(e.text));
         });
 
-        // Triage new documents
         for (const docItem of (data?.sourceMaterials || [])) {
           const text = `Document: ${docItem.name}\n\n${docItem.summary || docItem.content}`;
           if (!existingEvidence.has(text)) {
-            await triageEvidence(uid, initiativeId, text);
+            await triageEvidence(text);
           }
         }
 
-        // Triage new answers
         for (const q of (data?.questions || [])) {
           for (const ans of Object.values(q.answers || {})) {
             if (ans?.text && ans.text.trim()) {
               const combined = `Question: ${q.question}\nAnswer: ${ans.text}`;
               if (!existingEvidence.has(combined)) {
-                await triageEvidence(uid, initiativeId, combined);
+                await triageEvidence(combined);
               }
             }
           }
@@ -205,15 +154,56 @@ export const InquiryMapProvider = ({ children }) => {
         console.error("Error refreshing inquiry map:", err);
       }
     },
-    [triageEvidence]
+    [currentUser, currentInitiative, triageEvidence] // Depend on internal state
   );
   
-  /**
-   * Manually updates the confidence of a hypothesis.
-   */
+  const addQuestion = useCallback(
+    async (hypothesisId, question) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId
+            ? { ...h, questions: [...(h.questions || []), question] }
+            : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error adding question:", err);
+      }
+    },
+    [currentUser, currentInitiative]
+  );
+
+  const addEvidence = useCallback(
+    async (hypothesisId, evidence, supporting = true) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const key = supporting ? "supportingEvidence" : "refutingEvidence";
+        const updatedHypotheses = currentHypotheses.map((h) =>
+          h.id === hypothesisId
+            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] } 
+            : h
+        );
+        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+      } catch (err) {
+        console.error("Error adding evidence:", err);
+      }
+    },
+    [currentUser, currentInitiative]
+  );
+
   const updateConfidence = useCallback(
-    async (uid, initiativeId, hypothesisId, confidence) => {
-      const ref = doc(db, "users", uid, "initiatives", initiativeId);
+    async (hypothesisId, confidence) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
       try {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
@@ -227,7 +217,7 @@ export const InquiryMapProvider = ({ children }) => {
         console.error("Error updating confidence:", err);
       }
     },
-    []
+    [currentUser, currentInitiative]
   );
 
   const value = {
