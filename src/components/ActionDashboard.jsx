@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
   doc,
@@ -59,6 +59,7 @@ export default function ActionDashboard() {
   const handleDrop = async (e, newPriority) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
+    const user = auth.currentUser;
     if (!id || !user) return;
     const taskRef = doc(db, "profiles", user.uid, "taskQueue", id);
     try {
