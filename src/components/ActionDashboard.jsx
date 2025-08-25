@@ -20,7 +20,7 @@ import { useInquiryMap } from "../context/InquiryMapContext";
 // the `overridePriority` field.
 export default function ActionDashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => auth.currentUser);
   const [tasks, setTasks] = useState([]);
   // Gracefully handle missing InquiryMap context
   const { hypotheses = [] } = useInquiryMap() || {};
@@ -38,13 +38,22 @@ export default function ActionDashboard() {
       return;
     }
     const q = query(collection(db, "profiles", user.uid, "taskQueue"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Only show tasks that are not completed.
-      setTasks(
-        tasksData.filter((t) => t.status !== "done" && t.status !== "completed")
-      );
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Filter out completed tasks using a case-insensitive match.
+        setTasks(
+          tasksData.filter(
+            (t) => !["done", "completed"].includes((t.status || "").toLowerCase()),
+          ),
+        );
+      },
+      (error) => {
+        console.error("Error fetching tasks:", error);
+        setTasks([]);
+      },
+    );
     return () => unsubscribe();
   }, [user]);
 
