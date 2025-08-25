@@ -13,27 +13,63 @@ import {
 import { getPriority } from "../utils/priorityMatrix";
 import { useInquiryMap } from "../context/InquiryMapContext";
 
-// Renders an action dashboard with tasks grouped by priority.
-// Priority defaults to a dynamic calculation using the Inquiry Map's
-// hypothesis confidence scores. Users can manually override a task's
-// priority via drag and drop, which is persisted to Firestore under
-// the `overridePriority` field.
+// --- helpers ---------------------------------------------------------------
+
+/** Normalize a hypothesis confidence value no matter which field name is used. */
+function confOf(h) {
+  if (!h) return undefined;
+  if (typeof h.confidence === "number") return h.confidence;
+  if (typeof h.confidenceScore === "number") return h.confidenceScore;
+  return undefined;
+}
+
+/** Try to find confidence for a task given the current hypotheses. */
+function findConfidenceForTask(task, hypotheses) {
+  if (!task) return undefined;
+
+  // 1) direct id match
+  const direct = hypotheses.find((h) => h.id === task.hypothesisId);
+  const c1 = confOf(direct);
+  if (typeof c1 === "number") return c1;
+
+  // 2) legacy id like "hypothesis-3"
+  const m = /^hypothesis-(\d+)$/.exec(task.hypothesisId || "");
+  if (m) {
+    const idx = Number(m[1]);
+    if (!Number.isNaN(idx) && hypotheses[idx]) {
+      const c2 = confOf(hypotheses[idx]);
+      if (typeof c2 === "number") return c2;
+    }
+  }
+
+  // 3) sometimes tasks were saved with a label instead of id
+  //    try to match by statement/label/title
+  const byLabel = hypotheses.find((h) => {
+    const candidates = [h.statement, h.label, h.text, h.title].filter(Boolean);
+    return candidates.includes(task.hypothesisId) || candidates.includes(task.hypothesisLabel);
+  });
+  const c3 = confOf(byLabel);
+  if (typeof c3 === "number") return c3;
+
+  // unknown
+  return undefined;
+}
+
+// --------------------------------------------------------------------------
+
 export default function ActionDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
   const [user, setUser] = useState(() => auth.currentUser);
   const [tasks, setTasks] = useState([]);
-  // Gracefully handle missing InquiryMap context
   const { hypotheses = [] } = useInquiryMap() || {};
 
-  // Track authentication state so we can read/write the user's task queue.
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
 
-  // Listen in real time for task changes.
   useEffect(() => {
     if (!user || !initiativeId) {
       setTasks([]);
@@ -46,7 +82,6 @@ export default function ActionDashboard() {
       q,
       (snapshot) => {
         const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Filter out completed tasks using a case-insensitive match.
         setTasks(
           tasksData.filter(
             (t) => !["done", "completed"].includes((t.status || "").toLowerCase()),
@@ -86,7 +121,6 @@ export default function ActionDashboard() {
     try {
       await updateDoc(taskRef, { overridePriority: newPriority });
     } catch (error) {
-      // Fall back to setDoc in case the task doesn't exist yet.
       if (error.code === "not-found") {
         try {
           await setDoc(taskRef, { overridePriority: newPriority }, { merge: true });
@@ -99,17 +133,17 @@ export default function ActionDashboard() {
     }
   };
 
-  // Determine if the project can graduate to Solution Design.
+  // --- Graduation check uses normalized confidence -------------------------
   const readyToGraduate = useMemo(() => {
     const highConfidenceHypotheses = hypotheses.filter(
-      (h) => (h.confidence || 0) >= 0.75,
+      (h) => (confOf(h) || 0) >= 0.75,
     );
     if (highConfidenceHypotheses.length === 0) return false;
 
     const hasPendingCriticalTasks = highConfidenceHypotheses.some((h) =>
       tasks.some((t) => {
         if (t.hypothesisId !== h.id) return false;
-        const currentPriority = getPriority(t.taskType, h.confidence);
+        const currentPriority = getPriority(t.taskType, confOf(h) || 0);
         return ["critical", "high"].includes(currentPriority);
       }),
     );
@@ -120,19 +154,19 @@ export default function ActionDashboard() {
     navigate("/solution-design");
   };
 
-  // Group tasks by priority, using overridePriority if present.
+  // --- Grouping with robust confidence lookup ------------------------------
   const groupedTasks = useMemo(() => {
     const priorities = ["critical", "high", "medium", "low"];
     const grouped = priorities.reduce((acc, p) => ({ ...acc, [p]: [] }), {});
-    const confidenceMap = new Map(
-      hypotheses.map((h) => [h.id, h.confidence || 0]),
-    );
 
     tasks.forEach((task) => {
-      const autoPriority = getPriority(
-        task.taskType,
-        confidenceMap.get(task.hypothesisId) || 0,
-      );
+      const conf = findConfidenceForTask(task, hypotheses);
+
+      // If we can't resolve a confidence (unlinked/legacy task), don't
+      // accidentally treat it as 0% (which biases to "high" for explore).
+      const autoPriority =
+        conf === undefined ? "medium" : getPriority(task.taskType, conf);
+
       const priority = task.overridePriority || autoPriority;
       if (grouped[priority]) {
         grouped[priority].push(task);
@@ -212,4 +246,3 @@ export default function ActionDashboard() {
     </div>
   );
 }
-
