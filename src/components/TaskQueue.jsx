@@ -297,6 +297,21 @@ export default function TaskQueue({
           : `${task.name} (${task.email})`}
       </strong>
       {task.tag && <span className={`tag-badge tag-${task.tag}`}>{task.tag}</span>}
+      {task.hypothesisId && (
+        <span
+          className="tag-badge tag-hypothesis"
+          onClick={() =>
+            navigate(
+              `/inquiry-map?initiativeId=${task.project || "General"}&hypothesisId=${task.hypothesisId}`
+            )
+          }
+        >
+          {task.hypothesisId}
+        </span>
+      )}
+      {task.taskType && (
+        <span className={`tag-badge tag-${task.taskType}`}>{task.taskType}</span>
+      )}
       <p>{task.message}</p>
       {Array.isArray(task.provenance) && task.provenance.length > 0 && (
         <div className="provenance-chips">
