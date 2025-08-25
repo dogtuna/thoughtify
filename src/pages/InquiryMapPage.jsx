@@ -37,7 +37,7 @@ const InquiryMapContent = () => {
     (hypothesisId, confidence) => {
       const user = auth.currentUser;
       if (user && initiativeId) {
-        updateConfidence(user.uid, initiativeId, hypothesisId, confidence);
+        updateConfidence(hypothesisId, confidence);
       }
     },
     [initiativeId, updateConfidence]
@@ -46,7 +46,7 @@ const InquiryMapContent = () => {
   const handleRefresh = useCallback(() => {
     const user = auth.currentUser;
     if (user && initiativeId) {
-      refreshInquiryMap(user.uid, initiativeId);
+      refreshInquiryMap();
     }
   }, [initiativeId, refreshInquiryMap]);
 
