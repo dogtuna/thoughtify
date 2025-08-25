@@ -15,6 +15,17 @@ import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLo
 
 const InquiryMapContext = createContext();
 
+// Normalize potential object maps from Firestore into arrays to avoid runtime errors
+const toArray = (val) =>
+  Array.isArray(val) ? val : val && typeof val === "object" ? Object.values(val) : [];
+
+const getInquiryData = (data) => ({
+  hypotheses: toArray(data?.inquiryMap?.hypotheses ?? data?.hypotheses),
+  recommendations: toArray(
+    data?.inquiryMap?.recommendations ?? data?.recommendations
+  ),
+});
+
 const defaultState = {
   hypotheses: [],
   businessGoal: "",
@@ -43,9 +54,10 @@ export const InquiryMapProvider = ({ children }) => {
     const ref = doc(db, "users", uid, "initiatives", initiativeId);
     unsubscribeRef.current = onSnapshot(ref, (snap) => {
       const data = snap.data();
-      setHypotheses(data?.inquiryMap?.hypotheses || []);
+      const { hypotheses: hyps, recommendations: recs } = getInquiryData(data);
+      setHypotheses(hyps);
       setBusinessGoal(data?.businessGoal || "");
-      setRecommendations(data?.inquiryMap?.recommendations || []);
+      setRecommendations(recs);
     });
   }, []);
 
@@ -67,9 +79,9 @@ export const InquiryMapProvider = ({ children }) => {
         if (!snap.exists()) throw new Error("Initiative not found");
 
         const data = snap.data();
-        const currentHypotheses = data?.inquiryMap?.hypotheses || [];
+        const { hypotheses: currentHypotheses, recommendations: currentRecommendations } =
+          getInquiryData(data);
         const contacts = data?.contacts || [];
-        const currentRecommendations = data?.inquiryMap?.recommendations || [];
 
         const prompt = generateTriagePrompt(evidenceText, currentHypotheses, contacts);
         const { text } = await generate(prompt);
@@ -102,7 +114,9 @@ export const InquiryMapProvider = ({ children }) => {
 
         await updateDoc(ref, {
           "inquiryMap.hypotheses": updatedHypotheses,
+          hypotheses: updatedHypotheses,
           "inquiryMap.recommendations": finalRecommendations,
+          recommendations: finalRecommendations,
         });
 
       } catch (err) {
@@ -123,7 +137,7 @@ export const InquiryMapProvider = ({ children }) => {
         if (!snap.exists()) throw new Error("Initiative not found");
 
         const data = snap.data();
-        const currentHypotheses = data?.inquiryMap?.hypotheses || [];
+        const { hypotheses: currentHypotheses } = getInquiryData(data);
 
         const existingEvidence = new Set();
         currentHypotheses.forEach((h) => {
@@ -155,6 +169,34 @@ export const InquiryMapProvider = ({ children }) => {
     [currentUser, currentInitiative, triageEvidence]
   );
 
+  const addHypothesis = useCallback(
+    async (statement) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const currentHypotheses = getInquiryData(snap.data()).hypotheses;
+        const newHypothesis = {
+          id: `hyp-${Date.now()}`,
+          statement,
+          confidence: 0,
+          supportingEvidence: [],
+          refutingEvidence: [],
+          sourceContributions: [],
+        };
+        const updated = [...currentHypotheses, newHypothesis];
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": updated,
+          hypotheses: updated,
+        });
+      } catch (err) {
+        console.error("Error adding hypothesis:", err);
+      }
+    },
+    [currentUser, currentInitiative]
+  );
+
   const addQuestion = useCallback(
     async (hypothesisId, question) => {
       if (!currentUser || !currentInitiative) return;
@@ -162,13 +204,16 @@ export const InquiryMapProvider = ({ children }) => {
       try {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const currentHypotheses = getInquiryData(snap.data()).hypotheses;
         const updatedHypotheses = currentHypotheses.map((h) =>
           h.id === hypothesisId
             ? { ...h, questions: [...(h.questions || []), question] }
             : h
         );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": updatedHypotheses,
+          hypotheses: updatedHypotheses,
+        });
       } catch (err) {
         console.error("Error adding question:", err);
       }
@@ -183,14 +228,17 @@ export const InquiryMapProvider = ({ children }) => {
       try {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const currentHypotheses = getInquiryData(snap.data()).hypotheses;
         const key = supporting ? "supportingEvidence" : "refutingEvidence";
         const updatedHypotheses = currentHypotheses.map((h) =>
           h.id === hypothesisId
             ? { ...h, [key]: [...(h[key] || []), { text: evidence }] }
             : h
         );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": updatedHypotheses,
+          hypotheses: updatedHypotheses,
+        });
       } catch (err) {
         console.error("Error adding evidence:", err);
       }
@@ -206,11 +254,14 @@ export const InquiryMapProvider = ({ children }) => {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
 
-        const currentHypotheses = snap.data()?.inquiryMap?.hypotheses || [];
+        const currentHypotheses = getInquiryData(snap.data()).hypotheses;
         const updatedHypotheses = currentHypotheses.map((h) =>
           h.id === hypothesisId ? { ...h, confidence: Math.min(1, Math.max(0, confidence)) } : h
         );
-        await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": updatedHypotheses,
+          hypotheses: updatedHypotheses,
+        });
       } catch (err) {
         console.error("Error updating confidence:", err);
       }
@@ -223,6 +274,7 @@ export const InquiryMapProvider = ({ children }) => {
     businessGoal,
     recommendations,
     loadHypotheses,
+    addHypothesis,
     addQuestion,
     addEvidence,
     triageEvidence,
