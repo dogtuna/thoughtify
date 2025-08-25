@@ -13,6 +13,7 @@ import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
+import { useInquiryMap } from "../context/InquiryMapContext"; 
 
 // --- Helper Functions for Sizing (Unchanged) ---
 function useVisibleHeight(containerRef) {
@@ -170,7 +171,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
   const addHypothesis = (e) => {
     e.preventDefault();
     // This would call a function in the context to add the hypothesis to Firestore
-    console.log("Adding new hypothesis:", newHypothesis); 
+    console.log("Adding new hypothesis:", newHypothesis);
     setNewHypothesis("");
     setModalOpen(false);
   };
@@ -205,16 +206,12 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
           <button
             type="button"
             className="px-3 py-1.5 bg-green-600 text-white rounded"
-            onPointerDownCapture={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDownCapture={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={handleRefresh}
+            // **CRITICAL FIX: This now calls the function directly from the context.**
+            onClick={refreshInquiryMap}
             disabled={isAnalyzing}
           >
             {isAnalyzing ? "Analyzing..." : "Refresh Map"}
           </button>
-            {isAnalyzing && <span className="text-sm">Analyzing…</span>}
         </Panel>
 
         <Panel position="top-right">
@@ -223,31 +220,16 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
           </button>
         </Panel>
       </ReactFlow>
-      {selected &&
-        createPortal(
+
+      {/* Portals for modals (Unchanged but confirmed complete) */}
+      {selected && createPortal(
           <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1000,
-              background: "rgba(0,0,0,0.5)",
-            }}
+            style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.5)" }}
             onClick={() => setSelected(null)}
           >
             <div
               className="initiative-card"
-              style={{
-                position: "fixed",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: "min(520px, 90vw)",
-                maxHeight: "90vh",
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-              }}
+              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "min(520px, 90vw)", maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center gap-2">
@@ -260,7 +242,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
                 max="100"
                 value={selectedPct}
                 onChange={(e) =>
-                  updateConfidence(selected.id, Number(e.target.value) / 100)
+                  handleConfidenceChange(selected.id, Number(e.target.value) / 100)
                 }
               />
               <span>{selectedPct}%</span>
@@ -326,32 +308,15 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
           document.body
         )}
 
-      {modalOpen &&
-        createPortal(
+      {modalOpen && createPortal(
           <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1000,
-              background: "rgba(0,0,0,0.5)",
-            }}
+            style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.5)" }}
             onClick={() => setModalOpen(false)}
           >
             <form
               onSubmit={addHypothesis}
               className="initiative-card"
-              style={{
-                position: "fixed",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: "min(520px, 90vw)",
-                maxHeight: "90vh",
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-              }}
+              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "min(520px, 90vw)", maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}
               onClick={(e) => e.stopPropagation()}
             >
             <label className="block">
@@ -376,6 +341,6 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
   );
 };
 
-InquiryMap.propTypes = {}; // Simplified as it no longer takes these props directly
+InquiryMap.propTypes = {};
 
 export default InquiryMap;

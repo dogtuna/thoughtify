@@ -27,15 +27,13 @@ export const InquiryMapProvider = ({ children }) => {
   const [recommendations, setRecommendations] = useState(defaultState.recommendations);
   const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
-  
-  // **CRITICAL FIX: Store the current context internally**
+
   const [currentUser, setCurrentUser] = useState(null);
   const [currentInitiative, setCurrentInitiative] = useState(null);
 
   const isAnalyzing = activeTriages > 0;
 
   const loadHypotheses = useCallback((uid, initiativeId) => {
-    // Set the context for all other functions to use
     setCurrentUser(uid);
     setCurrentInitiative(initiativeId);
 
@@ -95,7 +93,7 @@ export const InquiryMapProvider = ({ children }) => {
             evidenceText,
             analysis.analysisSummary
           );
-          
+
           updatedHypotheses[targetIndex] = updatedHypothesis;
           allNewRecommendations.push(...extraRecommendations);
         });
@@ -113,7 +111,7 @@ export const InquiryMapProvider = ({ children }) => {
         setActiveTriages((c) => c - 1);
       }
     },
-    [currentUser, currentInitiative] // Depend on the internal state
+    [currentUser, currentInitiative]
   );
 
   const refreshInquiryMap = useCallback(
@@ -126,7 +124,7 @@ export const InquiryMapProvider = ({ children }) => {
 
         const data = snap.data();
         const currentHypotheses = data?.inquiryMap?.hypotheses || [];
-        
+
         const existingEvidence = new Set();
         currentHypotheses.forEach((h) => {
           (h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
@@ -154,9 +152,9 @@ export const InquiryMapProvider = ({ children }) => {
         console.error("Error refreshing inquiry map:", err);
       }
     },
-    [currentUser, currentInitiative, triageEvidence] // Depend on internal state
+    [currentUser, currentInitiative, triageEvidence]
   );
-  
+
   const addQuestion = useCallback(
     async (hypothesisId, question) => {
       if (!currentUser || !currentInitiative) return;
@@ -189,7 +187,7 @@ export const InquiryMapProvider = ({ children }) => {
         const key = supporting ? "supportingEvidence" : "refutingEvidence";
         const updatedHypotheses = currentHypotheses.map((h) =>
           h.id === hypothesisId
-            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] } 
+            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] }
             : h
         );
         await updateDoc(ref, { "inquiryMap.hypotheses": updatedHypotheses });
