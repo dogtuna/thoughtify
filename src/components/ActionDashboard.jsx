@@ -16,54 +16,75 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
     e.preventDefault();
   };
 
-  const handleDrop = async (e, priority) => {
+  // This function now only handles manual priority overrides.
+  const handleDrop = async (e, newPriority) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
-    const task = tasks.find((t) => t.id === id);
     const user = auth.currentUser;
-    if (!task || !user) return;
-    const conf = task.hypothesisId
-      ? hypotheses.find((h) => h.id === task.hypothesisId)?.confidence || 0
-      : 0;
-    const newPriority = priority || getPriority(task.taskType ?? "explore", conf);
+    if (!id || !user) return;
+
+    // Update the task in Firestore with the new, manually set priority.
     await updateDoc(doc(db, "profiles", user.uid, "taskQueue", id), {
       priority: newPriority,
-      taskType: task.taskType ?? "explore",
-      hypothesisId: task.hypothesisId ?? null,
     });
   };
 
   const readyToGraduate = useMemo(() => {
-    const highConfidence = hypotheses.filter(
+    const highConfidenceHypotheses = hypotheses.filter(
       (h) => (h.confidence || 0) >= 0.75
     );
-    if (highConfidence.length === 0) return false;
-    const hasPending = highConfidence.some((h) =>
-      tasks.some(
-        (t) =>
-          t.hypothesisId === h.id &&
-          ["critical", "high"].includes(t.priority || "low")
-      )
+    if (highConfidenceHypotheses.length === 0) return false;
+
+    // Check if any of these high-confidence hypotheses have critical/high priority tasks.
+    const hasPendingCriticalTasks = highConfidenceHypotheses.some((h) =>
+      tasks.some((t) => {
+        if (t.hypothesisId !== h.id) return false;
+        const currentPriority = getPriority(t.taskType, h.confidence);
+        return ["critical", "high"].includes(currentPriority);
+      })
     );
-    return !hasPending;
+    return !hasPendingCriticalTasks;
   }, [hypotheses, tasks]);
 
   const handleGraduate = () => {
-    navigate("/solution-design");
+    // This would likely trigger a modal to confirm, then archive remaining tasks
+    // and navigate to the solution design phase.
+    console.log("Graduating to Solution Design!");
+    navigate("/solution-design"); // Assuming you have a route for this
   };
+  
+  // **CRITICAL FIX: The Prioritization Logic is now inside the component.**
+  // This ensures the dashboard is always up-to-date with the Inquiry Map.
+  const groupedTasks = useMemo(() => {
+    const priorities = ["critical", "high", "medium", "low"];
+    const grouped = priorities.reduce((acc, p) => ({ ...acc, [p]: [] }), {});
+    
+    // Create a quick lookup map for hypothesis confidence scores.
+    const confidenceMap = new Map(hypotheses.map(h => [h.id, h.confidence || 0]));
 
-  const priorities = ["critical", "high", "medium", "low"];
-  const grouped = priorities.reduce((acc, p) => {
-    acc[p] = tasks.filter((t) => (t.priority || "low") === p);
-    return acc;
-  }, {});
+    tasks.forEach(task => {
+      // If a task has a manual priority override, respect it.
+      // Otherwise, calculate its priority dynamically.
+      const priority = task.priority || getPriority(task.taskType, confidenceMap.get(task.hypothesisId));
+      if (grouped[priority]) {
+        grouped[priority].push(task);
+      } else {
+        grouped.low.push(task); // Default to low if priority is invalid
+      }
+    });
+
+    return grouped;
+  }, [tasks, hypotheses]);
+
 
   return (
     <div className="flex flex-col gap-4">
       {readyToGraduate && (
-        <div className="text-center">
+        <div className="p-4 mb-4 text-center bg-green-100 border border-green-400 text-green-700 rounded-lg">
+          <p className="font-bold">Analysis Complete!</p>
+          <p className="text-sm">You have high confidence in one or more hypotheses and no remaining critical tasks. You are ready to move to the next phase.</p>
           <button
-            className="rounded bg-blue-500 px-4 py-2 font-semibold text-white"
+            className="mt-2 rounded bg-green-600 px-4 py-2 font-semibold text-white shadow-md hover:bg-green-700"
             onClick={handleGraduate}
           >
             Graduate to Solution Design
@@ -71,19 +92,19 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
         </div>
       )}
       <div className="flex gap-4">
-        {priorities.map((p) => (
+        {Object.keys(groupedTasks).map((priority) => (
           <div
-            key={p}
-            className="flex-1"
+            key={priority}
+            className="flex-1 bg-gray-100 rounded-lg p-2"
             onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, p)}
+            onDrop={(e) => handleDrop(e, priority)}
           >
-            <h3 className="mb-2 text-center font-semibold capitalize">{p}</h3>
-            <div className="flex min-h-[100px] flex-col gap-2">
-              {grouped[p].map((t) => (
+            <h3 className="mb-2 text-center font-semibold capitalize">{priority}</h3>
+            <div className="flex min-h-[200px] flex-col gap-2">
+              {groupedTasks[priority].map((t) => (
                 <div
                   key={t.id}
-                  className="initiative-card task-card p-2"
+                  className="initiative-card task-card p-2 cursor-grab active:cursor-grabbing"
                   draggable
                   onDragStart={(e) => handleDragStart(e, t.id)}
                 >
@@ -92,6 +113,7 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
                     {t.hypothesisId && (
                       <span
                         className="tag-badge tag-hypothesis cursor-pointer"
+                        title={`Linked to Hypothesis ${t.hypothesisId}`}
                         onClick={() =>
                           navigate(
                             `/inquiry-map?initiativeId=${t.project || "General"}&hypothesisId=${t.hypothesisId}`
