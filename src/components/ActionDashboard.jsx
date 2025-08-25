@@ -2,38 +2,58 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, updateDoc, collection, query, onSnapshot } from "firebase/firestore";
-import PropTypes from "prop-types";
+import {
+  doc,
+  updateDoc,
+  setDoc,
+  collection,
+  query,
+  onSnapshot,
+} from "firebase/firestore";
 import { getPriority } from "../utils/priorityMatrix";
-import { useInquiryMap } from "../context/InquiryMapContext"; // Assuming context is in this path
+import { useInquiryMap } from "../context/InquiryMapContext";
 
+// Renders an action dashboard with tasks grouped by priority.
+// Priority defaults to a dynamic calculation using the Inquiry Map's
+// hypothesis confidence scores. Users can manually override a task's
+// priority via drag and drop, which is persisted to Firestore under
+// the `overridePriority` field.
 export default function ActionDashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => auth.currentUser);
   const [tasks, setTasks] = useState([]);
-  
-  // Get hypotheses directly from the context
-  const { hypotheses } = useInquiryMap();
+  // Gracefully handle missing InquiryMap context
+  const { hypotheses = [] } = useInquiryMap() || {};
 
+  // Track authentication state so we can read/write the user's task queue.
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
 
-  // **CRITICAL FIX #1: Use a real-time listener for tasks.**
-  // This ensures the component's state is always synchronized with Firestore,
-  // preventing the "No document to update" error.
+  // Listen in real time for task changes.
   useEffect(() => {
     if (!user) {
       setTasks([]);
       return;
     }
     const q = query(collection(db, "profiles", user.uid, "taskQueue"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setTasks(tasksData.filter(t => t.status !== 'done')); // Only show non-done tasks
-    });
-    // Cleanup the listener when the component unmounts
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Filter out completed tasks using a case-insensitive match.
+        setTasks(
+          tasksData.filter(
+            (t) => !["done", "completed"].includes((t.status || "").toLowerCase()),
+          ),
+        );
+      },
+      (error) => {
+        console.error("Error fetching tasks:", error);
+        setTasks([]);
+      },
+    );
     return () => unsubscribe();
   }, [user]);
 
@@ -49,18 +69,27 @@ export default function ActionDashboard() {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
     if (!id || !user) return;
+    const taskRef = doc(db, "profiles", user.uid, "taskQueue", id);
     try {
-      // Update the task in Firestore with the new, manually set priority.
-      const taskRef = doc(db, "profiles", user.uid, "taskQueue", id);
-      await updateDoc(taskRef, { priority: newPriority });
+      await updateDoc(taskRef, { overridePriority: newPriority });
     } catch (error) {
-      console.error("Error updating task priority:", error);
+      // Fall back to setDoc in case the task doesn't exist yet.
+      if (error.code === "not-found") {
+        try {
+          await setDoc(taskRef, { overridePriority: newPriority }, { merge: true });
+        } catch (err) {
+          console.error("Error creating task for priority override:", err);
+        }
+      } else {
+        console.error("Error updating task priority:", error);
+      }
     }
   };
 
+  // Determine if the project can graduate to Solution Design.
   const readyToGraduate = useMemo(() => {
     const highConfidenceHypotheses = hypotheses.filter(
-      (h) => (h.confidence || 0) >= 0.75
+      (h) => (h.confidence || 0) >= 0.75,
     );
     if (highConfidenceHypotheses.length === 0) return false;
 
@@ -69,26 +98,29 @@ export default function ActionDashboard() {
         if (t.hypothesisId !== h.id) return false;
         const currentPriority = getPriority(t.taskType, h.confidence);
         return ["critical", "high"].includes(currentPriority);
-      })
+      }),
     );
     return !hasPendingCriticalTasks;
   }, [hypotheses, tasks]);
 
   const handleGraduate = () => {
-    console.log("Graduating to Solution Design!");
     navigate("/solution-design");
   };
 
+  // Group tasks by priority, using overridePriority if present.
   const groupedTasks = useMemo(() => {
     const priorities = ["critical", "high", "medium", "low"];
     const grouped = priorities.reduce((acc, p) => ({ ...acc, [p]: [] }), {});
-    const confidenceMap = new Map(hypotheses.map(h => [h.id, h.confidence || 0]));
+    const confidenceMap = new Map(
+      hypotheses.map((h) => [h.id, h.confidence || 0]),
+    );
 
-    tasks.forEach(task => {
-      // **CRITICAL FIX #2: Always calculate priority.**
-      // We ignore the `task.priority` field from the DB unless it's a manual override.
-      // For this implementation, we will always calculate it dynamically.
-      const priority = getPriority(task.taskType, confidenceMap.get(task.hypothesisId));
+    tasks.forEach((task) => {
+      const autoPriority = getPriority(
+        task.taskType,
+        confidenceMap.get(task.hypothesisId) || 0,
+      );
+      const priority = task.overridePriority || autoPriority;
       if (grouped[priority]) {
         grouped[priority].push(task);
       } else {
@@ -104,7 +136,10 @@ export default function ActionDashboard() {
       {readyToGraduate && (
         <div className="p-4 mb-4 text-center bg-green-100 border border-green-400 text-green-700 rounded-lg">
           <p className="font-bold">Analysis Complete!</p>
-          <p className="text-sm">You have high confidence in one or more hypotheses and no remaining critical tasks.</p>
+          <p className="text-sm">
+            You have high confidence in one or more hypotheses and no remaining
+            critical tasks.
+          </p>
           <button
             className="mt-2 rounded bg-green-600 px-4 py-2 font-semibold text-white shadow-md hover:bg-green-700"
             onClick={handleGraduate}
@@ -117,11 +152,13 @@ export default function ActionDashboard() {
         {Object.keys(groupedTasks).map((priority) => (
           <div
             key={priority}
-            className="flex-1 bg-gray-100 rounded-lg p-2"
+            className="flex-1 rounded-lg p-2"
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, priority)}
           >
-            <h3 className="mb-2 text-center font-semibold capitalize">{priority}</h3>
+            <h3 className="mb-2 text-center font-semibold capitalize">
+              {priority}
+            </h3>
             <div className="flex min-h-[200px] flex-col gap-2">
               {groupedTasks[priority].map((t) => (
                 <div
@@ -138,7 +175,9 @@ export default function ActionDashboard() {
                         title={`Linked to Hypothesis ${t.hypothesisId}`}
                         onClick={() =>
                           navigate(
-                            `/inquiry-map?initiativeId=${t.initiativeId || "General"}&hypothesisId=${t.hypothesisId}`
+                            `/inquiry-map?initiativeId=${
+                              t.initiativeId || "General"
+                            }&hypothesisId=${t.hypothesisId}`,
                           )
                         }
                       >
@@ -146,7 +185,9 @@ export default function ActionDashboard() {
                       </span>
                     )}
                     {t.taskType && (
-                      <span className={`tag-badge tag-${t.taskType}`}>{t.taskType}</span>
+                      <span className={`tag-badge tag-${t.taskType}`}>
+                        {t.taskType}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -159,13 +200,3 @@ export default function ActionDashboard() {
   );
 }
 
-// **CRITICAL FIX #3: Removed props that are now consumed from context**
-ActionDashboard.propTypes = {
-  // tasks: PropTypes.arrayOf(PropTypes.object), // No longer needed
-  // hypotheses: PropTypes.arrayOf(PropTypes.object), // No longer needed
-};
-
-ActionDashboard.propTypes = {
-  tasks: PropTypes.arrayOf(PropTypes.object),
-  hypotheses: PropTypes.arrayOf(PropTypes.object),
-};
