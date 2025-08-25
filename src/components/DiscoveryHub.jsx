@@ -27,6 +27,7 @@ import {
 import { getPriority } from "../utils/priorityMatrix";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
+import ActionDashboard from "./ActionDashboard.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -169,6 +170,12 @@ const DiscoveryHub = () => {
   const [viewingStatus, setViewingStatus] = useState("");
   const [qaModal, setQaModal] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (searchParams.has("actionDashboard")) {
+      setActive("actionDashboard");
+    }
+  }, [searchParams]);
 
   const normalizeAssignee = useCallback(
     (a) => normalizeAssigneeName(a, currentUserName),
@@ -2474,6 +2481,12 @@ Respond ONLY in this JSON format:
             )}
           </li>
           <li
+            className={active === "actionDashboard" ? "active" : ""}
+            onClick={() => setActive("actionDashboard")}
+          >
+            Action Dashboard
+          </li>
+          <li
             className={active === "status" && !viewingStatus ? "active" : ""}
             onClick={() => {
               setActive("status");
@@ -2971,6 +2984,8 @@ Respond ONLY in this JSON format:
         document.body
       )}
   </div>
+        ) : active === "actionDashboard" ? (
+          <ActionDashboard tasks={projectTasks} hypotheses={hypotheses} />
         ) : (
           <>
             <div className="filter-bar">
