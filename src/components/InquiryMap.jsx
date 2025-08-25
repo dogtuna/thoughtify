@@ -96,12 +96,10 @@ ResizableNode.propTypes = {
 const nodeTypes = { resizable: ResizableNode };
 
 /* --------------------------------- main ---------------------------------- */
-const InquiryMap = () => {
+const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh = () => {}, isAnalyzing }) => {
   const wrapperRef = useRef(null);
   const height = useVisibleHeight(wrapperRef);
   const marginTop = useHeaderOverlap(wrapperRef);
-
-  const { hypotheses, businessGoal, isAnalyzing, refreshInquiryMap, updateConfidence: updateConfidenceInDb } = useInquiryMap();
 
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useState([]);
