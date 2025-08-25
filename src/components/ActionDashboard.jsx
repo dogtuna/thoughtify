@@ -5,7 +5,7 @@ import { auth, db } from "../firebase";
 import { doc, updateDoc, collection, query, onSnapshot } from "firebase/firestore";
 import PropTypes from "prop-types";
 import { getPriority } from "../utils/priorityMatrix";
-import { useInquiryMap } from "../contexts/InquiryMapContext"; // Assuming context is in this path
+import { useInquiryMap } from "../context/InquiryMapContext"; // Assuming context is in this path
 
 export default function ActionDashboard() {
   const navigate = useNavigate();
