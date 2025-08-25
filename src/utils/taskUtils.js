@@ -91,6 +91,20 @@ export async function isQuestionTask(message) {
 }
 
 /**
+ * Apply default prioritization metadata to a task.
+ * @param {object} task
+ * @returns {object}
+ */
+export function withTaskDefaults(task = {}) {
+  return {
+    hypothesisId: null,
+    taskType: "explore",
+    priority: "low",
+    ...task,
+  };
+}
+
+/**
  * Remove duplicate tasks based on their message text.
  * Comparison is case-insensitive and ignores punctuation and extra spaces.
  * Keeps the first occurrence of each unique message.
@@ -104,12 +118,14 @@ export function dedupeByMessage(tasks) {
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
   const seen = new Set();
-  return tasks.filter((t) => {
-    const key = normalize(t.message);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return tasks
+    .filter((t) => {
+      const key = normalize(t.message);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(withTaskDefaults);
 }
 
 export function normalizeAssigneeName(name, currentUser) {
@@ -123,6 +139,7 @@ export function normalizeAssigneeName(name, currentUser) {
 export default {
   classifyTask,
   isQuestionTask,
+  withTaskDefaults,
   dedupeByMessage,
   normalizeAssigneeName,
 };

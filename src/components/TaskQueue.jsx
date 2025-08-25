@@ -84,6 +84,9 @@ export default function TaskQueue({
     await updateDoc(doc(db, "profiles", user.uid, "taskQueue", task.id), {
       status,
       statusChangedAt: serverTimestamp(),
+      hypothesisId: task.hypothesisId ?? null,
+      taskType: task.taskType ?? "explore",
+      priority: task.priority ?? "low",
       ...extra,
     });
   };
@@ -132,6 +135,9 @@ export default function TaskQueue({
     await updateDoc(doc(db, "profiles", user.uid, "taskQueue", first.id), {
       message,
       provenance,
+      hypothesisId: first.hypothesisId ?? null,
+      taskType: first.taskType ?? "explore",
+      priority: first.priority ?? "low",
     });
     for (const t of rest) {
       await deleteDoc(doc(db, "profiles", user.uid, "taskQueue", t.id));

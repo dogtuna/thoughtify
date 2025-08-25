@@ -810,7 +810,13 @@ Respond ONLY in this JSON format:
                   "tasks",
                   existing.id
                 ),
-                { message: merged, tag }
+                {
+                  message: merged,
+                  tag,
+                  hypothesisId: existing.hypothesisId ?? null,
+                  taskType: existing.taskType ?? "explore",
+                  priority: existing.priority ?? "low",
+                }
               );
             }
             continue;
@@ -860,6 +866,9 @@ Respond ONLY in this JSON format:
             createdAt: serverTimestamp(),
             tag,
             provenance,
+            hypothesisId: null,
+            taskType: "explore",
+            priority: "low",
           });
           addedCount += 1;
         }
@@ -906,14 +915,29 @@ Respond ONLY in this JSON format:
   const updateTaskStatus = async (id, status, extra = {}) => {
     if (!uid || !initiativeId) return;
     try {
-      const data = { status, statusChangedAt: serverTimestamp(), ...extra };
+      const taskRef = doc(
+        db,
+        "users",
+        uid,
+        "initiatives",
+        initiativeId,
+        "tasks",
+        id
+      );
+      const snap = await getDoc(taskRef);
+      const current = snap.data() || {};
+      const data = {
+        status,
+        statusChangedAt: serverTimestamp(),
+        hypothesisId: current.hypothesisId ?? null,
+        taskType: current.taskType ?? "explore",
+        priority: current.priority ?? "low",
+        ...extra,
+      };
       if (status === "completed") {
         data.completedAt = serverTimestamp();
       }
-      await updateDoc(
-        doc(db, "users", uid, "initiatives", initiativeId, "tasks", id),
-        data
-      );
+      await updateDoc(taskRef, data);
     } catch (err) {
       console.error("updateTaskStatus error", err);
     }
@@ -999,6 +1023,7 @@ Respond ONLY in this JSON format:
   };
 
   const addAssigneeToTask = (taskId, name) => {
+    const task = projectTasks.find((t) => t.id === taskId) || {};
     const normalized = normalizeAssigneeName(name, currentUserName);
     let newAssignees = [];
     setProjectTasks((prev) =>
@@ -1016,12 +1041,19 @@ Respond ONLY in this JSON format:
     if (uid && initiativeId && newAssignees.length) {
       updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
-        { assignees: newAssignees, assignee: newAssignees[0] }
+        {
+          assignees: newAssignees,
+          assignee: newAssignees[0],
+          hypothesisId: task.hypothesisId ?? null,
+          taskType: task.taskType ?? "explore",
+          priority: task.priority ?? "low",
+        }
       ).catch((err) => console.error("addAssigneeToTask error", err));
     }
   };
 
   const removeAssigneeFromTask = (taskId, name) => {
+    const task = projectTasks.find((t) => t.id === taskId) || {};
     const normalized = normalizeAssigneeName(name, currentUserName);
     let newAssignees = [];
     setProjectTasks((prev) =>
@@ -1039,7 +1071,13 @@ Respond ONLY in this JSON format:
     if (uid && initiativeId) {
       updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
-        { assignees: newAssignees, assignee: newAssignees[0] || "" }
+        {
+          assignees: newAssignees,
+          assignee: newAssignees[0] || "",
+          hypothesisId: task.hypothesisId ?? null,
+          taskType: task.taskType ?? "explore",
+          priority: task.priority ?? "low",
+        }
       ).catch((err) => console.error("removeAssigneeFromTask error", err));
     }
   };
@@ -1069,7 +1107,12 @@ Respond ONLY in this JSON format:
     try {
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", taskId),
-        { subTasks: updated }
+        {
+          subTasks: updated,
+          hypothesisId: task.hypothesisId ?? null,
+          taskType: task.taskType ?? "explore",
+          priority: task.priority ?? "low",
+        }
       );
       setProjectTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, subTasks: updated } : t))
@@ -1133,6 +1176,9 @@ Respond ONLY in this JSON format:
           subType: editTask.subType,
           tag: editTask.subType,
           subTasks: editTask.subTasks,
+          hypothesisId: editTask.hypothesisId ?? null,
+          taskType: editTask.taskType ?? "explore",
+          priority: editTask.priority ?? "low",
         }
       );
       setProjectTasks((prev) =>
@@ -1251,7 +1297,14 @@ Respond ONLY in this JSON format:
     });
     await updateDoc(
       doc(db, "users", uid, "initiatives", initiativeId, "tasks", first.id),
-      { message: header, subTasks, provenance }
+      {
+        message: header,
+        subTasks,
+        provenance,
+        hypothesisId: first.hypothesisId ?? null,
+        taskType: first.taskType ?? "explore",
+        priority: first.priority ?? "low",
+      }
     );
     for (const t of rest) {
       await deleteDoc(
@@ -1306,7 +1359,12 @@ Respond ONLY in this JSON format:
     for (let i = 0; i < prioritized.length; i++) {
       await updateDoc(
         doc(db, "users", uid, "initiatives", initiativeId, "tasks", prioritized[i].id),
-        { order: i }
+        {
+          order: i,
+          hypothesisId: prioritized[i].hypothesisId ?? null,
+          taskType: prioritized[i].taskType ?? "explore",
+          priority: prioritized[i].priority ?? "low",
+        }
       );
     }
     setPrioritized(null);
