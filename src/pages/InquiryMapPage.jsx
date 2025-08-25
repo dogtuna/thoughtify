@@ -21,16 +21,26 @@ const InquiryMapContent = () => {
 
   // Track auth state separately so we only load data when a user is available
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      console.log("Auth state changed", u?.uid);
+      setUser(u);
+    });
     return () => unsubscribe();
   }, []);
 
   // Load hypotheses once both user and initiative ID are known
   useEffect(() => {
     if (user && initiativeId) {
+      console.log("Loading hypotheses for", user.uid, initiativeId);
       loadHypotheses(user.uid, initiativeId);
+    } else {
+      console.log("Waiting for user or initiativeId", { user, initiativeId });
     }
   }, [user, initiativeId, loadHypotheses]);
+
+  useEffect(() => {
+    console.log("Hypotheses state updated", hypotheses);
+  }, [hypotheses]);
 
   const parsedHypotheses = (Array.isArray(hypotheses) ? hypotheses : []).map((h) => ({
     id: h.id,
