@@ -706,11 +706,7 @@ Respond ONLY in this JSON format:
 
       if (uid && initiativeId) {
         try {
-          await triageEvidence(
-            uid,
-            initiativeId,
-            `Question: ${question}\nAnswer: ${text}`,
-          );
+          await triageEvidence(`Question: ${question}\nAnswer: ${text}`);
         } catch (err) {
           console.error("triageEvidence error", err);
         }
@@ -1913,11 +1909,7 @@ Respond ONLY in this JSON format:
       newDocs.push({ name: file.name, content, addedAt: new Date().toISOString() });
       if (uid && initiativeId) {
         try {
-          await triageEvidence(
-            uid,
-            initiativeId,
-            `Title: ${file.name}\n\n${content}`,
-          );
+          await triageEvidence(`Title: ${file.name}\n\n${content}`);
         } catch (err) {
           console.error("triageEvidence error", err);
         }

@@ -9,6 +9,7 @@ import ReactFlow, {
   applyNodeChanges,
   addEdge,
   applyEdgeChanges,
+  Handle,
 } from "reactflow";
 import { NodeResizer } from "@reactflow/node-resizer";
 import "reactflow/dist/style.css";
@@ -77,13 +78,25 @@ const colorFor = (c) =>
 
 const ResizableNode = ({ id, data, selected }) => (
   <div className="relative">
+    <Handle type="target" position="left" />
+    <Handle type="source" position="right" />
     <NodeResizer
       minWidth={240}
       minHeight={72}
       isVisible={selected}
       onResizeEnd={(_, p) => data.onResize?.(id, p.width, p.height)}
     />
-    <div style={{ padding: 12, lineHeight: 1.25, background: "transparent", color: "#111827", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+    <div
+      style={{
+        padding: 12,
+        lineHeight: 1.25,
+        background: "transparent",
+        color: "#111827",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "anywhere",
+      }}
+    >
       {data.label}
     </div>
   </div>
