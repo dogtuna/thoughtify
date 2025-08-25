@@ -19,6 +19,12 @@
   margin: 0.5rem 0;
 }
 
+.sidebar li.subheading {
+  cursor: default;
+  margin-top: 1rem;
+  font-weight: bold;
+}
+
 .sidebar .sub-menu {
   margin-left: 1rem;
 }
