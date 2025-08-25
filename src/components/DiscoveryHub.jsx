@@ -158,7 +158,7 @@ const DiscoveryHub = () => {
   const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const { triageEvidence, loadHypotheses } = useInquiryMap();
+  const { triageEvidence, loadHypotheses, hypotheses } = useInquiryMap();
   const [businessGoal, setBusinessGoal] = useState("");
   const [statusHistory, setStatusHistory] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -843,6 +843,12 @@ Respond ONLY in this JSON format:
           existingQuestionSet.add(lowerText);
         } else {
           const tag = await classifyTask(s.text);
+          let taskType;
+          try {
+            taskType = await classifyTask(s.text);
+          } catch {
+            taskType = "explore";
+          }
           const finalAssignees = assigneeNames.length
             ? assigneeNames
             : [currentUserName];
@@ -866,8 +872,8 @@ Respond ONLY in this JSON format:
             createdAt: serverTimestamp(),
             tag,
             provenance,
-            hypothesisId: null,
-            taskType: "explore",
+            hypothesisId: s.hypothesisId || null,
+            taskType,
             priority: "low",
           });
           addedCount += 1;
@@ -1131,6 +1137,8 @@ Respond ONLY in this JSON format:
           : [task.assignee || currentUserName],
       subType: task.subType || task.tag || "task",
       subTasks: task.subTasks ? task.subTasks.map((st) => ({ ...st })) : [],
+      hypothesisId: task.hypothesisId || "",
+      taskType: task.taskType || "explore",
     });
   };
 
@@ -1191,6 +1199,8 @@ Respond ONLY in this JSON format:
                 subType: editTask.subType,
                 tag: editTask.subType,
                 subTasks: editTask.subTasks,
+                hypothesisId: editTask.hypothesisId ?? null,
+                taskType: editTask.taskType ?? "explore",
               }
             : t
         )
@@ -2781,6 +2791,33 @@ Respond ONLY in this JSON format:
                 <option value="research">research</option>
                 <option value="instructional-design">instructional-design</option>
                 <option value="other">other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Hypothesis</label>
+              <select
+                value={editTask.hypothesisId}
+                onChange={(e) => updateEditTaskField("hypothesisId", e.target.value)}
+                className="w-full rounded-md border px-2 py-1"
+              >
+                <option value="">None</option>
+                {hypotheses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.statement || h.text || h.label || h.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Task Type</label>
+              <select
+                value={editTask.taskType}
+                onChange={(e) => updateEditTaskField("taskType", e.target.value)}
+                className="w-full rounded-md border px-2 py-1"
+              >
+                <option value="validate">Validate</option>
+                <option value="explore">Explore</option>
+                <option value="refute">Refute</option>
               </select>
             </div>
             <div className="space-y-2">

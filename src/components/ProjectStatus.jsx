@@ -83,10 +83,12 @@ const ProjectStatus = ({
 
     const lastUpdateForAudience = history.find(h => h.audience === audience);
     const previous = lastUpdateForAudience ? lastUpdateForAudience.summary : "None";
+    // eslint-disable-next-line no-unused-vars
     const today = new Date().toDateString();
 
-    const audiencePrompt = audience === "client" 
-      ? "Use a client-facing tone that is professional and strategically focused." 
+    // eslint-disable-next-line no-unused-vars
+    const audiencePrompt = audience === "client"
+      ? "Use a client-facing tone that is professional and strategically focused."
       : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
 
     const prompt = `Your role is an expert Performance Consultant. Draft a project status update based on the current state of the Inquiry Map.
@@ -179,12 +181,14 @@ ${JSON.stringify({recommendations, tasks})}
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const copySummary = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(summary);
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const openSendModal = () => {
     if (!emailConnected) {
       alert("Connect your Gmail account in settings.");
@@ -226,11 +230,13 @@ ${JSON.stringify({recommendations, tasks})}
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const confirmRecipients = () => {
     sendEmail(recipientModal.selected);
     setRecipientModal(null);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const saveContact = () => {
     const updated = [...contacts, newContact];
     setContacts(updated);
@@ -238,7 +244,7 @@ ${JSON.stringify({recommendations, tasks})}
     setRecipientModal((m) =>
       m ? { ...m, selected: [...m.selected, newContact.name] } : m
     );
-  };  
+  };
   
   // Omitted saveEdit, markSent, email functions for brevity as they remain the same
 
