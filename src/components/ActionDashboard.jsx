@@ -22,7 +22,8 @@ export default function ActionDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const { hypotheses } = useInquiryMap();
+  // Gracefully handle missing InquiryMap context
+  const { hypotheses = [] } = useInquiryMap() || {};
 
   // Track authentication state so we can read/write the user's task queue.
   useEffect(() => {
@@ -40,7 +41,9 @@ export default function ActionDashboard() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       // Only show tasks that are not completed.
-      setTasks(tasksData.filter((t) => t.status !== "done"));
+      setTasks(
+        tasksData.filter((t) => t.status !== "done" && t.status !== "completed")
+      );
     });
     return () => unsubscribe();
   }, [user]);
@@ -188,3 +191,4 @@ export default function ActionDashboard() {
     </div>
   );
 }
+
