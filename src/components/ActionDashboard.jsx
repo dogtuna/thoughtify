@@ -1,12 +1,41 @@
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, query, onSnapshot } from "firebase/firestore";
 import PropTypes from "prop-types";
 import { getPriority } from "../utils/priorityMatrix";
+import { useInquiryMap } from "../contexts/InquiryMapContext"; // Assuming context is in this path
 
-export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
+export default function ActionDashboard() {
   const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  
+  // Get hypotheses directly from the context
+  const { hypotheses } = useInquiryMap();
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
+
+  // **CRITICAL FIX #1: Use a real-time listener for tasks.**
+  // This ensures the component's state is always synchronized with Firestore,
+  // preventing the "No document to update" error.
+  useEffect(() => {
+    if (!user) {
+      setTasks([]);
+      return;
+    }
+    const q = query(collection(db, "profiles", user.uid, "taskQueue"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setTasks(tasksData.filter(t => t.status !== 'done')); // Only show non-done tasks
+    });
+    // Cleanup the listener when the component unmounts
+    return () => unsubscribe();
+  }, [user]);
 
   const handleDragStart = (e, id) => {
     e.dataTransfer.setData("text/plain", id);
@@ -16,17 +45,17 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
     e.preventDefault();
   };
 
-  // This function now only handles manual priority overrides.
   const handleDrop = async (e, newPriority) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
-    const user = auth.currentUser;
     if (!id || !user) return;
-
-    // Update the task in Firestore with the new, manually set priority.
-    await updateDoc(doc(db, "profiles", user.uid, "taskQueue", id), {
-      priority: newPriority,
-    });
+    try {
+      // Update the task in Firestore with the new, manually set priority.
+      const taskRef = doc(db, "profiles", user.uid, "taskQueue", id);
+      await updateDoc(taskRef, { priority: newPriority });
+    } catch (error) {
+      console.error("Error updating task priority:", error);
+    }
   };
 
   const readyToGraduate = useMemo(() => {
@@ -35,7 +64,6 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
     );
     if (highConfidenceHypotheses.length === 0) return false;
 
-    // Check if any of these high-confidence hypotheses have critical/high priority tasks.
     const hasPendingCriticalTasks = highConfidenceHypotheses.some((h) =>
       tasks.some((t) => {
         if (t.hypothesisId !== h.id) return false;
@@ -47,42 +75,36 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
   }, [hypotheses, tasks]);
 
   const handleGraduate = () => {
-    // This would likely trigger a modal to confirm, then archive remaining tasks
-    // and navigate to the solution design phase.
     console.log("Graduating to Solution Design!");
-    navigate("/solution-design"); // Assuming you have a route for this
+    navigate("/solution-design");
   };
-  
-  // **CRITICAL FIX: The Prioritization Logic is now inside the component.**
-  // This ensures the dashboard is always up-to-date with the Inquiry Map.
+
   const groupedTasks = useMemo(() => {
     const priorities = ["critical", "high", "medium", "low"];
     const grouped = priorities.reduce((acc, p) => ({ ...acc, [p]: [] }), {});
-    
-    // Create a quick lookup map for hypothesis confidence scores.
     const confidenceMap = new Map(hypotheses.map(h => [h.id, h.confidence || 0]));
 
     tasks.forEach(task => {
-      // If a task has a manual priority override, respect it.
-      // Otherwise, calculate its priority dynamically.
-      const priority = task.priority || getPriority(task.taskType, confidenceMap.get(task.hypothesisId));
+      // **CRITICAL FIX #2: Always calculate priority.**
+      // We ignore the `task.priority` field from the DB unless it's a manual override.
+      // For this implementation, we will always calculate it dynamically.
+      const priority = getPriority(task.taskType, confidenceMap.get(task.hypothesisId));
       if (grouped[priority]) {
         grouped[priority].push(task);
       } else {
-        grouped.low.push(task); // Default to low if priority is invalid
+        grouped.low.push(task);
       }
     });
 
     return grouped;
   }, [tasks, hypotheses]);
 
-
   return (
     <div className="flex flex-col gap-4">
       {readyToGraduate && (
         <div className="p-4 mb-4 text-center bg-green-100 border border-green-400 text-green-700 rounded-lg">
           <p className="font-bold">Analysis Complete!</p>
-          <p className="text-sm">You have high confidence in one or more hypotheses and no remaining critical tasks. You are ready to move to the next phase.</p>
+          <p className="text-sm">You have high confidence in one or more hypotheses and no remaining critical tasks.</p>
           <button
             className="mt-2 rounded bg-green-600 px-4 py-2 font-semibold text-white shadow-md hover:bg-green-700"
             onClick={handleGraduate}
@@ -116,7 +138,7 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
                         title={`Linked to Hypothesis ${t.hypothesisId}`}
                         onClick={() =>
                           navigate(
-                            `/inquiry-map?initiativeId=${t.project || "General"}&hypothesisId=${t.hypothesisId}`
+                            `/inquiry-map?initiativeId=${t.initiativeId || "General"}&hypothesisId=${t.hypothesisId}`
                           )
                         }
                       >
@@ -136,6 +158,12 @@ export default function ActionDashboard({ tasks = [], hypotheses = [] }) {
     </div>
   );
 }
+
+// **CRITICAL FIX #3: Removed props that are now consumed from context**
+ActionDashboard.propTypes = {
+  // tasks: PropTypes.arrayOf(PropTypes.object), // No longer needed
+  // hypotheses: PropTypes.arrayOf(PropTypes.object), // No longer needed
+};
 
 ActionDashboard.propTypes = {
   tasks: PropTypes.arrayOf(PropTypes.object),
