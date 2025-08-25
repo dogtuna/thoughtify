@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const InquiryMapContent = () => {
   const {
@@ -17,10 +18,12 @@ const InquiryMapContent = () => {
   const initiativeId = searchParams.get("initiativeId");
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (user && initiativeId) {
-      loadHypotheses(user.uid, initiativeId);
-    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && initiativeId) {
+        loadHypotheses(user.uid, initiativeId);
+      }
+    });
+    return () => unsubscribe();
   }, [initiativeId, loadHypotheses]);
 
   const parsedHypotheses = (Array.isArray(hypotheses) ? hypotheses : []).map((h) => ({
@@ -35,20 +38,14 @@ const InquiryMapContent = () => {
 
   const handleUpdateConfidence = useCallback(
     (hypothesisId, confidence) => {
-      const user = auth.currentUser;
-      if (user && initiativeId) {
-        updateConfidence(hypothesisId, confidence);
-      }
+      updateConfidence(hypothesisId, confidence);
     },
-    [initiativeId, updateConfidence]
+    [updateConfidence]
   );
 
   const handleRefresh = useCallback(() => {
-    const user = auth.currentUser;
-    if (user && initiativeId) {
-      refreshInquiryMap();
-    }
-  }, [initiativeId, refreshInquiryMap]);
+    refreshInquiryMap();
+  }, [refreshInquiryMap]);
 
   return (
     <main className="min-h-screen pt-32 pb-40">
