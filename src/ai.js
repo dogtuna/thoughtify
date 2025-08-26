@@ -26,7 +26,8 @@ async function getModel() {
 export async function generate(prompt) {
   const model = await getModel();
   const result = await model.generateContent(prompt);
-  return { text: result.response.text() };
+  const text = await result.response.text();
+  return { text };
 }
 
 export default { generate };
