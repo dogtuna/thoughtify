@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { useInquiryMap } from "../context/InquiryMapContext"; // Corrected path assuming standard structure
 import {
@@ -24,8 +25,10 @@ const ProjectStatus = ({
   setContacts = () => {},
   emailConnected = false,
   onHistoryChange = () => {},
-  initiativeId = "",
+  initiativeId: propInitiativeId = "",
 }) => {
+  const [searchParams] = useSearchParams();
+  const initiativeId = propInitiativeId || searchParams.get("initiativeId") || "";
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [audience, setAudience] = useState("client");
@@ -82,7 +85,6 @@ const ProjectStatus = ({
   }, [user, initiativeId, onHistoryChange]);
 
   const generateSummary = async () => {
-    if (!user || !initiativeId) return;
     setLoading(true);
 
     const lastUpdateForAudience = history.find(h => h.audience === audience);
@@ -115,7 +117,7 @@ This is a **follow-up brief**. Analyze the **change in hypothesis confidence sco
 ${previous}
 
 **Current Inquiry Map State (Hypotheses, Confidence Scores, and linked evidence summaries):**
-${JSON.stringify(hypotheses)} 
+${JSON.stringify(hypotheses)}
 
 **Project Baseline:**
 Goal: ${businessGoal}
@@ -124,23 +126,28 @@ Sponsor: ${(contacts.find(c => /sponsor/i.test(c.role)) || {}).name || 'Unknown'
 **Current Recommendations & Outstanding Tasks:**
 ${JSON.stringify({recommendations, tasks})}
 `;
-    
+
     try {
       const { text } = await ai.generate(prompt);
       const clean = text.trim();
-      
-      const now = new Date().toISOString();
-      const entry = { date: now, summary: clean, sent: false, audience: audience };
-      
-      const colRef = collection(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates");
-      const docRef = await addDoc(colRef, entry);
-      const entryWithId = { id: docRef.id, ...entry };
-      
-      const updatedHistory = [entryWithId, ...history];
-      setHistory(updatedHistory);
-      setSelectedUpdate(entryWithId);
+
       setSummary(clean);
-      onHistoryChange(updatedHistory);
+
+      if (user && initiativeId) {
+        const now = new Date().toISOString();
+        const entry = { date: now, summary: clean, sent: false, audience };
+
+        const colRef = collection(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates");
+        const docRef = await addDoc(colRef, entry);
+        const entryWithId = { id: docRef.id, ...entry };
+
+        const updatedHistory = [entryWithId, ...history];
+        setHistory(updatedHistory);
+        setSelectedUpdate(entryWithId);
+        onHistoryChange(updatedHistory);
+      } else {
+        console.warn("Missing user or initiativeId; summary not saved to history");
+      }
     } catch (err) {
       console.error("generateSummary error", err);
     }
