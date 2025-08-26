@@ -2842,7 +2842,7 @@ Respond ONLY in this JSON format:
     {answerPanel &&
       createPortal(
         <AnswerSlideOver
-          question={questions[answerPanel.idx]}
+          question={answerPanel.question}
           idx={answerPanel.idx}
           allContacts={contacts}
           currentUserName={currentUserName}
@@ -3151,7 +3151,9 @@ Respond ONLY in this JSON format:
                         )}
                         <button
                           className="generator-button"
-                          onClick={() => setAnswerPanel({ idx: q.idx })}
+                          onClick={() =>
+                            setAnswerPanel({ idx: q.idx, question: q })
+                          }
                         >
                           Answer
                         </button>
