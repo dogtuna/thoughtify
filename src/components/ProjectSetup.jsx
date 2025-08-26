@@ -161,6 +161,16 @@ const ProjectSetup = () => {
     e.preventDefault();
   };
 
+  const handlePasteText = () => {
+    const text = window.prompt("Paste your text:");
+    if (text && text.trim()) {
+      const defaultName = `pasted-${sourceMaterials.length + 1}.txt`;
+      const name =
+        window.prompt("Enter a filename", defaultName) || defaultName;
+      setSourceMaterials((prev) => [...prev, { name, content: text }]);
+    }
+  };
+
   const removeFile = (index) => {
     setSourceMaterials((prev) => prev.filter((_, i) => i !== index));
   };
@@ -364,6 +374,13 @@ const ProjectSetup = () => {
               <div className="upload-title">Upload Source Material (Optional)</div>
               <div className="upload-subtitle">Click to upload or drag and drop</div>
               <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+              <button
+                type="button"
+                className="generator-button paste-text"
+                onClick={handlePasteText}
+              >
+                Paste Text
+              </button>
               {sourceMaterials.length > 0 && (
                 <ul className="file-list">
                   {sourceMaterials.map((f, idx) => (
