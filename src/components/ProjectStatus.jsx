@@ -50,15 +50,15 @@ const ProjectStatus = ({
   useCanonical(canonicalProjectUrl(initiativeId));
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !initiativeId) return;
     const q = query(
-      collection(db, "profiles", user.uid, "taskQueue"),
+      collection(db, "users", user.uid, "initiatives", initiativeId, "tasks"),
       where("status", "!=", "done")
     );
     getDocs(q).then((snap) => {
       setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-  }, [user]);
+  }, [user, initiativeId]);
 
   useEffect(() => {
     if (!user || !initiativeId) return;
