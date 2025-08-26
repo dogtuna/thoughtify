@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { useInquiryMap } from "../context/InquiryMapContext"; // Corrected path assuming standard structure
 import {
@@ -24,8 +25,10 @@ const ProjectStatus = ({
   setContacts = () => {},
   emailConnected = false,
   onHistoryChange = () => {},
-  initiativeId = "",
+  initiativeId: propInitiativeId = "",
 }) => {
+  const [searchParams] = useSearchParams();
+  const initiativeId = propInitiativeId || searchParams.get("initiativeId") || "";
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [audience, setAudience] = useState("client");
