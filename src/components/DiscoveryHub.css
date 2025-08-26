@@ -393,3 +393,37 @@
   max-width: none;
 }
 
+.slide-over-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.slide-over-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(90vw, 400px);
+  height: 100%;
+  background: #fff;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.suggestion-list {
+  margin-top: 0.5rem;
+}
+
+.suggestion-list li {
+  margin-bottom: 0.5rem;
+}
+
+.assignment-select {
+  padding: 0.25rem 0;
+}
+
