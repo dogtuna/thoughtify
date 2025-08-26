@@ -173,6 +173,11 @@ const DiscoveryHub = () => {
   const [qaModal, setQaModal] = useState(null);
   const navigate = useNavigate();
 
+  const handleAnswerClick = (e, q) => {
+    e.stopPropagation();
+    setAnswerPanel({ idx: q.idx, question: q });
+  };
+
   useEffect(() => {
     const section = searchParams.get("section");
     if (section) {
@@ -3152,18 +3157,7 @@ Respond ONLY in this JSON format:
                         <button
                           type="button"
                           className="generator-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAnswerPanel({ idx: q.idx, question: q });
-                          }}
-                        >
-                          Answer
-                        </button>
-                        <button
-                          className="generator-button"
-                          onClick={() =>
-                            setAnswerPanel({ idx: q.idx, question: q })
-                          }
+                          onClick={(e) => handleAnswerClick(e, q)}
                         >
                           Answer
                         </button>

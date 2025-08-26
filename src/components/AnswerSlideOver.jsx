@@ -14,7 +14,10 @@ const AnswerSlideOver = ({
   setToast,
   setAnalyzing,
 }) => {
-  const [contact, setContact] = useState(question.contacts[0] || "");
+  // Guard against questions that do not have any associated contacts.
+  const [contact, setContact] = useState(
+    (question.contacts && question.contacts[0]) || ""
+  );
   const [text, setText] = useState("");
   const [stage, setStage] = useState("compose");
   const [suggestions, setSuggestions] = useState([]);
@@ -77,7 +80,7 @@ const AnswerSlideOver = ({
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
               >
-                {question.contacts.map((c) => (
+                {(question.contacts || []).map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
