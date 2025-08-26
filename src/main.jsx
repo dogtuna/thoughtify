@@ -29,8 +29,11 @@ import ComingSoonPage from "./pages/ComingSoonPage";
 import Login from "./components/Login";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Settings from "./components/Settings";
-import Tasks from "./components/Tasks";
 import InquiryMapPage from "./pages/InquiryMapPage";
+import AppShell from "./components/AppShell";
+import ActionDashboard from "./components/ActionDashboard.jsx";
+import ProjectStatus from "./components/ProjectStatus.jsx";
+import ProjectStatusHistory from "./components/ProjectStatusHistory.jsx";
 
 window.PropTypes = PropTypes;
 
@@ -70,7 +73,7 @@ function Root() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<App />}>
+        <Route element={<App />}> 
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -84,6 +87,8 @@ function Root() {
               )
             }
           />
+        </Route>
+        <Route element={<AppShell />}> 
           <Route
             path="/admin-dashboard"
             element={
@@ -94,7 +99,10 @@ function Root() {
               )
             }
           />
-          <Route path="/dashboard" element={<CustomDashboard />} />
+          <Route
+            path="/dashboard"
+            element={user ? <CustomDashboard /> : <Navigate to="/login" />}
+          />
           <Route
             path="/project-setup"
             element={user ? <ProjectSetup /> : <Navigate to="/login" />}
@@ -108,8 +116,18 @@ function Root() {
             element={user ? <InquiryMapPage /> : <Navigate to="/login" />}
           />
           <Route
-            path="/tasks"
-            element={user ? <Tasks /> : <Navigate to="/login" />}
+            path="/action-dashboard"
+            element={user ? <ActionDashboard /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/project-status"
+            element={user ? <ProjectStatus /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/project-status/history"
+            element={
+              user ? <ProjectStatusHistory /> : <Navigate to="/login" />
+            }
           />
           <Route path="/settings" element={<Settings />} />
           <Route
@@ -129,8 +147,8 @@ function Root() {
             <Route path="storyboard" element={<StoryboardGenerator />} />
             <Route path="content-assets" element={<ContentAssetGenerator />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" />} />
         </Route>
+        <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </BrowserRouter>
   );

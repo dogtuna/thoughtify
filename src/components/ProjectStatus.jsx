@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useInquiryMap } from "../context/InquiryMapContext"; // Corrected path assuming standard structure
+import { useSearchParams } from "react-router-dom";
 import {
   collection,
   query,
@@ -16,14 +17,18 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import ai from "../ai";
 import PropTypes from "prop-types";
+import useCanonical from "../utils/useCanonical";
+import { canonicalProjectUrl } from "../utils/canonical";
 
 const ProjectStatus = ({
   contacts = [],
   setContacts = () => {},
   emailConnected = false,
   onHistoryChange = () => {},
-  initiativeId = "",
+  initiativeId: propInitiativeId = "",
 }) => {
+  const [searchParams] = useSearchParams();
+  const initiativeId = propInitiativeId || searchParams.get("initiativeId") || "";
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [audience, setAudience] = useState("client");
@@ -44,6 +49,8 @@ const ProjectStatus = ({
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
+
+  useCanonical(canonicalProjectUrl(initiativeId));
 
   useEffect(() => {
     if (!user) return;

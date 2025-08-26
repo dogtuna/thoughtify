@@ -16,7 +16,9 @@ import "reactflow/dist/style.css";
 import "@reactflow/node-resizer/dist/style.css";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
-import { useInquiryMap } from "../context/InquiryMapContext"; 
+import { useInquiryMap } from "../context/InquiryMapContext";
+import useCanonical from "../utils/useCanonical";
+import { canonicalMapNodeUrl } from "../utils/canonical";
 
 // --- Helper Functions for Sizing (Unchanged) ---
 function useVisibleHeight(containerRef) {
@@ -130,6 +132,8 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
   const sizesRef = useRef(storedLayout.sizes || {});
 
   const [nodes, setNodes] = useNodesState([]);
+  const activeNode = nodes[0]?.id;
+  useCanonical(activeNode ? canonicalMapNodeUrl(activeNode) : window.location.href);
   const [edges, setEdges] = useState(storedLayout.edges || []);
   const edgesRef = useRef(edges);
   const [selected, setSelected] = useState(null);

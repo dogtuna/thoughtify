@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
 import {
@@ -116,7 +116,7 @@ const DiscoveryHub = () => {
   const [contactFilter, setContactFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [groupBy, setGroupBy] = useState("");
-  const [taskStatusFilter, setTaskStatusFilter] = useState("all");
+  const taskStatusFilter = "all";
   const [taskProjectFilter, setTaskProjectFilter] = useState("all");
   const [taskContactFilter, setTaskContactFilter] = useState("all");
   const [taskTypeFilter, setTaskTypeFilter] = useState("all");
@@ -164,16 +164,23 @@ const DiscoveryHub = () => {
   const [projectName, setProjectName] = useState("");
   const { triageEvidence, loadHypotheses, hypotheses } = useInquiryMap();
   const [businessGoal, setBusinessGoal] = useState("");
-  const [statusHistory, setStatusHistory] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
-  const [viewingStatus, setViewingStatus] = useState("");
+  const [viewingStatus] = useState("");
+  const setStatusHistory = () => {};
   const [qaModal, setQaModal] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (searchParams.has("actionDashboard")) {
+    const section = searchParams.get("section");
+    if (section) {
+      setActive(section);
+    } else if (searchParams.has("actionDashboard")) {
       setActive("actionDashboard");
+    }
+    const status = searchParams.get("status");
+    if (status) {
+      setStatusFilter(status);
     }
   }, [searchParams]);
 
@@ -2492,124 +2499,6 @@ Respond ONLY in this JSON format:
   return (
     <div className="dashboard-container discovery-hub">
       {toast && <div className="toast">{toast}</div>}
-      <aside className="sidebar">
-        <h2>Discovery Hub</h2>
-        <ul>
-          <li className="subheading">Client Facing</li>
-          <li
-            className={active === "documents" ? "active" : ""}
-            onClick={() => setActive("documents")}
-          >
-            Documents
-          </li>
-          <li className={active === "questions" ? "active" : ""}>
-            <span
-              className="questions"
-              onClick={() => {
-                setActive("questions");
-                setStatusFilter("");
-              }}
-            >
-              Questions
-            </span>
-            {active === "questions" && (
-              <ul className="sub-menu">
-                <li
-                  className={statusFilter === "toask" ? "active" : ""}
-                  onClick={() => setStatusFilter("toask")}
-                >
-                  Ask
-                </li>
-                <li
-                  className={statusFilter === "asked" ? "active" : ""}
-                  onClick={() => setStatusFilter("asked")}
-                >
-                  Asked
-                </li>
-                <li
-                  className={statusFilter === "answered" ? "active" : ""}
-                  onClick={() => setStatusFilter("answered")}
-                >
-                  Answered
-                </li>
-              </ul>
-            )}
-          </li>
-          <li className="subheading">Internal</li>
-          <li className={active === "tasks" ? "active" : ""}>
-            <span
-              onClick={() => setActive("tasks")}
-              className="cursor-pointer"
-            >
-              Tasks
-            </span>
-            {active === "tasks" && (
-              <ul className="sub-menu">
-                <li
-                  className={taskStatusFilter === "all" ? "active" : ""}
-                  onClick={() => setTaskStatusFilter("all")}
-                >
-                  All Tasks
-                </li>
-                <li
-                  className={taskStatusFilter === "open" ? "active" : ""}
-                  onClick={() => setTaskStatusFilter("open")}
-                >
-                  Open Tasks
-                </li>
-                <li
-                  className={taskStatusFilter === "scheduled" ? "active" : ""}
-                  onClick={() => setTaskStatusFilter("scheduled")}
-                >
-                  Scheduled Tasks
-                </li>
-                <li
-                  className={taskStatusFilter === "completed" ? "active" : ""}
-                  onClick={() => setTaskStatusFilter("completed")}
-                >
-                  Completed Tasks
-                </li>
-              </ul>
-            )}
-          </li>
-          <li
-            className={active === "actionDashboard" ? "active" : ""}
-            onClick={() => setActive("actionDashboard")}
-          >
-            Action Dashboard
-          </li>
-          <li
-            className={active === "status" && !viewingStatus ? "active" : ""}
-            onClick={() => {
-              setActive("status");
-              setViewingStatus(null);
-            }}
-          >
-            Project Status
-          </li>
-          {active === "status" && statusHistory.filter((u) => u.sent).length > 0 && (
-            <ul className="sub-menu">
-              <li className="subheading">Past Updates</li>
-              {statusHistory
-                .filter((u) => u.sent)
-                .map((u, i) => (
-                  <li
-                    key={i}
-                    className={viewingStatus === u ? "active" : ""}
-                    onClick={() => setViewingStatus(u)}
-                  >
-                    {new Date(u.date).toDateString()}
-                  </li>
-                ))}
-            </ul>
-          )}
-          <li>
-            <Link to={`/inquiry-map?initiativeId=${initiativeId || ""}`}>
-              Inquiry Map
-            </Link>
-          </li>
-        </ul>
-      </aside>
       <div className="main-content">
         {active === "documents" ? (
           <div className="document-section">
