@@ -5,12 +5,16 @@ import { auth, db } from "../firebase";
 import TaskQueue from "./TaskQueue";
 import TaskSidebar from "./TaskSidebar";
 import "../pages/admin.css";
+import useCanonical from "../utils/useCanonical";
+import { canonicalTaskUrl } from "../utils/canonical";
 
 const Tasks = () => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [inquiries, setInquiries] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useCanonical(tasks[0]?.id ? canonicalTaskUrl(tasks[0].id) : window.location.href);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, setUser);

@@ -31,6 +31,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Settings from "./components/Settings";
 import Tasks from "./components/Tasks";
 import InquiryMapPage from "./pages/InquiryMapPage";
+import AppShell from "./components/AppShell";
 
 window.PropTypes = PropTypes;
 
@@ -70,7 +71,7 @@ function Root() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<App />}>
+        <Route element={<App />}> 
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ComingSoonPage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -84,6 +85,8 @@ function Root() {
               )
             }
           />
+        </Route>
+        <Route element={<AppShell />}> 
           <Route
             path="/admin-dashboard"
             element={
@@ -94,7 +97,10 @@ function Root() {
               )
             }
           />
-          <Route path="/dashboard" element={<CustomDashboard />} />
+          <Route
+            path="/dashboard"
+            element={user ? <CustomDashboard /> : <Navigate to="/login" />}
+          />
           <Route
             path="/project-setup"
             element={user ? <ProjectSetup /> : <Navigate to="/login" />}
@@ -129,8 +135,8 @@ function Root() {
             <Route path="storyboard" element={<StoryboardGenerator />} />
             <Route path="content-assets" element={<ContentAssetGenerator />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" />} />
         </Route>
+        <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </BrowserRouter>
   );
