@@ -3150,6 +3150,16 @@ Respond ONLY in this JSON format:
                           </button>
                         )}
                         <button
+                          type="button"
+                          className="generator-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAnswerPanel({ idx: q.idx, question: q });
+                          }}
+                        >
+                          Answer
+                        </button>
+                        <button
                           className="generator-button"
                           onClick={() =>
                             setAnswerPanel({ idx: q.idx, question: q })
