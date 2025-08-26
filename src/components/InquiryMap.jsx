@@ -184,7 +184,12 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       const id = h.id || `hypothesis-${i}`;
       const conf = h.confidence;
       const pct = Math.round((conf || 0) * 100);
-      const label = `${h.statement || h.label || ""} (${pct}%)`;
+      const letter = /^[A-Z]$/.test(id)
+        ? id
+        : String.fromCharCode(65 + i);
+      const label = `Hypothesis ${letter}: ${
+        h.statement || h.label || ""
+      } (${pct}%)`;
       const offset = (i - (hypotheses.length - 1) / 2) * (CARD_W + marginX);
       return {
         id,
@@ -325,7 +330,7 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center gap-2">
-              <span className="font-semibold truncate flex-1">
+              <span className="font-semibold flex-1 whitespace-pre-wrap break-words">
                 {selected.data.label}
               </span>
               <input

@@ -2200,6 +2200,34 @@ Respond ONLY in this JSON format:
     });
   };
 
+  const handlePasteText = async () => {
+    const text = window.prompt("Paste your text:");
+    if (text && text.trim()) {
+      const defaultName = `pasted-${documents.length + 1}.txt`;
+      const name =
+        window.prompt("Enter a filename", defaultName) || defaultName;
+      const doc = {
+        name,
+        content: text,
+        addedAt: new Date().toISOString(),
+      };
+      if (uid && initiativeId) {
+        try {
+          await triageEvidence(`Title: ${doc.name}\n\n${doc.content}`);
+        } catch (err) {
+          console.error("triageEvidence error", err);
+        }
+      }
+      setDocuments((prev) => {
+        const updated = [...prev, doc];
+        if (uid) {
+          saveInitiative(uid, initiativeId, { sourceMaterials: updated });
+        }
+        return updated;
+      });
+    }
+  };
+
   const summarizeText = async (text) => {
     const context = `Project Name: ${projectName || "Unknown"}\nBusiness Goal: ${
       businessGoal || "Unknown"
@@ -2593,6 +2621,12 @@ Respond ONLY in this JSON format:
                 Summarize All Files
               </button>
             )}
+            <button
+              className="generator-button paste-text"
+              onClick={handlePasteText}
+            >
+              Paste Text
+            </button>
             <ul className="document-list">
               {documents.map((doc, idx) => (
                 <li key={idx} className="document-item">
@@ -3052,6 +3086,10 @@ Respond ONLY in this JSON format:
           <ActionDashboard />
         ) : (
           <>
+            <p className="mb-4 text-sm text-gray-500">
+              Click the <strong>Ask</strong> button, choose the responder, and enter
+              answer text to receive analysis and suggested tasks.
+            </p>
             <div className="filter-bar">
               <label>
                 Contact:
