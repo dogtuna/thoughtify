@@ -9,6 +9,8 @@ import { auth } from "../firebase";
 const NavBar = () => {
   const [loggedIn, setLoggedIn] = useState(false);
 
+  const homePath = loggedIn ? "/dashboard" : "/";
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setLoggedIn(!!user);
@@ -42,7 +44,7 @@ const NavBar = () => {
         </div>
 
         <div className="nav-links">
-          <Link to={loggedIn ? "/dashboard" : "/"} className="nav-link active">
+          <Link to={homePath} className="nav-link">
             Home
           </Link>
           <Link to="/ai-tools" className="nav-link">

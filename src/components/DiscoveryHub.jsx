@@ -3086,6 +3086,10 @@ Respond ONLY in this JSON format:
           <ActionDashboard />
         ) : (
           <>
+            <p className="mb-4 text-sm text-gray-500">
+              Click the <strong>Ask</strong> button, choose the responder, and enter
+              answer text to receive analysis and suggested tasks.
+            </p>
             <div className="filter-bar">
               <label>
                 Contact:
