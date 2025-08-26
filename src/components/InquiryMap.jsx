@@ -19,6 +19,7 @@ import "./AIToolsGenerators.css";
 import { useInquiryMap } from "../context/InquiryMapContext";
 import useCanonical from "../utils/useCanonical";
 import { canonicalMapNodeUrl } from "../utils/canonical";
+import HypothesisCard from "./HypothesisCard";
 
 // --- Helper Functions for Sizing (Unchanged) ---
 function useVisibleHeight(containerRef) {
@@ -187,20 +188,25 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
     const hs = hypotheses.map((h, i) => {
       const id = h.id || `hypothesis-${i}`;
       const conf = h.confidence;
-      const pct = Math.round((conf || 0) * 100);
       const letter = /^[A-Z]$/.test(id)
         ? id
         : String.fromCharCode(65 + i);
-      const label = `Hypothesis ${letter}: ${
-        h.statement || h.label || ""
-      } (${pct}%)`;
       const offset = (i - (hypotheses.length - 1) / 2) * (CARD_W + marginX);
       return {
         id,
         type: "resizable",
-        data: { ...h, label, onResize: persistSize },
+        data: {
+          ...h,
+          label: <HypothesisCard hypothesis={{ ...h, displayId: letter }} />,
+          onResize: persistSize,
+        },
         position: positionsRef.current[id] || { x: offset, y: rowYHypos },
-        style: { ...baseCardStyle, background: h.contested ? "#fb923c" : colorFor(conf), width: sizesRef.current[id]?.width ?? CARD_W, height: sizesRef.current[id]?.height ?? CARD_H },
+        style: {
+          ...baseCardStyle,
+          background: h.contested ? "#fb923c" : colorFor(conf),
+          width: sizesRef.current[id]?.width ?? CARD_W,
+          height: sizesRef.current[id]?.height ?? CARD_H,
+        },
       };
     });
 
