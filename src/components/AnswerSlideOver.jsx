@@ -20,6 +20,7 @@ const AnswerSlideOver = ({
   );
   const [text, setText] = useState("");
   const [stage, setStage] = useState("compose");
+  const [analysis, setAnalysis] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [selected, setSelected] = useState([]);
   const [assignments, setAssignments] = useState({});
@@ -31,8 +32,9 @@ const AnswerSlideOver = ({
     setAnalyzing(true);
     const result = await analyzeAnswer(question.question || "", text, contact);
     setAnalyzing(false);
+    setAnalysis(result.analysis || "");
     setSuggestions(result.suggestions || []);
-    setStage("suggestions");
+    setStage("results");
   };
 
   const toggleSelection = (i) => {
@@ -70,7 +72,7 @@ const AnswerSlideOver = ({
     <div className="slide-over-overlay" onClick={onClose}>
       <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
         <h3>Answer Question</h3>
-        <p>{question.question}</p>
+        {stage === "compose" && <p>{question.question}</p>}
         {stage === "compose" && (
           <>
             <label className="block text-sm font-medium">
@@ -104,44 +106,59 @@ const AnswerSlideOver = ({
           </>
         )}
         {stage === "loading" && <p>Analyzing answer...</p>}
-        {stage === "suggestions" && (
+        {stage === "results" && (
           <>
-            {suggestions.length > 0 ? (
-              <>
-                <p>Would you like to add any of these tasks to your task list?</p>
-                <ul className="suggestion-list">
-                  {suggestions.map((s, i) => (
-                    <li key={i}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(i)}
-                          onChange={() => toggleSelection(i)}
-                        />
-                        {s.text}
-                      </label>
-                      {selected.includes(i) && (
-                        <select
-                          value={assignments[i] || ""}
-                          onChange={(e) => handleAssignmentChange(i, e.target.value)}
-                        >
-                          <option value="">Assign to...</option>
-                          <option value={currentUserName}>Me</option>
-                          {allContacts.map((c) => (
-                            <option key={c.name} value={c.name}>
-                              {c.name}
-                            </option>
-                          ))}
-                          <option value="__add__">Add New</option>
-                        </select>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p>No task suggestions.</p>
-            )}
+            <details open>
+              <summary>Analysis</summary>
+              <p>
+                {typeof analysis === "string" ? analysis : JSON.stringify(analysis)}
+              </p>
+            </details>
+            <details open>
+              <summary>Suggested Tasks</summary>
+              {suggestions.length > 0 ? (
+                <>
+                  <p>
+                    Would you like to add any of these tasks to your task list?
+                  </p>
+                  <ul className="suggestion-list">
+                    {suggestions.map((s, i) => (
+                      <li key={i}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(i)}
+                            onChange={() => toggleSelection(i)}
+                          />
+                          {s.text}
+                        </label>
+                        {selected.includes(i) && (
+                          <div className="assignment-select">
+                            <select
+                              value={assignments[i] || ""}
+                              onChange={(e) =>
+                                handleAssignmentChange(i, e.target.value)
+                              }
+                            >
+                              <option value="">Assign to...</option>
+                              <option value={currentUserName}>Me</option>
+                              {allContacts.map((c) => (
+                                <option key={c.name} value={c.name}>
+                                  {c.name}
+                                </option>
+                              ))}
+                              <option value="__add__">Add New</option>
+                            </select>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p>No task suggestions.</p>
+              )}
+            </details>
             <div className="modal-actions">
               <button className="generator-button" onClick={handleConfirm}>
                 Confirm

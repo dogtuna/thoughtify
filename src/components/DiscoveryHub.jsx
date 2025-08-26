@@ -174,8 +174,12 @@ const DiscoveryHub = () => {
   const navigate = useNavigate();
 
   const handleAnswerClick = (e, q) => {
+    // Prevent the card's click handlers from firing and grab the
+    // authoritative question object before opening the slide-over.
+    e.preventDefault();
     e.stopPropagation();
-    setAnswerPanel({ idx: q.idx, question: q });
+    const original = questions[q.idx] || q;
+    setAnswerPanel({ idx: q.idx, question: original });
   };
 
   useEffect(() => {
@@ -2842,6 +2846,23 @@ Respond ONLY in this JSON format:
             </div>
           </div>
         </div>,
+        document.body
+      )}
+    {answerPanel &&
+      createPortal(
+        <AnswerSlideOver
+          question={answerPanel.question}
+          idx={answerPanel.idx}
+          allContacts={contacts}
+          currentUserName={currentUserName}
+          updateAnswer={updateAnswer}
+          analyzeAnswer={analyzeAnswer}
+          createTasks={createTasksFromAnalysis}
+          addContact={addContact}
+          onClose={() => setAnswerPanel(null)}
+          setToast={setToast}
+          setAnalyzing={setAnalyzing}
+        />,
         document.body
       )}
     {qaModal &&
