@@ -16,6 +16,8 @@ import { httpsCallable } from "firebase/functions";
 import { getToken as getAppCheckToken } from "firebase/app-check";
 import ai from "../ai";
 import PropTypes from "prop-types";
+import useCanonical from "../utils/useCanonical";
+import { canonicalProjectUrl } from "../utils/canonical";
 
 const ProjectStatus = ({
   contacts = [],
@@ -44,6 +46,8 @@ const ProjectStatus = ({
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
+
+  useCanonical(canonicalProjectUrl(initiativeId));
 
   useEffect(() => {
     if (!user) return;

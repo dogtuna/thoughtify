@@ -1,6 +1,9 @@
 import PropTypes from "prop-types";
+import useCanonical from "../utils/useCanonical";
+import { canonicalUpdateUrl } from "../utils/canonical";
 
 const PastUpdateView = ({ update }) => {
+  useCanonical(update?.id ? canonicalUpdateUrl(update.id) : window.location.href);
   if (!update) return null;
   const copy = () => {
     if (navigator.clipboard) {
@@ -24,6 +27,7 @@ const PastUpdateView = ({ update }) => {
 
 PastUpdateView.propTypes = {
   update: PropTypes.shape({
+    id: PropTypes.string,
     date: PropTypes.string.isRequired,
     summary: PropTypes.string.isRequired,
   }),

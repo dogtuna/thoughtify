@@ -1,0 +1,47 @@
+.discovery-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 1.5rem 1rem 1rem;
+  border-right: 1px solid rgba(255,255,255,0.2);
+  height: calc(100vh - 64px);
+  position: fixed;
+  left: 0;
+  top: 64px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  overflow-y: auto;
+}
+
+.discovery-sidebar .sidebar-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+}
+
+.discovery-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.discovery-sidebar li {
+  margin: 0.5rem 0;
+}
+
+.discovery-sidebar li ul {
+  margin-left: 1rem;
+}
+
+.discovery-sidebar a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-main {
+  margin-left: 200px;
+  margin-top: 64px;
+  padding: 1rem;
+}
+
+.app-main.full {
+  margin-left: 0;
+}
