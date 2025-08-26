@@ -29,7 +29,6 @@ import ComingSoonPage from "./pages/ComingSoonPage";
 import Login from "./components/Login";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Settings from "./components/Settings";
-import Tasks from "./components/Tasks";
 import InquiryMapPage from "./pages/InquiryMapPage";
 import AppShell from "./components/AppShell";
 import ActionDashboard from "./components/ActionDashboard.jsx";
@@ -115,10 +114,6 @@ function Root() {
           <Route
             path="/inquiry-map"
             element={user ? <InquiryMapPage /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/tasks"
-            element={user ? <Tasks /> : <Navigate to="/login" />}
           />
           <Route
             path="/action-dashboard"
