@@ -28,6 +28,7 @@ import { getPriority } from "../utils/priorityMatrix";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import ActionDashboard from "./ActionDashboard.jsx";
+import AnswerSlideOver from "./AnswerSlideOver.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -147,6 +148,7 @@ const DiscoveryHub = () => {
   const [draftIndex, setDraftIndex] = useState(0);
   const [recipientModal, setRecipientModal] = useState(null);
   const [analysisModal, setAnalysisModal] = useState(null);
+  const [answerPanel, setAnswerPanel] = useState(null);
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [activeComposer, setActiveComposer] = useState(null);
   const [restoredDraftKey, setRestoredDraftKey] = useState(null);
@@ -2837,6 +2839,23 @@ Respond ONLY in this JSON format:
         </div>,
         document.body
       )}
+    {answerPanel &&
+      createPortal(
+        <AnswerSlideOver
+          question={answerPanel.question}
+          idx={answerPanel.idx}
+          allContacts={contacts}
+          currentUserName={currentUserName}
+          updateAnswer={updateAnswer}
+          analyzeAnswer={analyzeAnswer}
+          createTasks={createTasksFromAnalysis}
+          addContact={addContact}
+          onClose={() => setAnswerPanel(null)}
+          setToast={setToast}
+          setAnalyzing={setAnalyzing}
+        />,
+        document.body
+      )}
     {qaModal &&
       createPortal(
         <div className="modal-overlay" onClick={() => setQaModal(null)}>
@@ -3130,6 +3149,14 @@ Respond ONLY in this JSON format:
                             Ask
                           </button>
                         )}
+                        <button
+                          className="generator-button"
+                          onClick={() =>
+                            setAnswerPanel({ idx: q.idx, question: q })
+                          }
+                        >
+                          Answer
+                        </button>
                         <button
                           className="generator-button"
                           onClick={() => draftEmail(q)}
