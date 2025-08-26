@@ -724,6 +724,22 @@ body.pulsing::before {
   border: 1px solid rgba(255,255,255,0.4);
   background: rgba(255,255,255,0.1);
   color: #fff;
+  width: 16rem;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.search-bar button {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .dropdown {
@@ -737,6 +753,15 @@ body.pulsing::before {
   margin: 0;
   border-radius: 4px;
   z-index: 10;
+}
+
+.dropdown li button {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .dropdown li {

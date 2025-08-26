@@ -32,6 +32,9 @@ import Settings from "./components/Settings";
 import Tasks from "./components/Tasks";
 import InquiryMapPage from "./pages/InquiryMapPage";
 import AppShell from "./components/AppShell";
+import ActionDashboard from "./components/ActionDashboard.jsx";
+import ProjectStatus from "./components/ProjectStatus.jsx";
+import ProjectStatusHistory from "./components/ProjectStatusHistory.jsx";
 
 window.PropTypes = PropTypes;
 
@@ -116,6 +119,20 @@ function Root() {
           <Route
             path="/tasks"
             element={user ? <Tasks /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/action-dashboard"
+            element={user ? <ActionDashboard /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/project-status"
+            element={user ? <ProjectStatus /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/project-status/history"
+            element={
+              user ? <ProjectStatusHistory /> : <Navigate to="/login" />
+            }
           />
           <Route path="/settings" element={<Settings />} />
           <Route

@@ -1,20 +1,39 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
-
-const sampleProjects = ["Project Alpha", "Project Beta"];
+import { loadInitiatives } from "../utils/initiatives";
 
 export default function NavBar() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [projectMenu, setProjectMenu] = useState(false);
   const [addMenu, setAddMenu] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoggedIn(!!user);
+      if (user) {
+        const data = await loadInitiatives(user.uid);
+        setProjects(data);
+      } else {
+        setProjects([]);
+      }
     });
     return () => unsubscribe();
   }, []);
+
+  const handleAddProject = () => {
+    const newId = crypto.randomUUID();
+    navigate(`/project-setup?initiativeId=${newId}`);
+    setProjectMenu(false);
+  };
+
+  const handleSelectProject = (id) => {
+    navigate(`/discovery?initiativeId=${id}`);
+    setProjectMenu(false);
+  };
 
   return (
     <header className="glass-header" data-header>
@@ -48,15 +67,24 @@ export default function NavBar() {
                 </button>
                 {projectMenu && (
                   <ul className="dropdown">
-                    <li>Add New Project</li>
-                    {sampleProjects.map((p) => (
-                      <li key={p}>{p}</li>
+                    <li>
+                      <button type="button" onClick={handleAddProject}>
+                        Add New Project
+                      </button>
+                    </li>
+                    {projects.map((p) => (
+                      <li key={p.id}>
+                        <button type="button" onClick={() => handleSelectProject(p.id)}>
+                          {p.projectName || p.businessGoal || p.id}
+                        </button>
+                      </li>
                     ))}
                   </ul>
                 )}
               </div>
               <div className="search-bar">
                 <input type="text" placeholder="Search projects" />
+                <button type="button">Search</button>
               </div>
               <div className="add-menu">
                 <button type="button" onClick={() => setAddMenu(!addMenu)}>
