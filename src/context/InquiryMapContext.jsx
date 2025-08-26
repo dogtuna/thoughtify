@@ -117,7 +117,8 @@ export const InquiryMapProvider = ({ children }) => {
             updatedHypotheses[targetIndex],
             link,
             evidenceText,
-            analysis.analysisSummary
+            analysis.analysisSummary,
+            currentUser
           );
 
           updatedHypotheses[targetIndex] = updatedHypothesis;

@@ -71,8 +71,15 @@ ${contactsList}
 
 /**
  * Calculates the new confidence score for a hypothesis based on new evidence.
+ * Also appends an audit log entry explaining "why" the confidence changed.
  */
-export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisSummary) => {
+export const calculateNewConfidence = (
+  hypothesis,
+  link,
+  evidenceText,
+  analysisSummary,
+  user
+) => {
   const baseScore = hypothesis.confidenceScore ?? 0;
   const evidenceCount = (hypothesis.supportingEvidence?.length || 0) + (hypothesis.refutingEvidence?.length || 0);
   const diminishingFactor = 1 / Math.max(1, evidenceCount * 0.5);
@@ -87,6 +94,7 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
   const multiplier = link.relationship === "Refutes" ? -1.5 : 1;
   const delta = weightedImpact * diminishingFactor * multiplier;
 
+  const timestamp = Date.now();
   const newEvidenceEntry = {
     text: evidenceText,
     analysisSummary,
@@ -97,6 +105,8 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
     evidenceType: link.evidenceType,
     directness: link.directness,
     relationship: link.relationship,
+    timestamp,
+    user,
   };
 
   const key = link.relationship === "Supports" ? "supportingEvidence" : "refutingEvidence";
@@ -134,13 +144,27 @@ export const calculateNewConfidence = (hypothesis, link, evidenceText, analysisS
       );
     }
   }
-  
+
+  const oldConfidence = hypothesis.confidence ?? logisticConfidence(baseScore);
+  const newConfidence = logisticConfidence(newScore);
+  const deltaPct = newConfidence - oldConfidence;
+
+  const auditEntry = {
+    timestamp,
+    user,
+    evidence: evidenceText,
+    source: link.source,
+    weight: delta,
+    message: `${deltaPct >= 0 ? '+' : ''}${(deltaPct * 100).toFixed(0)}% from ${link.source}`,
+  };
+
   const updatedHypothesis = {
     ...hypothesis,
     [key]: updatedEvidence,
     confidenceScore: newScore,
-    confidence: logisticConfidence(newScore),
+    confidence: newConfidence,
     contested,
+    auditLog: [...(hypothesis.auditLog || []), auditEntry],
   };
 
   return { updatedHypothesis, extraRecommendations: [] };
