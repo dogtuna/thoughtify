@@ -3326,6 +3326,23 @@ Respond ONLY in this JSON format:
             </li>
         </ul>
         )}
+            {answerPanel &&
+      createPortal(
+        <AnswerSlideOver
+          question={answerPanel.question}
+          idx={answerPanel.idx}
+          allContacts={contacts}
+          currentUserName={currentUserName}
+          updateAnswer={updateAnswer}
+          analyzeAnswer={analyzeAnswer}
+          createTasks={createTasksFromAnalysis}
+          addContact={addContact}
+          onClose={() => setAnswerPanel(null)}
+          setToast={setToast}
+          setAnalyzing={setAnalyzing}
+        />,
+        document.body
+      )}
       {analysisModal && (
         <div
           className="modal-overlay"
