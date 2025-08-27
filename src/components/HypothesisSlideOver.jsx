@@ -1,8 +1,22 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
 
+const formatEvidenceSummary = (e) => {
+  const base = (e.analysisSummary || e.text || "").replace(
+    /^The new evidence\s*/i,
+    ""
+  );
+  if (!e.source) return base;
+  const intro = /interview|team|lead|manager|comment|exit/i.test(e.source)
+    ? `Comments from ${e.source}`
+    : `Data from ${e.source}`;
+  const lower = base.charAt(0).toLowerCase() + base.slice(1);
+  return `${intro} ${lower}`;
+};
+
 const HypothesisSlideOver = ({ hypothesis, onClose }) => {
-  const [showEvidence, setShowEvidence] = useState(false);
+  const [view, setView] = useState("summary");
+  const [selectedEvidence, setSelectedEvidence] = useState(null);
 
   const evidenceCount =
     (hypothesis.supportingEvidence?.length || 0) +
@@ -10,13 +24,41 @@ const HypothesisSlideOver = ({ hypothesis, onClose }) => {
   const pct = Math.round((hypothesis.confidence || 0) * 100);
   const titleId = hypothesis.displayId || hypothesis.id;
 
-  if (showEvidence) {
-    const allEvidence = [
-      ...(hypothesis.supportingEvidence || []).map((e) => ({ ...e, relation: "Supports" })),
-      ...(hypothesis.refutingEvidence || []).map((e) => ({ ...e, relation: "Refutes" })),
-    ];
-    const sorted = allEvidence.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const allEvidence = [
+    ...(hypothesis.supportingEvidence || []).map((e) => ({ ...e, relation: "Supports" })),
+    ...(hypothesis.refutingEvidence || []).map((e) => ({ ...e, relation: "Refutes" })),
+  ];
+  const sorted = allEvidence.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 
+  if (view === "detail" && selectedEvidence) {
+    return (
+      <div className="slide-over-overlay" onClick={onClose}>
+        <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center mb-2">
+            <button
+              className="text-white underline mr-2"
+              type="button"
+              onClick={() => setView("evidence")}
+            >
+              Back
+            </button>
+            <div className="flex-1" />
+            <button className="text-white" type="button" onClick={onClose}>
+              Close
+            </button>
+          </div>
+          <h3 className="mb-2 text-white">
+            {selectedEvidence.source || "Evidence"}
+          </h3>
+          <div className="text-sm whitespace-pre-wrap">
+            {selectedEvidence.text}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "evidence") {
     let conflictBanner = null;
     if (
       (hypothesis.supportingEvidence?.length || 0) > 0 &&
@@ -55,7 +97,7 @@ const HypothesisSlideOver = ({ hypothesis, onClose }) => {
             <button
               className="text-white underline mr-2"
               type="button"
-              onClick={() => setShowEvidence(false)}
+              onClick={() => setView("summary")}
             >
               Back
             </button>
@@ -66,13 +108,22 @@ const HypothesisSlideOver = ({ hypothesis, onClose }) => {
           </div>
           <h3 className="mb-2 text-white">Evidence for Hypothesis</h3>
           {conflictBanner}
-          <ul className="text-sm max-h-[60vh] overflow-y-auto">
+          <ul className="text-sm">
             {sorted.map((e, i) => (
               <li key={i} className="mb-2">
-                <div className="font-medium">{e.analysisSummary || e.text}</div>
+                <div className="font-medium">{formatEvidenceSummary(e)}</div>
                 <div className="text-gray-200">
-                  {e.source || "Unknown"} • {" "}
-                  {e.timestamp ? new Date(e.timestamp).toLocaleString() : ""} • {" "}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => {
+                      setSelectedEvidence(e);
+                      setView("detail");
+                    }}
+                  >
+                    {e.source || "Unknown"}
+                  </button>
+                  {" "}• {e.timestamp ? new Date(e.timestamp).toLocaleString() : ""} • {" "}
                   {(e.delta * 100).toFixed(1)}%
                 </div>
               </li>
@@ -97,7 +148,7 @@ const HypothesisSlideOver = ({ hypothesis, onClose }) => {
         </div>
         <div
           className="text-sm text-gray-200 cursor-pointer underline"
-          onClick={() => setShowEvidence(true)}
+          onClick={() => setView("evidence")}
         >
           {pct}% confidence • {evidenceCount} items of evidence
         </div>
