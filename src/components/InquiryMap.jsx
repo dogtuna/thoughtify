@@ -20,6 +20,7 @@ import { useInquiryMap } from "../context/InquiryMapContext";
 import useCanonical from "../utils/useCanonical";
 import { canonicalMapNodeUrl } from "../utils/canonical";
 import HypothesisCard from "./HypothesisCard";
+import HypothesisSlideOver from "./HypothesisSlideOver";
 
 // --- Helper Functions for Sizing (Unchanged) ---
 function useVisibleHeight(containerRef) {
@@ -114,7 +115,7 @@ ResizableNode.propTypes = {
 const nodeTypes = { resizable: ResizableNode };
 
 /* --------------------------------- main ---------------------------------- */
-const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefresh = () => {}, isAnalyzing }) => {
+const InquiryMap = ({ businessGoal, hypotheses = [], onRefresh = () => {}, isAnalyzing }) => {
   const wrapperRef = useRef(null);
   const height = useVisibleHeight(wrapperRef);
   const marginTop = useHeaderOverlap(wrapperRef);
@@ -141,7 +142,6 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
   const [modalOpen, setModalOpen] = useState(false);
   const [newHypothesis, setNewHypothesis] = useState("");
 
-  const selectedPct = selected ? Math.min(100, Math.max(0, Math.round((selected.data.confidence || 0) * 100))) : 0;
   const { addHypothesis: addHypothesisToDb } = useInquiryMap();
 
   const saveLayout = useCallback((currentNodes, currentEdges) => {
@@ -268,10 +268,6 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
     saveLayout(nodes, edges);
   }, [nodes, edges, saveLayout]);
 
-  const handleConfidenceChange = (id, confidence) => {
-    onUpdateConfidence(id, confidence);
-  };
-
   const addHypothesis = (e) => {
     e.preventDefault();
     // This would call a function in the context to add the hypothesis to Firestore
@@ -329,89 +325,12 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
       </ReactFlow>
 
       {/* Portals for modals (Unchanged but confirmed complete) */}
-      {selected && createPortal(
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.5)" }}
-            onClick={() => setSelected(null)}
-          >
-            <div
-              className="initiative-card"
-              style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "min(520px, 90vw)", maxHeight: "90vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-            <div className="flex items-center gap-2">
-              <span className="font-semibold flex-1 whitespace-pre-wrap break-words">
-                {selected.data.label}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={selectedPct}
-                onChange={(e) =>
-                  handleConfidenceChange(selected.id, Number(e.target.value) / 100)
-                }
-              />
-              <span>{selectedPct}%</span>
-            </div>
-            {Array.isArray(selected.data.sourceContributions) &&
-              selected.data.sourceContributions.length > 0 && (
-                <details>
-                  <summary className="cursor-pointer">Source contributions</summary>
-                  <ul className="list-disc ml-4">
-                    {selected.data.sourceContributions.map((s, idx) => (
-                      <li key={idx}>
-                        {s.source.length > 60
-                          ? `${s.source.slice(0, 60)}…`
-                          : s.source}
-                        : {(s.percent * 100).toFixed(1)}%
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            {(Array.isArray(selected.data.supportingEvidence) &&
-              selected.data.supportingEvidence.length > 0) ||
-            (Array.isArray(selected.data.refutingEvidence) &&
-              selected.data.refutingEvidence.length > 0) ? (
-              <details>
-                <summary className="cursor-pointer">Evidence</summary>
-                <ul className="ml-4 space-y-1">
-                  {selected.data.supportingEvidence?.map((e, idx) => (
-                    <li key={`sup-${idx}`} className="flex items-start gap-1">
-                      <span className="text-green-600 font-bold">+</span>
-                      <span>
-                        {e.analysisSummary ||
-                          (e.text.length > 60
-                            ? `${e.text.slice(0, 60)}…`
-                            : e.text)}
-                      </span>
-                    </li>
-                  ))}
-                  {selected.data.refutingEvidence?.map((e, idx) => (
-                    <li key={`ref-${idx}`} className="flex items-start gap-1">
-                      <span className="text-red-600 font-bold">-</span>
-                      <span>
-                        {e.analysisSummary ||
-                          (e.text.length > 60
-                            ? `${e.text.slice(0, 60)}…`
-                            : e.text)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-            <div className="flex justify-end">
-              <button
-                className="px-3 py-1 bg-blue-500 text-white rounded"
-                onClick={() => setSelected(null)}
-              >
-                Close
-              </button>
-            </div>
-            </div>
-          </div>,
+      {selected &&
+        createPortal(
+          <HypothesisSlideOver
+            hypothesis={selected.data}
+            onClose={() => setSelected(null)}
+          />, 
           document.body
         )}
 
@@ -451,7 +370,6 @@ const InquiryMap = ({ businessGoal, hypotheses = [], onUpdateConfidence, onRefre
 InquiryMap.propTypes = {
   businessGoal: PropTypes.string,
   hypotheses: PropTypes.arrayOf(PropTypes.object),
-  onUpdateConfidence: PropTypes.func,
   onRefresh: PropTypes.func,
   isAnalyzing: PropTypes.bool,
 };
