@@ -45,16 +45,7 @@ const InquiryMap = ({ hypotheses = [] }) => {
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="font-semibold">Hypothesis {letter}</div>
-                {h.contested && (
-                  <button
-                    type="button"
-                    className="text-orange-400"
-                    title="Resolve conflict"
-                    onClick={(e) => handleConflictClick(e, h)}
-                  >
-                    !
-                  </button>
-                )}
+                
               </div>
               <div className="text-white mb-2">
                 {h.statement || h.label || ""}
@@ -62,9 +53,20 @@ const InquiryMap = ({ hypotheses = [] }) => {
               <div className="flex items-center justify-end gap-4">
                 {up && <span className="text-green-600">▲</span>}
                 {down && <span className="text-red-600">▼</span>}
-                <span className="w-12 text-right">{pct}%</span>
-                <span className="text-green-600">{supports}</span>
-                <span className="text-red-600">{refutes}</span>
+                {h.contested && (
+                  <button
+                    type="button"
+                    className="text-orange-400"
+                    style={{ padding: '0.1em 1.2em' }}
+                    title="Resolve conflict"
+                    onClick={(e) => handleConflictClick(e, h)}
+                  >
+                    !
+                  </button>
+                )}
+                Confidence: <span className="w-12 text-right">{pct}%</span>
+                Supporting: <span className="text-green-600">{supports}</span>
+                Refuting: <span className="text-red-600">{refutes}</span>
               </div>
             </li>
           );
