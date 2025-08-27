@@ -47,7 +47,7 @@ const InquiryMapContent = () => {
   }));
 
   return (
-    <main className="min-h-screen pt-32 pb-40">
+    <main className="min-h-screen pb-40">
       <div className="flex items-center gap-4 mb-4">
         {isAnalyzing && <span>Analyzing evidence...</span>}
       </div>
