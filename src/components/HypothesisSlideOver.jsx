@@ -18,6 +18,11 @@ const formatEvidenceSummary = (e) => {
   return `${intro} ${lower}`;
 };
 
+const isLikelyPerson = (src = "") =>
+  /\b(manager|lead|director|vp|chief|officer|head|analyst|engineer|consultant|employee|supervisor|coordinator)\b/i.test(
+    src
+  );
+
 const HypothesisSlideOver = ({
   hypothesis,
   onClose,
@@ -146,12 +151,44 @@ const HypothesisSlideOver = ({
   }
 
   if (view === "conflict" && hasConflict) {
-    const tasks = [
-      {
-        text: `Facilitate a discussion between ${topSupport.source} and ${topRefute.source} to resolve conflicting views on hypothesis ${titleId}.`,
+    const supportSrc = topSupport.source || "supporting source";
+    const refuteSrc = topRefute.source || "refuting source";
+    const supportSummary =
+      topSupport.analysisSummary || topSupport.text || "";
+    const refuteSummary =
+      topRefute.analysisSummary || topRefute.text || "";
+    const supportIsPerson = isLikelyPerson(supportSrc);
+    const refuteIsPerson = isLikelyPerson(refuteSrc);
+
+    const tasks = [];
+    if (supportIsPerson) {
+      tasks.push({
+        text: `Interview ${supportSrc} to clarify their supporting view: "${supportSummary}"`,
         taskType: "validate",
-      },
-    ];
+      });
+    } else {
+      tasks.push({
+        text: `Review ${supportSrc} to verify its supporting claim: "${supportSummary}"`,
+        taskType: "validate",
+      });
+    }
+
+    if (refuteIsPerson) {
+      tasks.push({
+        text: `Interview ${refuteSrc} to clarify their refuting view: "${refuteSummary}"`,
+        taskType: "validate",
+      });
+    } else {
+      tasks.push({
+        text: `Review ${refuteSrc} to verify its refuting claim: "${refuteSummary}"`,
+        taskType: "validate",
+      });
+    }
+
+    tasks.push({
+      text: `Compare findings from ${supportSrc} and ${refuteSrc} to resolve conflicting perspectives on hypothesis ${titleId}.`,
+      taskType: "validate",
+    });
 
     const handleAddTasks = async () => {
       const user = auth.currentUser;
