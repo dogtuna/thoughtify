@@ -10,7 +10,6 @@ const InquiryMapContent = () => {
     hypotheses,
     businessGoal,
     loadHypotheses,
-    updateConfidence,
     refreshInquiryMap,
     isAnalyzing,
   } = useInquiryMap();
@@ -52,13 +51,6 @@ const InquiryMapContent = () => {
     contested: h.contested || false,
   }));
 
-  const handleUpdateConfidence = useCallback(
-    (hypothesisId, confidence) => {
-      updateConfidence(hypothesisId, confidence);
-    },
-    [updateConfidence]
-  );
-
   const handleRefresh = useCallback(() => {
     refreshInquiryMap();
   }, [refreshInquiryMap]);
@@ -71,7 +63,6 @@ const InquiryMapContent = () => {
       <InquiryMap
         businessGoal={businessGoal}
         hypotheses={parsedHypotheses}
-        onUpdateConfidence={handleUpdateConfidence}
         onRefresh={handleRefresh}
         isAnalyzing={isAnalyzing}
       />
