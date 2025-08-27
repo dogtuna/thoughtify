@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
@@ -6,13 +6,7 @@ import { auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 const InquiryMapContent = () => {
-  const {
-    hypotheses,
-    businessGoal,
-    loadHypotheses,
-    refreshInquiryMap,
-    isAnalyzing,
-  } = useInquiryMap();
+  const { hypotheses, loadHypotheses, isAnalyzing } = useInquiryMap();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
 
@@ -49,23 +43,15 @@ const InquiryMapContent = () => {
     refutingEvidence: h.refutingEvidence || [],
     sourceContributions: h.sourceContributions || [],
     contested: h.contested || false,
+    trend: Math.sign(h.auditLog?.[h.auditLog.length - 1]?.weight || 0),
   }));
-
-  const handleRefresh = useCallback(() => {
-    refreshInquiryMap();
-  }, [refreshInquiryMap]);
 
   return (
     <main className="min-h-screen pt-32 pb-40">
       <div className="flex items-center gap-4 mb-4">
         {isAnalyzing && <span>Analyzing evidence...</span>}
       </div>
-      <InquiryMap
-        businessGoal={businessGoal}
-        hypotheses={parsedHypotheses}
-        onRefresh={handleRefresh}
-        isAnalyzing={isAnalyzing}
-      />
+      <InquiryMap hypotheses={parsedHypotheses} />
     </main>
   );
 };
