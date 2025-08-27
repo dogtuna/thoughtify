@@ -1,27 +1,36 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import PropTypes from "prop-types";
 import HypothesisSlideOver from "./HypothesisSlideOver";
+import "./AIToolsGenerators.css";
 
 const InquiryMap = ({ hypotheses = [] }) => {
   const [selected, setSelected] = useState(null);
   const [conflict, setConflict] = useState(null);
 
+  const idToLetter = useMemo(() => {
+    const map = {};
+    hypotheses.forEach((h, idx) => {
+      map[h.id] = String.fromCharCode(65 + idx);
+    });
+    return map;
+  }, [hypotheses]);
+
   const sorted = [...hypotheses].sort((a, b) => b.confidence - a.confidence);
 
-  const handleRowClick = (h, letter) => {
-    setSelected({ ...h, displayId: letter });
+  const handleRowClick = (h) => {
+    setSelected({ ...h, displayId: idToLetter[h.id] });
   };
 
-  const handleConflictClick = (e, h, letter) => {
+  const handleConflictClick = (e, h) => {
     e.stopPropagation();
-    setConflict({ ...h, displayId: letter });
+    setConflict({ ...h, displayId: idToLetter[h.id] });
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <ul className="divide-y divide-gray-200">
-        {sorted.map((h, idx) => {
-          const letter = String.fromCharCode(65 + idx);
+    <div className="mx-auto w-[90%]">
+      <ul className="space-y-4">
+        {sorted.map((h) => {
+          const letter = idToLetter[h.id];
           const pct = Math.round((h.confidence || 0) * 100);
           const trend = h.trend || 0;
           const up = trend > 0;
@@ -31,32 +40,31 @@ const InquiryMap = ({ hypotheses = [] }) => {
           return (
             <li
               key={h.id}
-              className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-              onClick={() => handleRowClick(h, letter)}
+              className="initiative-card cursor-pointer transition-opacity hover:opacity-90"
+              onClick={() => handleRowClick(h)}
             >
-              <div className="flex-1">
+              <div className="flex justify-between items-start mb-2">
                 <div className="font-semibold">Hypothesis {letter}</div>
-                <div className="text-sm text-gray-600">
-                  {h.statement || h.label || ""}
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                {up && <span className="text-green-600">▲</span>}
-                {down && <span className="text-red-600">▼</span>}
-                {!up && !down && <span className="text-gray-400">▶</span>}
-                <span className="w-12 text-right">{pct}%</span>
-                <span className="text-green-600">{supports}</span>
-                <span className="text-red-600">{refutes}</span>
                 {h.contested && (
                   <button
                     type="button"
-                    className="text-orange-600"
+                    className="text-orange-400"
                     title="Resolve conflict"
-                    onClick={(e) => handleConflictClick(e, h, letter)}
+                    onClick={(e) => handleConflictClick(e, h)}
                   >
                     !
                   </button>
                 )}
+              </div>
+              <div className="text-white mb-2">
+                {h.statement || h.label || ""}
+              </div>
+              <div className="flex items-center justify-end gap-4">
+                {up && <span className="text-green-600">▲</span>}
+                {down && <span className="text-red-600">▼</span>}
+                <span className="w-12 text-right">{pct}%</span>
+                <span className="text-green-600">{supports}</span>
+                <span className="text-red-600">{refutes}</span>
               </div>
             </li>
           );
