@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../firebase";
 import { loadInitiatives } from "../utils/initiatives";
 
@@ -10,6 +10,10 @@ export default function NavBar() {
   const [addMenu, setAddMenu] = useState(false);
   const [projects, setProjects] = useState([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const initiativeId = searchParams.get("initiativeId");
+  const activeProject = projects.find((p) => p.id === initiativeId);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -62,8 +66,13 @@ export default function NavBar() {
           {loggedIn && (
             <>
               <div className="project-switcher">
+                <span>Project:</span>
                 <button type="button" onClick={() => setProjectMenu(!projectMenu)}>
-                  Projects
+                  {activeProject
+                    ? activeProject.projectName ||
+                      activeProject.businessGoal ||
+                      activeProject.id
+                    : "Select or Add"}
                 </button>
                 {projectMenu && (
                   <ul className="dropdown">

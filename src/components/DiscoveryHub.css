@@ -33,9 +33,9 @@
   font-weight: bold;
 }
 
-.main-content {
+.discovery-hub .main-content {
   flex: 1;
-  padding: 1rem;
+  padding: 0 1rem 1rem;
 }
 
 .filter-bar {
