@@ -708,6 +708,12 @@ body.pulsing::before {
   position: relative;
 }
 
+.project-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .project-switcher button,
 .add-menu button {
   background: none;
