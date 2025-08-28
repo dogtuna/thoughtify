@@ -1,6 +1,7 @@
 // src/mcp/client.js
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { MCP_SERVER_URL, MCP_HEADERS } from "./config.js";
 
 // Keep one live client per server URL
 const clients = new Map(); // Map<string, { client, transport, initialized }>
@@ -8,7 +9,7 @@ const clients = new Map(); // Map<string, { client, transport, initialized }>
 const PROTOCOL_VERSION = "2025-03-26";
 
 /** Build a transport with optional auth headers (API key or Bearer). */
-function makeTransport(serverUrl, extraHeaders) {
+function makeTransport(serverUrl, extraHeaders = MCP_HEADERS) {
   const headers = {
     // Streamable HTTP expects both
     Accept: "application/json, text/event-stream",
@@ -19,7 +20,7 @@ function makeTransport(serverUrl, extraHeaders) {
   });
 }
 
-async function ensureClient(serverUrl, extraHeaders) {
+async function ensureClient(serverUrl = MCP_SERVER_URL, extraHeaders = MCP_HEADERS) {
   let rec = clients.get(serverUrl);
   if (rec) return rec;
 
@@ -57,7 +58,7 @@ function isNotInitializedErr(err) {
 }
 
 /** Retry once if the serverless hop lost the session. */
-async function withInitRetry(serverUrl, extraHeaders, fn) {
+async function withInitRetry(serverUrl = MCP_SERVER_URL, extraHeaders = MCP_HEADERS, fn) {
   let rec = await ensureClient(serverUrl, extraHeaders);
   try {
     await initializeIfNeeded(rec);
@@ -76,18 +77,18 @@ async function withInitRetry(serverUrl, extraHeaders, fn) {
 
 /** Public API (JS) **/
 
-export async function connect(serverUrl, extraHeaders) {
+export async function connect(serverUrl = MCP_SERVER_URL, extraHeaders = MCP_HEADERS) {
   await withInitRetry(serverUrl, extraHeaders, async () => undefined);
 }
 
-export async function listTools(serverUrl, extraHeaders) {
+export async function listTools(serverUrl = MCP_SERVER_URL, extraHeaders = MCP_HEADERS) {
   return withInitRetry(serverUrl, extraHeaders, async (rec) => {
     const { tools } = await rec.client.listTools();
     return tools; // [{ name, title, description, inputSchema }, ...]
   });
 }
 
-export async function runTool(serverUrl, toolName, args = {}, extraHeaders) {
+export async function runTool(serverUrl = MCP_SERVER_URL, toolName, args = {}, extraHeaders = MCP_HEADERS) {
   return withInitRetry(serverUrl, extraHeaders, async (rec) => {
     try {
       const res = await rec.client.callTool({ name: toolName, arguments: args });
@@ -115,7 +116,7 @@ export async function runTool(serverUrl, toolName, args = {}, extraHeaders) {
   });
 }
 
-export async function* runToolStream(serverUrl, toolName, args = {}, extraHeaders) {
+export async function* runToolStream(serverUrl = MCP_SERVER_URL, toolName, args = {}, extraHeaders = MCP_HEADERS) {
   const queue = [];
   let resolve;
   let done = false;
@@ -186,7 +187,7 @@ export async function* runToolStream(serverUrl, toolName, args = {}, extraHeader
   return finalRes;
 }
 
-export async function close(serverUrl) {
+export async function close(serverUrl = MCP_SERVER_URL) {
   const rec = clients.get(serverUrl);
   if (!rec) return;
   try {
