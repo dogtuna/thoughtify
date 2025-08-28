@@ -1,9 +1,14 @@
 // functions/mcpServer.js
 import { onRequest } from "firebase-functions/v2/https";
-import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+
+// ---------- config ----------
+const PROTOCOL_VERSION = "2025-03-26";
+const SERVER_NAME = "firebase-callables";
+const SERVER_VER  = "1.0.2";
+const CALL_TIMEOUT_MS = 120_000;
 
 // Tools to expose (your callable Cloud Functions)
 const callableFunctions = [
@@ -32,7 +37,7 @@ const callableFunctions = [
 // Open input schema: accept any object
 const anyObject = z.object({}).catchall(z.any());
 
-// ------------------------ helpers ------------------------
+// ---------- helpers ----------
 function toToolResult(result) {
   try {
     if (result === undefined || result === null) {
@@ -55,22 +60,48 @@ async function callCallable(name, input) {
   const fn = mod?.[name];
   if (!fn) throw new Error(`Function ${name} not found in index.js`);
   if (typeof fn.run === "function") {
-    // Firebase v2 onCall testing API
-    return await fn.run({ data: input });
+    return await fn.run({ data: input }); // v2 onCall testing API
   }
   if (typeof fn === "function") {
-    // Fallback for direct callable
-    return await fn({ data: input });
+    return await fn({ data: input });      // fallback
   }
   throw new Error(`Function ${name} is not callable`);
 }
 
-// ------------------------ server ------------------------
+/**
+ * If no session is provided and body lacks an "initialize" message,
+ * prepend a minimal initialize so single-call POSTs work in serverless.
+ */
+function ensureInitializedBodyIfNeeded(req, body) {
+  const hasSession = !!(req.get("Mcp-Session-Id") || req.get("mcp-session-id"));
+  const msgs = Array.isArray(body) ? body : [body];
+  const hasInitialize = msgs.some((m) => m && m.method === "initialize");
+
+  if (hasSession || hasInitialize) return body;
+
+  const init = {
+    jsonrpc: "2.0",
+    id: 1, // id doesn't matter; client can ignore it
+    method: "initialize",
+    params: {
+      protocolVersion: PROTOCOL_VERSION,
+      clientInfo: { name: "server-auto-init", version: SERVER_VER },
+      capabilities: {},
+    },
+  };
+  return Array.isArray(body) ? [init, ...body] : [init, body];
+}
+
+// ---------- server ----------
 function buildServer() {
-  const server = new McpServer({
-    name: "firebase-callables",
-    version: "1.0.1",
-  });
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VER });
+
+  // Simple ping tool for sanity checks
+  server.registerTool(
+    "ping",
+    { title: "ping", description: "Health check", inputSchema: { type: "object" } },
+    async () => ({ content: [{ type: "text", text: "pong" }] })
+  );
 
   for (const name of callableFunctions) {
     server.registerTool(
@@ -85,13 +116,9 @@ function buildServer() {
           if (!input || typeof input !== "object") {
             return { content: [{ type: "text", text: "Input must be an object" }], isError: true };
           }
-
-          // Guard long-running calls
-          const TIMEOUT_MS = 120_000;
           const timeout = new Promise((_, rej) =>
-            setTimeout(() => rej(new Error(`Timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS)
+            setTimeout(() => rej(new Error(`Timeout after ${CALL_TIMEOUT_MS}ms`)), CALL_TIMEOUT_MS)
           );
-
           const result = await Promise.race([callCallable(name, input), timeout]);
           return toToolResult(result);
         } catch (err) {
@@ -101,7 +128,6 @@ function buildServer() {
       }
     );
   }
-
   return server;
 }
 
@@ -115,46 +141,41 @@ export const mcpServer = onRequest(async (req, res) => {
   res.set("Cache-Control", "no-store");
   res.set("Vary", "Accept"); // content negotiation (JSON/SSE)
 
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
+  if (req.method === "OPTIONS") return void res.status(204).end();
 
-  // Simple health/info for quick checks in a browser
+  // Health endpoint for quick browser check
   if (req.method === "GET") {
-    res.status(200).json({ ok: true, name: "firebase-callables", version: "1.0.1" });
-    return;
+    return void res.status(200).json({ ok: true, name: SERVER_NAME, version: SERVER_VER });
   }
 
   if (req.method !== "POST") {
-    res
+    return void res
       .status(405)
       .json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed." }, id: null });
-    return;
   }
 
   try {
     const server = buildServer();
 
-    // Emit a session id so clients can reuse it across calls
+    // Stateless mode: DO NOT generate server-side session ids.
+    // (Multiple CF instances won't share memory; let each POST stand alone.)
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: undefined,
     });
 
-    // Clean up when the connection closes
     res.on("close", () => {
       try {
         transport.close();
         server.close?.();
-      } catch {
-        /* noop */
-      }
+      } catch {}
     });
 
     await server.connect(transport);
 
-    const body =
+    // Parse body and auto-prepend initialize if needed (sessionless safety)
+    const parsed =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
+    const body = ensureInitializedBodyIfNeeded(req, parsed);
 
     await transport.handleRequest(req, res, body);
   } catch (error) {
