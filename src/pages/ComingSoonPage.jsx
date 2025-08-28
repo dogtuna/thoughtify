@@ -12,12 +12,19 @@ import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import Testimonials from "../components/Testimonials";
 import hero1 from "../assets/hero1.png";
+import { runTool } from "../mcp/client";
 
 import "../App.css";
 import "../coreBenefits.css";
 
 export default function ComingSoonPage({ openSignupModal }) {
   const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
+  const LRS_SERVER = "https://cloud.scorm.com/lrs/8FKK4XRIED";
+  const LRS_HEADERS = {
+    "Content-Type": "application/json",
+    "X-Experience-API-Version": "1.0.3",
+    Authorization: LRS_AUTH,
+  };
   const {
     register: registerSignup,
     handleSubmit: handleSignupSubmit,
@@ -124,35 +131,7 @@ const onEmailSubmit = async (data) => {
     };
 
     // 3) Send to SCORM Cloud LRS
-    const lrsResponse = await fetch(
-      "https://cloud.scorm.com/lrs/8FKK4XRIED/statements",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIStatement),
-      }
-    );
-
-    // 4) Safely parse the response (JSON or plain text)
-    let lrsResponseData;
-    const contentType = lrsResponse.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      lrsResponseData = await lrsResponse.json();
-    } else {
-      lrsResponseData = await lrsResponse.text();
-    }
-
-    // 5) Handle HTTP errors
-    if (!lrsResponse.ok) {
-      console.error("SCORM Cloud LRS Error:", lrsResponseData);
-      throw new Error(
-        `Failed to send xAPI statement: ${lrsResponseData}`
-      );
-    }
+    await runTool(LRS_SERVER, "statements", xAPIStatement, LRS_HEADERS);
 
     // 6) Clear the form and reset step
     resetSignup();
@@ -193,22 +172,7 @@ const onEmailSubmit = async (data) => {
         timestamp: new Date().toISOString(),
       };
 
-      const lrsResponse = await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIStatement),
-      });
-
-      const lrsResponseData = await lrsResponse.json();
-
-      if (!lrsResponse.ok) {
-        console.error("SCORM Cloud LRS Error:", lrsResponseData);
-        throw new Error(`Failed to send xAPI statement: ${JSON.stringify(lrsResponseData)}`);
-      }
+      await runTool(LRS_SERVER, "statements", xAPIStatement, LRS_HEADERS);
 
       resetInquiry();
     } catch (error) {
