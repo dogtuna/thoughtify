@@ -34,7 +34,7 @@ function buildServer() {
     version: "1.0.0",
   });
 
-  // Open input schema: accept any object (ZodObject shape)
+  // Open input schema: accept any object
   const anyObject = z.object({}).catchall(z.any());
 
   for (const name of callableFunctions) {
@@ -53,31 +53,45 @@ function buildServer() {
               isError: true,
             };
           }
+
           // Lazy-load your exported callable functions from index.js
           const mod = await import("./index.js");
-          const fn = (mod as any)[name];
+          const fn = mod?.[name];
 
-          if (!fn || typeof fn.run !== "function") {
+          // Prefer the .run() helper if available (v2 testing API)
+          if (fn && typeof fn.run === "function") {
+            const result = await fn.run({ data: input });
             return {
-              content: [{ type: "text", text: `Function ${name} is not callable` }],
-              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: typeof result === "string" ? result : JSON.stringify(result),
+                },
+              ],
             };
           }
 
-          const result = await fn.run({ data: input });
+          // Fallback: attempt direct invocation if it's a function
+          if (typeof fn === "function") {
+            const result = await fn({ data: input });
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: typeof result === "string" ? result : JSON.stringify(result),
+                },
+              ],
+            };
+          }
 
-          // Tool results must return MCP content blocks; return JSON as text for max compatibility
           return {
-            content: [
-              {
-                type: "text",
-                text: typeof result === "string" ? result : JSON.stringify(result),
-              },
-            ],
+            content: [{ type: "text", text: `Function ${name} is not callable` }],
+            isError: true,
           };
-        } catch (err: any) {
+        } catch (err) {
+          const msg = err?.message || String(err);
           return {
-            content: [{ type: "text", text: `Error: ${err?.message || String(err)}` }],
+            content: [{ type: "text", text: `Error: ${msg}` }],
             isError: true,
           };
         }
@@ -113,7 +127,7 @@ export const mcpServer = onRequest(async (req, res) => {
       res.on("close", () => {
         try {
           transport.close();
-          // @ts-ignore close() exists at runtime
+          // close() may exist on server implementation
           server.close?.();
         } catch {
           /* noop */
@@ -128,9 +142,9 @@ export const mcpServer = onRequest(async (req, res) => {
           ? JSON.parse(req.body || "{}")
           : req.body ?? {};
 
-      await transport.handleRequest(req as any, res as any, body);
+      await transport.handleRequest(req, res, body);
       return;
-    } catch (error: any) {
+    } catch (error) {
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: "2.0",
@@ -157,3 +171,4 @@ export const mcpServer = onRequest(async (req, res) => {
   // Fallback
   res.status(405).send("Method not allowed.");
 });
+
