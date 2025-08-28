@@ -10,8 +10,7 @@ const { mcpServer } = await import('../mcpServer.js');
 
 const fft = functionsTest();
 
-function startWrappedServer() {
-  const wrapped = fft.wrap(mcpServer);
+function startServer() {
   const server = http.createServer((req, res) => {
     // Express-style helper
     // @ts-ignore
@@ -21,7 +20,7 @@ function startWrappedServer() {
     req.on('end', () => {
       // @ts-ignore
       req.body = chunks.length ? Buffer.concat(chunks).toString() : undefined;
-      wrapped(req, res);
+      mcpServer(req, res);
     });
   });
   return new Promise<{url: string, close: () => void}>((resolve) => {
@@ -38,7 +37,7 @@ describe('mcpServer HTTPS function', () => {
   });
 
   test('ping tool responds', async () => {
-    const { url, close } = await startWrappedServer();
+    const { url, close } = await startServer();
     const initResp = await fetch(url, {
       method: 'POST',
       headers: {
