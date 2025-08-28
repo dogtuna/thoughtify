@@ -1,16 +1,16 @@
 // functions/mcpServer.js
 import { onRequest } from "firebase-functions/v2/https";
+import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
-// ---------- config ----------
 const PROTOCOL_VERSION = "2025-03-26";
 const SERVER_NAME = "firebase-callables";
-const SERVER_VER  = "1.0.2";
+const SERVER_VER = "1.0.3";
 const CALL_TIMEOUT_MS = 120_000;
 
-// Tools to expose (your callable Cloud Functions)
+// List of callable Cloud Functions to expose as MCP tools
 const callableFunctions = [
   "generateTrainingPlan",
   "generateStudyMaterial",
@@ -34,10 +34,8 @@ const callableFunctions = [
   "sendEmailReply",
 ];
 
-// Open input schema: accept any object
 const anyObject = z.object({}).catchall(z.any());
 
-// ---------- helpers ----------
 function toToolResult(result) {
   try {
     if (result === undefined || result === null) {
@@ -60,43 +58,18 @@ async function callCallable(name, input) {
   const fn = mod?.[name];
   if (!fn) throw new Error(`Function ${name} not found in index.js`);
   if (typeof fn.run === "function") {
-    return await fn.run({ data: input }); // v2 onCall testing API
+    return await fn.run({ data: input }); // v2 onCall test runner
   }
   if (typeof fn === "function") {
-    return await fn({ data: input });      // fallback
+    return await fn({ data: input }); // fallback
   }
   throw new Error(`Function ${name} is not callable`);
 }
 
-/**
- * If no session is provided and body lacks an "initialize" message,
- * prepend a minimal initialize so single-call POSTs work in serverless.
- */
-function ensureInitializedBodyIfNeeded(req, body) {
-  const hasSession = !!(req.get("Mcp-Session-Id") || req.get("mcp-session-id"));
-  const msgs = Array.isArray(body) ? body : [body];
-  const hasInitialize = msgs.some((m) => m && m.method === "initialize");
-
-  if (hasSession || hasInitialize) return body;
-
-  const init = {
-    jsonrpc: "2.0",
-    id: 1, // id doesn't matter; client can ignore it
-    method: "initialize",
-    params: {
-      protocolVersion: PROTOCOL_VERSION,
-      clientInfo: { name: "server-auto-init", version: SERVER_VER },
-      capabilities: {},
-    },
-  };
-  return Array.isArray(body) ? [init, ...body] : [init, body];
-}
-
-// ---------- server ----------
 function buildServer() {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VER });
 
-  // Simple ping tool for sanity checks
+  // Minimal health tool
   server.registerTool(
     "ping",
     { title: "ping", description: "Health check", inputSchema: { type: "object" } },
@@ -122,17 +95,20 @@ function buildServer() {
           const result = await Promise.race([callCallable(name, input), timeout]);
           return toToolResult(result);
         } catch (err) {
-          const msg = err?.message || String(err);
-          return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+          return {
+            content: [{ type: "text", text: `Error: ${err?.message || String(err)}` }],
+            isError: true,
+          };
         }
       }
     );
   }
+
   return server;
 }
 
 export const mcpServer = onRequest(async (req, res) => {
-  // CORS + security + caching
+  // CORS + security
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.set("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id, mcp-session-id");
@@ -143,7 +119,6 @@ export const mcpServer = onRequest(async (req, res) => {
 
   if (req.method === "OPTIONS") return void res.status(204).end();
 
-  // Health endpoint for quick browser check
   if (req.method === "GET") {
     return void res.status(200).json({ ok: true, name: SERVER_NAME, version: SERVER_VER });
   }
@@ -157,10 +132,9 @@ export const mcpServer = onRequest(async (req, res) => {
   try {
     const server = buildServer();
 
-    // Stateless mode: DO NOT generate server-side session ids.
-    // (Multiple CF instances won't share memory; let each POST stand alone.)
+    // Use real sessions so the client can: initialize → list → call
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
+      sessionIdGenerator: () => randomUUID(),
     });
 
     res.on("close", () => {
@@ -172,10 +146,10 @@ export const mcpServer = onRequest(async (req, res) => {
 
     await server.connect(transport);
 
-    // Parse body and auto-prepend initialize if needed (sessionless safety)
-    const parsed =
+    // MUST start each session with exactly one initialize message.
+    // We DO NOT auto-prepend initialize. Client must send it first per session.
+    const body =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
-    const body = ensureInitializedBodyIfNeeded(req, parsed);
 
     await transport.handleRequest(req, res, body);
   } catch (error) {
