@@ -1,4 +1,6 @@
 // functions/mcpServer.js
+/* eslint-env node */
+/* global process */
 import { onRequest } from "firebase-functions/v2/https";
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -17,10 +19,26 @@ const API_KEY = process.env.MCP_API_KEY;
 const SERVER_NAME = "firebase-callables";
 const SERVER_VER = "1.0.4";
 const CALL_TIMEOUT_MS = 120_000;
+const SESSION_TTL_MS = Number(process.env.MCP_SESSION_TTL_MS ?? "600000");
 
 // Keep transports (and servers) by session id across requests in this CF instance
-const transports = new Map(); // Map<string, StreamableHTTPServerTransport>
-const servers = new Map();    // Map<string, McpServer>
+const transports = new Map(); // Map<string, { transport: StreamableHTTPServerTransport, lastActivity: number }>
+const servers = new Map(); // Map<string, { server: McpServer, lastActivity: number }>
+
+if (SESSION_TTL_MS > 0) {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [sid, { transport, lastActivity }] of transports) {
+      if (now - lastActivity > SESSION_TTL_MS) {
+        try { transport.close(); } catch { /* ignore */ }
+        transports.delete(sid);
+        const serverEntry = servers.get(sid);
+        try { serverEntry?.server?.close?.(); } catch { /* ignore */ }
+        servers.delete(sid);
+      }
+    }
+  }, SESSION_TTL_MS).unref?.();
+}
 
 // Tools to expose
 const callableFunctions = [
@@ -149,7 +167,8 @@ export const mcpServer = onRequest(async (req, res) => {
 
   try {
     if (req.method === "POST") {
-      let transport = sessionId ? transports.get(sessionId) : undefined;
+      let transportEntry = sessionId ? transports.get(sessionId) : undefined;
+      let transport = transportEntry?.transport;
 
       if (!transport) {
         // Only create+connect on initialize
@@ -164,13 +183,13 @@ export const mcpServer = onRequest(async (req, res) => {
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (sid) => {
-            transports.set(sid, transport);
+            transports.set(sid, { transport, lastActivity: Date.now() });
           },
         });
 
         transport.onclose = () => {
           if (transport.sessionId) {
-            try { servers.get(transport.sessionId)?.close?.(); } catch {
+            try { servers.get(transport.sessionId)?.server?.close?.(); } catch {
               /* ignore */
             }
             servers.delete(transport.sessionId);
@@ -179,7 +198,7 @@ export const mcpServer = onRequest(async (req, res) => {
         };
 
         const server = buildServer();
-        servers.set(transport.sessionId ?? "pending", server); // overwritten once session exists
+        servers.set(transport.sessionId ?? "pending", { server, lastActivity: Date.now() }); // overwritten once session exists
         await server.connect(transport);
       }
 
@@ -187,8 +206,20 @@ export const mcpServer = onRequest(async (req, res) => {
 
       // If session id just got assigned on this initialize, fix server map key
       if (!sessionId && transport.sessionId && servers.has("pending")) {
-        servers.set(transport.sessionId, servers.get("pending"));
-        servers.delete("pending");
+        const entry = servers.get("pending");
+        if (entry) {
+          servers.set(transport.sessionId, entry);
+          servers.delete("pending");
+          entry.lastActivity = Date.now();
+        }
+      }
+
+      if (transport.sessionId) {
+        const now = Date.now();
+        const te = transports.get(transport.sessionId);
+        if (te) te.lastActivity = now;
+        const se = servers.get(transport.sessionId);
+        if (se) se.lastActivity = now;
       }
       return;
     }
@@ -198,10 +229,12 @@ export const mcpServer = onRequest(async (req, res) => {
         return void res.status(400).send("Invalid or missing session ID");
       }
       const t = transports.get(sessionId);
-      try { t?.close(); } catch {
+      try { t?.transport?.close(); } catch {
         /* ignore */
       }
       transports.delete(sessionId);
+      const s = servers.get(sessionId);
+      try { s?.server?.close?.(); } catch { /* ignore */ }
       servers.delete(sessionId);
       return void res.status(204).end();
     }
