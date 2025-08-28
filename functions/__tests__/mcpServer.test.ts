@@ -12,9 +12,27 @@ const fft = functionsTest();
 
 function startServer() {
   const server = http.createServer((req, res) => {
-    // Express-style helper
+    // Express-style helpers
     // @ts-ignore
     req.get = (name: string) => req.headers[name.toLowerCase()];
+
+    // Add minimal Express-like response methods
+    // @ts-ignore
+    res.set = (name: string, value: string) => {
+      res.setHeader(name, value);
+      return res;
+    };
+    // @ts-ignore
+    res.status = (code: number) => {
+      res.statusCode = code;
+      return res;
+    };
+    // @ts-ignore
+    res.json = (obj: unknown) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(obj));
+    };
+
     const chunks: Buffer[] = [];
     req.on('data', (c) => chunks.push(c));
     req.on('end', () => {
@@ -23,7 +41,7 @@ function startServer() {
       mcpServer(req, res);
     });
   });
-  return new Promise<{url: string, close: () => void}>((resolve) => {
+  return new Promise<{ url: string; close: () => void }>((resolve) => {
     server.listen(0, () => {
       const { port } = server.address() as any;
       resolve({ url: `http://127.0.0.1:${port}`, close: () => server.close() });
