@@ -6,6 +6,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import toolSchemas from "./mcpSchemas.js";
+import admin from "firebase-admin";
+
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const API_KEY = process.env.MCP_API_KEY;
 
 const SERVER_NAME = "firebase-callables";
 const SERVER_VER = "1.0.4";
@@ -40,6 +47,20 @@ const callableFunctions = [
 ];
 
 const anyObject = z.record(z.any());
+
+async function verifyAuth(req) {
+  const header = req.get("Authorization") || "";
+  if (header.startsWith("Bearer ")) {
+    const token = header.slice(7);
+    await admin.auth().verifyIdToken(token);
+    return;
+  }
+  if (header.startsWith("ApiKey ")) {
+    const key = header.slice(7);
+    if (API_KEY && key === API_KEY) return;
+  }
+  throw new Error("Unauthorized");
+}
 
 function toToolResult(result) {
   try {
@@ -117,6 +138,14 @@ export const mcpServer = onRequest(async (req, res) => {
   // Parse body once
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body ?? {});
   const sessionId = req.get("Mcp-Session-Id") || req.get("mcp-session-id");
+
+  if (req.method === "POST" || req.method === "DELETE") {
+    try {
+      await verifyAuth(req);
+    } catch {
+      return void res.status(401).json({ error: "Unauthorized" });
+    }
+  }
 
   try {
     if (req.method === "POST") {
