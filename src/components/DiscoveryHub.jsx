@@ -29,6 +29,7 @@ import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import ActionDashboard from "./ActionDashboard.jsx";
 import AnswerSlideOver from "./AnswerSlideOver.jsx";
+import ProjectOverview from "./ProjectOverview.jsx";
 import "./AIToolsGenerators.css";
 import "./DiscoveryHub.css";
 
@@ -130,7 +131,7 @@ const DiscoveryHub = () => {
   const [uid, setUid] = useState(null);
   const [currentUserName, setCurrentUserName] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [active, setActive] = useState("questions");
+  const [active, setActive] = useState("overview");
   const [summary, setSummary] = useState("");
   const [showSummary, setShowSummary] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -164,6 +165,7 @@ const DiscoveryHub = () => {
   const restoredRef = useRef(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [projectStage, setProjectStage] = useState("");
   const { triageEvidence, loadHypotheses, hypotheses } = useInquiryMap();
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
@@ -1694,6 +1696,7 @@ Respond ONLY in this JSON format:
         if (initiativeId) {
           const init = await loadInitiative(user.uid, initiativeId);
           setProjectName(init?.projectName || "");
+          setProjectStage(init?.stage || "");
           setBusinessGoal(init?.businessGoal || "");
           setAudienceProfile(init?.audienceProfile || "");
           setProjectConstraints(init?.projectConstraints || "");
@@ -2511,7 +2514,17 @@ Respond ONLY in this JSON format:
     <div className="dashboard-container discovery-hub">
       {toast && <div className="toast">{toast}</div>}
       <div className="main-content">
-        {active === "documents" ? (
+        {active === "overview" ? (
+          <ProjectOverview
+            uid={uid}
+            initiativeId={initiativeId}
+            stage={projectStage}
+            tasks={projectTasks}
+            questions={questions}
+            hypotheses={hypotheses}
+            documents={documents}
+          />
+        ) : active === "documents" ? (
           <div className="document-section">
             {documents.length > 0 && (
               <button
