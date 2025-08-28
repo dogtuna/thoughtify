@@ -38,7 +38,7 @@ const callableFunctions = [
   "sendEmailReply",
 ];
 
-const anyObject = z.object({}).catchall(z.any());
+const anyObject = z.record(z.any());
 
 function toToolResult(result) {
   try {
@@ -65,7 +65,7 @@ function buildServer() {
   // ping tool for sanity checks
   server.registerTool(
     "ping",
-    { title: "ping", description: "Health check", inputSchema: { type: "object" } },
+    { title: "ping", description: "Health check", inputSchema: anyObject },
     async () => ({ content: [{ type: "text", text: "pong" }] })
   );
 
