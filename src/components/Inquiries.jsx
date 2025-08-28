@@ -14,8 +14,15 @@ import {
 import { db } from "../firebase";
 import { classifyTask, isQuestionTask } from "../utils/taskUtils";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
+import { runTool } from "../mcp/client";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
+const LRS_SERVER = "https://cloud.scorm.com/lrs/8FKK4XRIED";
+const LRS_HEADERS = {
+  "Content-Type": "application/json",
+  "X-Experience-API-Version": "1.0.3",
+  Authorization: LRS_AUTH,
+};
 
 export default function NewInquiries({ user, openReplyModal }) {
   const [selectedItem, setSelectedItem] = useState(null);
@@ -79,15 +86,7 @@ export default function NewInquiries({ user, openReplyModal }) {
         timestamp: new Date().toISOString(),
       };
 
-      await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIDeleteInquiry),
-      });
+      await runTool(LRS_SERVER, "statements", xAPIDeleteInquiry, LRS_HEADERS);
     } catch (error) {
       console.error("Error deleting inquiry:", error);
     }
@@ -166,15 +165,7 @@ export default function NewInquiries({ user, openReplyModal }) {
         timestamp: new Date().toISOString(),
       };
 
-      await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIMoveInquiry),
-      });
+      await runTool(LRS_SERVER, "statements", xAPIMoveInquiry, LRS_HEADERS);
     } catch (error) {
       console.error("Error moving inquiry to task queue:", error);
     }

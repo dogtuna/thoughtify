@@ -16,8 +16,15 @@ import { db, auth } from "../firebase";
 import TaskQueue from "../components/TaskQueue";
 import Inquiries from "../components/Inquiries";
 import "./admin.css";
+import { runTool } from "../mcp/client";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
+const LRS_SERVER = "https://cloud.scorm.com/lrs/8FKK4XRIED";
+const LRS_HEADERS = {
+  "Content-Type": "application/json",
+  "X-Experience-API-Version": "1.0.3",
+  Authorization: LRS_AUTH,
+};
 
 export default function AdminDashboard({ user }) {
   const functionsInstance = getFunctions();
@@ -175,15 +182,7 @@ Thoughtify Training Team`;
         },
         timestamp: new Date().toISOString(),
       };
-      await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIInvitation),
-      });
+      await runTool(LRS_SERVER, "statements", xAPIInvitation, LRS_HEADERS);
   
       setNewInvitation({ businessName: "", businessEmail: "" });
       fetchInvitations();
@@ -259,23 +258,8 @@ Thoughtify Training Team`;
           timestamp: new Date().toISOString(),
         };
     
-        const lrsResponse = await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Experience-API-Version": "1.0.3",
-            Authorization: LRS_AUTH,
-          },
-          body: JSON.stringify(xAPIBlast),
-        });
-    
-        const lrsResponseData = await lrsResponse.json();
-        console.log("xAPI Response:", lrsResponseData);
-    
-        if (!lrsResponse.ok) {
-          console.error("SCORM Cloud LRS Error:", lrsResponseData);
-          throw new Error(`Failed to send xAPI statement: ${JSON.stringify(lrsResponseData)}`);
-        }
+        await runTool(LRS_SERVER, "statements", xAPIBlast, LRS_HEADERS);
+        console.log("xAPI Response: sent");
         closeBlastModal();
       } else {
         alert("Error sending email blast: " + response.data.error);
@@ -332,18 +316,8 @@ Thoughtify Training Team`;
         timestamp: new Date().toISOString(),
       };
   
-      const lrsResponse = await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIReplyTask),
-      });
-  
-      const lrsResponseData = await lrsResponse.json();
-      console.log("xAPI Response for task reply:", lrsResponseData);
+      await runTool(LRS_SERVER, "statements", xAPIReplyTask, LRS_HEADERS);
+      console.log("xAPI Response for task reply: sent");
     } catch (error) {
       console.error("Error replying to task:", error);
     }
@@ -381,22 +355,8 @@ Thoughtify Training Team`;
         timestamp: new Date().toISOString(),
       };
   
-      const lrsResponse = await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPICompleteTask),
-      });
-      const lrsResponseData = await lrsResponse.json();
-      console.log("xAPI Task Completion Response:", lrsResponseData);
-  
-      if (!lrsResponse.ok) {
-        console.error("SCORM Cloud LRS Error:", lrsResponseData);
-        throw new Error(`Failed to send xAPI statement: ${JSON.stringify(lrsResponseData)}`);
-      }
+      await runTool(LRS_SERVER, "statements", xAPICompleteTask, LRS_HEADERS);
+      console.log("xAPI Task Completion Response: sent");
     } catch (error) {
       console.error("Error completing task:", error);
     }
@@ -430,15 +390,7 @@ Thoughtify Training Team`;
         timestamp: new Date().toISOString(),
       };
   
-      await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Experience-API-Version": "1.0.3",
-          Authorization: LRS_AUTH,
-        },
-        body: JSON.stringify(xAPIDeleteTask),
-      });
+      await runTool(LRS_SERVER, "statements", xAPIDeleteTask, LRS_HEADERS);
     } catch (error) {
       console.error("Error deleting task:", error);
     }
@@ -493,15 +445,7 @@ Thoughtify Training Team`;
           timestamp: new Date().toISOString(),
         };
   
-        await fetch("https://cloud.scorm.com/lrs/8FKK4XRIED/statements", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Experience-API-Version": "1.0.3",
-            Authorization: LRS_AUTH,
-          },
-          body: JSON.stringify(xAPIReplyInquiry),
-        });
+        await runTool(LRS_SERVER, "statements", xAPIReplyInquiry, LRS_HEADERS);
   
         // Move the inquiry to the user's "inquiries" sub-collection with status "open"
         const userLeadsRef = collection(db, "profiles", user.uid, "inquiries");

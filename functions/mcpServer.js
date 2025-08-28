@@ -131,7 +131,9 @@ export const mcpServer = onRequest(async (req, res) => {
 
         transport.onclose = () => {
           if (transport.sessionId) {
-            try { servers.get(transport.sessionId)?.close?.(); } catch {}
+            try { servers.get(transport.sessionId)?.close?.(); } catch {
+              /* ignore */
+            }
             servers.delete(transport.sessionId);
             transports.delete(transport.sessionId);
           }
@@ -157,7 +159,9 @@ export const mcpServer = onRequest(async (req, res) => {
         return void res.status(400).send("Invalid or missing session ID");
       }
       const t = transports.get(sessionId);
-      try { t?.close(); } catch {}
+      try { t?.close(); } catch {
+        /* ignore */
+      }
       transports.delete(sessionId);
       servers.delete(sessionId);
       return void res.status(204).end();
