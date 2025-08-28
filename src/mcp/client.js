@@ -89,13 +89,101 @@ export async function listTools(serverUrl, extraHeaders) {
 
 export async function runTool(serverUrl, toolName, args = {}, extraHeaders) {
   return withInitRetry(serverUrl, extraHeaders, async (rec) => {
-    const res = await rec.client.callTool({ name: toolName, arguments: args });
-    if (res && res.isError) {
-      const txt = res.content?.[0]?.text || "Unknown tool error";
-      throw new Error(txt);
+    try {
+      const res = await rec.client.callTool({ name: toolName, arguments: args });
+      if (res && res.isError) {
+        const txt = res.content?.[0]?.text || "Unknown tool error";
+        throw { code: "tool_error", message: txt };
+      }
+      const content = res.content?.map((c) => {
+        if (c.type === "text") {
+          try {
+            return { ...c, text: JSON.parse(c.text) };
+          } catch {
+            return c;
+          }
+        }
+        return c;
+      });
+      return { ...res, content };
+    } catch (err) {
+      if (err && typeof err === "object" && "code" in err && "message" in err) {
+        throw { code: err.code, message: err.message };
+      }
+      throw err;
     }
-    return res; // { content: [...], isError?: false }
   });
+}
+
+export async function* runToolStream(serverUrl, toolName, args = {}, extraHeaders) {
+  const queue = [];
+  let resolve;
+  let done = false;
+  let finalRes;
+  let error;
+
+  const push = (val) => {
+    queue.push(val);
+    resolve?.();
+  };
+
+  const callPromise = withInitRetry(serverUrl, extraHeaders, async (rec) => {
+    const onprogress = (params) => {
+      const blocks = params?.content || [];
+      for (const block of blocks) {
+        if (block.type === "text" && typeof block.text === "string") {
+          push(block.text);
+        }
+      }
+    };
+    try {
+      const res = await rec.client.callTool(
+        { name: toolName, arguments: args },
+        undefined,
+        { onprogress }
+      );
+      if (res && res.isError) {
+        const txt = res.content?.[0]?.text || "Unknown tool error";
+        error = { code: "tool_error", message: txt };
+      } else {
+        const content = res.content?.map((c) => {
+          if (c.type === "text") {
+            try {
+              return { ...c, text: JSON.parse(c.text) };
+            } catch {
+              return c;
+            }
+          }
+          return c;
+        });
+        finalRes = { ...res, content };
+      }
+    } catch (err) {
+      if (err && typeof err === "object" && "code" in err && "message" in err) {
+        error = { code: err.code, message: err.message };
+      } else {
+        error = err;
+      }
+    } finally {
+      done = true;
+      push(null);
+    }
+  });
+
+  while (!done || queue.length) {
+    if (queue.length) {
+      const val = queue.shift();
+      if (val !== null) {
+        yield val;
+      }
+    } else {
+      await new Promise((r) => (resolve = r));
+    }
+  }
+
+  await callPromise;
+  if (error) throw error;
+  return finalRes;
 }
 
 export async function close(serverUrl) {
