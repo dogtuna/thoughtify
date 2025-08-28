@@ -16,10 +16,9 @@ import { db, auth } from "../firebase";
 import TaskQueue from "../components/TaskQueue";
 import Inquiries from "../components/Inquiries";
 import "./admin.css";
-import { runTool } from "../mcp/client";
+import { useMcp } from "../context/McpContext";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
-const LRS_SERVER = "https://cloud.scorm.com/lrs/8FKK4XRIED";
 const LRS_HEADERS = {
   "Content-Type": "application/json",
   "X-Experience-API-Version": "1.0.3",
@@ -28,6 +27,7 @@ const LRS_HEADERS = {
 
 export default function AdminDashboard({ user }) {
   const functionsInstance = getFunctions();
+  const { runTool } = useMcp();
 
   // State for invitation generation
   const [newInvitation, setNewInvitation] = useState({
@@ -182,7 +182,7 @@ Thoughtify Training Team`;
         },
         timestamp: new Date().toISOString(),
       };
-      await runTool(LRS_SERVER, "statements", xAPIInvitation, LRS_HEADERS);
+      await runTool("statements", xAPIInvitation, LRS_HEADERS);
   
       setNewInvitation({ businessName: "", businessEmail: "" });
       fetchInvitations();
@@ -258,7 +258,7 @@ Thoughtify Training Team`;
           timestamp: new Date().toISOString(),
         };
     
-        await runTool(LRS_SERVER, "statements", xAPIBlast, LRS_HEADERS);
+        await runTool("statements", xAPIBlast, LRS_HEADERS);
         console.log("xAPI Response: sent");
         closeBlastModal();
       } else {
@@ -316,7 +316,7 @@ Thoughtify Training Team`;
         timestamp: new Date().toISOString(),
       };
   
-      await runTool(LRS_SERVER, "statements", xAPIReplyTask, LRS_HEADERS);
+      await runTool("statements", xAPIReplyTask, LRS_HEADERS);
       console.log("xAPI Response for task reply: sent");
     } catch (error) {
       console.error("Error replying to task:", error);
@@ -355,7 +355,7 @@ Thoughtify Training Team`;
         timestamp: new Date().toISOString(),
       };
   
-      await runTool(LRS_SERVER, "statements", xAPICompleteTask, LRS_HEADERS);
+      await runTool("statements", xAPICompleteTask, LRS_HEADERS);
       console.log("xAPI Task Completion Response: sent");
     } catch (error) {
       console.error("Error completing task:", error);
@@ -390,7 +390,7 @@ Thoughtify Training Team`;
         timestamp: new Date().toISOString(),
       };
   
-      await runTool(LRS_SERVER, "statements", xAPIDeleteTask, LRS_HEADERS);
+      await runTool("statements", xAPIDeleteTask, LRS_HEADERS);
     } catch (error) {
       console.error("Error deleting task:", error);
     }
@@ -445,7 +445,7 @@ Thoughtify Training Team`;
           timestamp: new Date().toISOString(),
         };
   
-        await runTool(LRS_SERVER, "statements", xAPIReplyInquiry, LRS_HEADERS);
+        await runTool("statements", xAPIReplyInquiry, LRS_HEADERS);
   
         // Move the inquiry to the user's "inquiries" sub-collection with status "open"
         const userLeadsRef = collection(db, "profiles", user.uid, "inquiries");
