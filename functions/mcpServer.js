@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import toolSchemas from "./mcpSchemas.js";
 
 const SERVER_NAME = "firebase-callables";
 const SERVER_VER = "1.0.4";
@@ -70,18 +71,27 @@ function buildServer() {
   );
 
   for (const name of callableFunctions) {
+    const schema = toolSchemas[name] || anyObject;
     server.registerTool(
       name,
-      { title: name, description: `Proxy to the ${name} Cloud Function`, inputSchema: anyObject },
+      { title: name, description: `Proxy to the ${name} Cloud Function`, inputSchema: schema },
       async (input) => {
         try {
-          if (!input || typeof input !== "object") {
-            return { content: [{ type: "text", text: "Input must be an object" }], isError: true };
-          }
-          const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error(`Timeout after ${CALL_TIMEOUT_MS}ms`)), CALL_TIMEOUT_MS));
-          const result = await Promise.race([callCallable(name, input), timeout]);
+          const data = schema.parse(input ?? {});
+          const timeout = new Promise((_, rej) =>
+            setTimeout(() => rej(new Error(`Timeout after ${CALL_TIMEOUT_MS}ms`)), CALL_TIMEOUT_MS)
+          );
+          const result = await Promise.race([callCallable(name, data), timeout]);
           return toToolResult(result);
         } catch (err) {
+          if (err instanceof z.ZodError) {
+            return {
+              content: [
+                { type: "text", text: `Invalid input: ${err.issues.map((i) => i.message).join(", ")}` },
+              ],
+              isError: true,
+            };
+          }
           return { content: [{ type: "text", text: `Error: ${err?.message || String(err)}` }], isError: true };
         }
       }
