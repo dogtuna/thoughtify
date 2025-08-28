@@ -18,7 +18,9 @@ const API_KEY = process.env.MCP_API_KEY;
 
 const SERVER_NAME = "firebase-callables";
 const SERVER_VER = "1.0.4";
-const CALL_TIMEOUT_MS = 120_000;
+const CALL_TIMEOUT_MS = Number(
+  process.env.MCP_CALL_TIMEOUT_MS ?? "120000",
+);
 const SESSION_TTL_MS = Number(process.env.MCP_SESSION_TTL_MS ?? "600000");
 
 // Keep transports (and servers) by session id across requests in this CF instance

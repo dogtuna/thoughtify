@@ -10,3 +10,8 @@ Use one of the following formats:
 The API key must match the `MCP_API_KEY` environment variable or secret
 configured for the function. Requests without a valid token or key receive
 `401 Unauthorized`.
+
+## Configuration
+
+- `MCP_CALL_TIMEOUT_MS` &mdash; maximum time in milliseconds to wait for a
+  callable function to respond. Defaults to `120000` if unset.
