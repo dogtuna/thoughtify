@@ -2,6 +2,7 @@ import http from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { connect, listTools } from '../client.js';
+import { describe, test, expect } from 'vitest';
 
 async function startMockServer() {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => 's1' });

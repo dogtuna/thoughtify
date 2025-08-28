@@ -1,5 +1,6 @@
 import http from 'node:http';
 import functionsTest from 'firebase-functions-test';
+import { describe, test, expect, afterAll } from 'vitest';
 
 // Ensure API key for auth
 process.env.MCP_API_KEY = 'test-key';
