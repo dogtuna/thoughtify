@@ -14,10 +14,9 @@ import {
 import { db } from "../firebase";
 import { classifyTask, isQuestionTask } from "../utils/taskUtils";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
-import { runTool } from "../mcp/client";
+import { useMcp } from "../context/McpContext";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
-const LRS_SERVER = "https://cloud.scorm.com/lrs/8FKK4XRIED";
 const LRS_HEADERS = {
   "Content-Type": "application/json",
   "X-Experience-API-Version": "1.0.3",
@@ -25,6 +24,7 @@ const LRS_HEADERS = {
 };
 
 export default function NewInquiries({ user, openReplyModal }) {
+  const { runTool } = useMcp();
   const [selectedItem, setSelectedItem] = useState(null);
   const [replyData, setReplyData] = useState("");
   const [allInquiries, setAllInquiries] = useState([]);
@@ -86,7 +86,7 @@ export default function NewInquiries({ user, openReplyModal }) {
         timestamp: new Date().toISOString(),
       };
 
-      await runTool(LRS_SERVER, "statements", xAPIDeleteInquiry, LRS_HEADERS);
+      await runTool("statements", xAPIDeleteInquiry, LRS_HEADERS);
     } catch (error) {
       console.error("Error deleting inquiry:", error);
     }
@@ -165,7 +165,7 @@ export default function NewInquiries({ user, openReplyModal }) {
         timestamp: new Date().toISOString(),
       };
 
-      await runTool(LRS_SERVER, "statements", xAPIMoveInquiry, LRS_HEADERS);
+      await runTool("statements", xAPIMoveInquiry, LRS_HEADERS);
     } catch (error) {
       console.error("Error moving inquiry to task queue:", error);
     }

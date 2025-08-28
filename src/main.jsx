@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App.jsx";
 import { ProjectProvider } from "./context/ProjectContext.jsx";
 import { InquiryMapProvider } from "./context/InquiryMapContext";
+import { McpProvider } from "./context/McpContext.jsx";
 import PropTypes from "prop-types";
 import { initAnalytics, getAnalyticsConsent } from "./utils/analytics.js";
 import { onAuthStateChanged } from "firebase/auth";
@@ -156,10 +157,12 @@ function Root() {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <ProjectProvider>
-      <InquiryMapProvider>
-        <Root />
-      </InquiryMapProvider>
-    </ProjectProvider>
+    <McpProvider>
+      <ProjectProvider>
+        <InquiryMapProvider>
+          <Root />
+        </InquiryMapProvider>
+      </ProjectProvider>
+    </McpProvider>
   </StrictMode>
 );
