@@ -38,6 +38,11 @@
   padding: 0 1rem 1rem;
 }
 
+.discovery-hub .initiative-card {
+  margin: 0 0 20px;
+  max-width: none;
+}
+
 .filter-bar {
   display: flex;
   align-items: center;
@@ -212,7 +217,7 @@
 }
 
 .document-section {
-  max-width: 600px;
+  max-width: none;
 }
 
 .document-list {

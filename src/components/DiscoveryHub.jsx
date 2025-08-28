@@ -2511,7 +2511,7 @@ Respond ONLY in this JSON format:
   }
 
   return (
-    <div className="dashboard-container discovery-hub">
+    <div className="discovery-hub">
       {toast && <div className="toast">{toast}</div>}
       <div className="main-content">
         {active === "overview" ? (
