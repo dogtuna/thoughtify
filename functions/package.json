@@ -23,7 +23,8 @@
     "firebase-functions": "^6.4.0",
     "genkit": "^1.0.4",
     "googleapis": "^140.0.0",
-    "nodemailer": "^6.10.0"
+    "nodemailer": "^6.10.0",
+    "@modelcontextprotocol/server": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",

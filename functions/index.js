@@ -1773,3 +1773,4 @@ export const savePersona = onCall(async (request) => {
 });
 
 export { getEmailAuthUrl, emailOAuthCallback, sendQuestionEmail } from "./emailProviders.js";
+export { mcpServer } from "./mcpServer.js";
