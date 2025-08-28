@@ -1,28 +1,26 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import { connect, runTool as runToolClient, listTools as listToolsClient } from "../mcp/client";
+import { MCP_SERVER_URL } from "../mcp/config";
 
 const McpContext = createContext();
 
 export const McpProvider = ({ children }) => {
-  const serverUrl = import.meta.env.VITE_MCP_URL;
-
   useEffect(() => {
-    if (serverUrl) {
-      connect(serverUrl).catch((err) => {
+    if (MCP_SERVER_URL) {
+      connect().catch((err) => {
         console.error("MCP connection failed", err);
       });
     }
-  }, [serverUrl]);
+  }, []);
 
   const value = useMemo(
     () => ({
-      serverUrl,
       runTool: (toolName, args = {}, extraHeaders) =>
-        runToolClient(serverUrl, toolName, args, extraHeaders),
-      listTools: (extraHeaders) => listToolsClient(serverUrl, extraHeaders),
+        runToolClient(undefined, toolName, args, extraHeaders),
+      listTools: (extraHeaders) => listToolsClient(undefined, extraHeaders),
     }),
-    [serverUrl]
+    []
   );
 
   return <McpContext.Provider value={value}>{children}</McpContext.Provider>;
