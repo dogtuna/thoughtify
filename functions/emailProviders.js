@@ -310,6 +310,12 @@ export const sendQuestionEmail = onCall(
         "sendQuestionEmail error",
         (err && err.response && err.response.data) || err
       );
+      if (err && (err.code === "EAUTH" || err.responseCode === 535)) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Invalid email credentials"
+        );
+      }
       const msg =
         (err && err.response && err.response.data && JSON.stringify(err.response.data)) ||
         (err && err.message) ||
