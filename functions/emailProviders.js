@@ -1,6 +1,6 @@
 
-import { Buffer } from "node:buffer";
-import crypto from "node:crypto";
+import { Buffer } from "buffer";
+import crypto from "crypto";
 
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
