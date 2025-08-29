@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
-import { auth, db, app } from "../firebase";
-import {
-  doc,
-  getDoc,
-  deleteDoc,
-  setDoc,
-} from "firebase/firestore";
+import { auth, db, app, functions } from "../firebase";
+import { doc, getDoc, deleteDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import {
   getStorage,
   ref as storageRef,
@@ -85,8 +81,10 @@ export default function UserSettingsSlideOver({ onClose }) {
 
   const saveOutlook = async () => {
     if (!uid) return;
-    await setDoc(doc(db, "users", uid, "emailTokens", "outlook"), {
-      user: outlookUser,
+    const saveFn = httpsCallable(functions, "saveEmailCredentials");
+    await saveFn({
+      provider: "outlook",
+      user: outlookUser.trim(),
       pass: outlookPass,
     });
     setOutlookConnected(true);
@@ -102,10 +100,12 @@ export default function UserSettingsSlideOver({ onClose }) {
 
   const saveSmtp = async () => {
     if (!uid) return;
-    await setDoc(doc(db, "users", uid, "emailTokens", "smtp"), {
-      host: smtpHost,
+    const saveFn = httpsCallable(functions, "saveEmailCredentials");
+    await saveFn({
+      provider: "smtp",
+      host: smtpHost.trim(),
       port: smtpPort,
-      user: smtpUser,
+      user: smtpUser.trim(),
       pass: smtpPass,
     });
     setSmtpConnected(true);

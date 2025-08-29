@@ -197,6 +197,60 @@ async function getStoredProviderToken(uid, provider, keyHex) {
 }
 
 // ==============================
+// 3) Save SMTP/Outlook credentials (CALLABLE)
+// ==============================
+export const saveEmailCredentials = onCall(
+  {
+    region: "us-central1",
+    enforceAppCheck: true,
+    secrets: [TOKEN_ENCRYPTION_KEY],
+  },
+  async (request) => {
+    const uid = (request.auth && request.auth.uid) || null;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
+    }
+
+    const { provider, host, port, user, pass } = request.data || {};
+
+    if (provider !== "smtp" && provider !== "outlook") {
+      throw new HttpsError("invalid-argument", "Unknown provider");
+    }
+
+    const trimmedUser = (user || "").trim();
+    const trimmedPass = (pass || "").trim();
+
+    if (!trimmedUser || !trimmedPass) {
+      throw new HttpsError("invalid-argument", "Missing credentials");
+    }
+
+    const data = {
+      user: trimmedUser,
+      pass: encrypt(trimmedPass, TOKEN_ENCRYPTION_KEY.value()),
+    };
+
+    if (provider === "smtp") {
+      const trimmedHost = (host || "").trim();
+      const normalizedPort = Number(port) || 587;
+      if (!trimmedHost || !normalizedPort) {
+        throw new HttpsError("invalid-argument", "Missing SMTP fields");
+      }
+      data.host = trimmedHost;
+      data.port = normalizedPort;
+    }
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("emailTokens")
+      .doc(provider)
+      .set(data);
+
+    return { ok: true };
+  }
+);
+
+// ==============================
 // 3) Send email (CALLABLE with App Check)
 // ==============================
 export const sendQuestionEmail = onCall(
@@ -272,11 +326,20 @@ export const sendQuestionEmail = onCall(
         if (!snap.exists) {
           throw new HttpsError("failed-precondition", "No credentials stored");
         }
-        const { host, port, user, pass } = snap.data() || {};
+        const data = snap.data() || {};
+        const { host, port, user } = data;
+        let pass = data.pass || "";
         const smtpHost = host || (provider === "outlook" ? "smtp.office365.com" : null);
         const smtpPort = port || 587;
         if (!smtpHost || !user || !pass) {
           throw new HttpsError("failed-precondition", "Incomplete SMTP credentials");
+        }
+        if (typeof pass === "string") {
+          try {
+            pass = decrypt(pass, TOKEN_ENCRYPTION_KEY.value());
+          } catch (_) {
+            // assume pass stored plaintext
+          }
         }
         const transporter = nodemailer.createTransport({
           host: smtpHost,
