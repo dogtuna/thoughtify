@@ -15,6 +15,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
@@ -594,6 +595,8 @@ const DiscoveryHub = () => {
       return;
     }
     try {
+      if (appCheck) await getAppCheckToken(appCheck);
+      await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: emailProvider,
