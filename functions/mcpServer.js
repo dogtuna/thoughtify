@@ -107,7 +107,7 @@ function buildServer() {
   // ping tool for sanity checks
   server.registerTool(
     "ping",
-    { title: "ping", description: "Health check", inputSchema: anyObject },
+    { title: "ping", description: "Health check" },
     async () => ({ content: [{ type: "text", text: "pong" }] })
   );
 

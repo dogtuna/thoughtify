@@ -1,5 +1,7 @@
 import express from 'express';
 import functionsTest from 'firebase-functions-test';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { describe, test, expect, afterAll } from 'vitest';
 
 // Ensure API key for auth
@@ -31,39 +33,14 @@ describe('mcpServer HTTPS function', () => {
 
   test('ping tool responds', async () => {
     const { url, close } = await startServer();
-    const initResp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'ApiKey test-key',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'initialize',
-        params: { clientInfo: { name: 'test', version: '0.0.0' }, capabilities: {} },
-        id: 1,
-      }),
+    const transport = new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: { headers: { Authorization: 'ApiKey test-key' } },
     });
-    expect(initResp.status).toBe(200);
-    const sessionId = initResp.headers.get('mcp-session-id');
-    expect(sessionId).toBeTruthy();
-
-    const pingResp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'ApiKey test-key',
-        'Mcp-Session-Id': sessionId ?? '',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'call_tool',
-        params: { name: 'ping', arguments: {} },
-        id: 2,
-      }),
-    });
-    const pingJson = await pingResp.json();
-    expect(pingJson.result.content[0].text).toBe('pong');
+    const client = new Client({ name: 'test', version: '0.0.0' }, { capabilities: {} });
+    await client.connect(transport);
+    const res = await client.callTool({ name: 'ping', arguments: {} });
+    expect(res.content[0].text).toBe('pong');
+    await client.close();
     close();
   });
 });
