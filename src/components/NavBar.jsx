@@ -3,11 +3,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../firebase";
 import { loadInitiatives } from "../utils/initiatives";
+import UserSettingsSlideOver from "./UserSettingsSlideOver";
 
 export default function NavBar() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [projectMenu, setProjectMenu] = useState(false);
   const [addMenu, setAddMenu] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [projects, setProjects] = useState([]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,6 +28,12 @@ export default function NavBar() {
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setSettingsOpen(true);
+    window.addEventListener("openUserSettings", handler);
+    return () => window.removeEventListener("openUserSettings", handler);
   }, []);
 
   const handleAddProject = () => {
@@ -136,11 +144,15 @@ export default function NavBar() {
                 src="https://placehold.co/40x40/764ba2/FFFFFF?text=ID"
                 alt="User Avatar"
                 className="user-avatar"
+                onClick={() => setSettingsOpen(true)}
               />
             </>
           )}
         </div>
       </nav>
+      {settingsOpen && (
+        <UserSettingsSlideOver onClose={() => setSettingsOpen(false)} />
+      )}
     </header>
   );
 }
