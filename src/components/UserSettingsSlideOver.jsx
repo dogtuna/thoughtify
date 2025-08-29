@@ -4,7 +4,7 @@ import { onAuthStateChanged, updateProfile } from "firebase/auth";
 import { auth, db, app, functions, appCheck } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { getAppCheckToken } from "firebase/app-check";
+import { getToken } from "firebase/app-check";
 import {
   getStorage,
   ref as storageRef,
@@ -102,7 +102,7 @@ export default function UserSettingsSlideOver({ onClose }) {
 
   const saveCredentials = async (data) => {
     if (!auth.currentUser) return;
-    if (appCheck) await getAppCheckToken(appCheck);
+    if (appCheck) await getToken(appCheck);
     await auth.currentUser.getIdToken(true);
     const saveFn = httpsCallable(functions, "saveEmailCredentials");
     await saveFn(data);
