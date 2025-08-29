@@ -12,9 +12,9 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
-import { auth, db, functions } from "../firebase";
+import { auth, db, functions, appCheck } from "../firebase";
 import { httpsCallable } from "firebase/functions";
-import { getAppCheckToken } from "firebase/app-check";
+import { getToken } from "firebase/app-check";
 import ai from "../ai";
 import PropTypes from "prop-types";
 import useCanonical from "../utils/useCanonical";
@@ -228,7 +228,7 @@ ${JSON.stringify({recommendations, tasks})}
       return;
     }
     try {
-      if (appCheck) await getAppCheckToken(appCheck);
+      if (appCheck) await getToken(appCheck);
       await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
