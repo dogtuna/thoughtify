@@ -201,7 +201,7 @@ async function getStoredProviderToken(uid, provider, keyHex) {
 export const saveEmailCredentials = onCall(
   {
     region: "us-central1",
-    enforceAppCheck: true,
+    // App Check not enforced here to prevent CORS errors when tokens are missing
     secrets: [TOKEN_ENCRYPTION_KEY],
   },
   async (request) => {
