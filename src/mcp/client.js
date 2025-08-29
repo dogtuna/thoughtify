@@ -106,6 +106,20 @@ export async function runTool(serverUrl = MCP_SERVER_URL, toolName, args = {}, e
   });
 }
 
+export async function runZap(
+  { zapUrl, payload },
+  serverUrl = MCP_SERVER_URL,
+  extraHeaders = MCP_HEADERS
+) {
+  const result = await runTool(
+    serverUrl,
+    "triggerZap",
+    { zapUrl, payload },
+    extraHeaders
+  );
+  return result.content?.[0]?.text;
+}
+
 export async function* runToolStream(serverUrl = MCP_SERVER_URL, toolName, args = {}, extraHeaders = MCP_HEADERS) {
   const queue = [];
   let resolve;

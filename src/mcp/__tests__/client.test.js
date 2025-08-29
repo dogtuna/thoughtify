@@ -1,8 +1,8 @@
 import http from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { connect, listTools } from '../client.js';
-import { describe, test, expect } from 'vitest';
+import * as client from '../client.js';
+import { describe, test, expect, vi } from 'vitest';
 
 async function startMockServer() {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => 's1' });
@@ -36,8 +36,8 @@ async function startMockServer() {
 describe('MCP client', () => {
   test('connect and listTools', async () => {
     const { url, close } = await startMockServer();
-    await connect(url, { Authorization: 'ApiKey test' });
-    const tools = await listTools(url, { Authorization: 'ApiKey test' });
+    await client.connect(url, { Authorization: 'ApiKey test' });
+    const tools = await client.listTools(url, { Authorization: 'ApiKey test' });
     expect(tools.some(t => t.name === 'ping')).toBe(true);
     close();
   });
@@ -46,7 +46,26 @@ describe('MCP client', () => {
     const badServer = http.createServer((req, res) => { res.statusCode = 500; res.end('error'); });
     await new Promise((r) => badServer.listen(0, r));
     const badUrl = `http://127.0.0.1:${badServer.address().port}`;
-    await expect(connect(badUrl)).rejects.toBeDefined();
+    await expect(client.connect(badUrl)).rejects.toBeDefined();
     badServer.close();
+  });
+
+  test('runZap calls triggerZap tool', async () => {
+    const spy = vi
+      .spyOn(client, 'runTool')
+      .mockResolvedValue({ content: [{ text: { ok: true } }] });
+    const res = await client.runZap(
+      { zapUrl: 'https://example.com', payload: { foo: 'bar' } },
+      'http://example.com',
+      { Authorization: 'test' }
+    );
+    expect(spy).toHaveBeenCalledWith(
+      'http://example.com',
+      'triggerZap',
+      { zapUrl: 'https://example.com', payload: { foo: 'bar' } },
+      { Authorization: 'test' }
+    );
+    expect(res).toEqual({ ok: true });
+    spy.mockRestore();
   });
 });
