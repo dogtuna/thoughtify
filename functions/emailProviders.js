@@ -6,7 +6,6 @@ import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { google } from "googleapis";
-import nodemailer from "nodemailer";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -197,7 +196,7 @@ async function getStoredProviderToken(uid, provider, keyHex) {
 }
 
 // ==============================
-// 3) Save SMTP/Outlook credentials (CALLABLE)
+// 3) Save IMAP/POP credentials (CALLABLE)
 // ==============================
 export const saveEmailCredentials = onCall(
   {
@@ -211,33 +210,39 @@ export const saveEmailCredentials = onCall(
       throw new HttpsError("unauthenticated", "Sign in required.");
     }
 
-    const { provider, host, port, user, pass } = request.data || {};
+    const {
+      provider,
+      host,
+      port,
+      smtpHost,
+      smtpPort,
+      user,
+      pass,
+    } = request.data || {};
 
-    if (provider !== "smtp" && provider !== "outlook") {
+    if (provider !== "imap" && provider !== "pop3") {
       throw new HttpsError("invalid-argument", "Unknown provider");
     }
 
     const trimmedUser = (user || "").trim();
     const trimmedPass = (pass || "").trim();
+    const trimmedHost = (host || "").trim();
+    const normalizedPort = Number(port) || 0;
+    const trimmedSmtpHost = (smtpHost || "").trim();
+    const normalizedSmtpPort = Number(smtpPort) || 0;
 
-    if (!trimmedUser || !trimmedPass) {
+    if (!trimmedUser || !trimmedPass || !trimmedHost || !normalizedPort) {
       throw new HttpsError("invalid-argument", "Missing credentials");
     }
 
     const data = {
       user: trimmedUser,
       pass: encrypt(trimmedPass, TOKEN_ENCRYPTION_KEY.value()),
+      host: trimmedHost,
+      port: normalizedPort,
     };
-
-    if (provider === "smtp") {
-      const trimmedHost = (host || "").trim();
-      const normalizedPort = Number(port) || 587;
-      if (!trimmedHost || !normalizedPort) {
-        throw new HttpsError("invalid-argument", "Missing SMTP fields");
-      }
-      data.host = trimmedHost;
-      data.port = normalizedPort;
-    }
+    if (trimmedSmtpHost) data.smtpHost = trimmedSmtpHost;
+    if (normalizedSmtpPort) data.smtpPort = normalizedSmtpPort;
 
     await db
       .collection("users")
@@ -316,46 +321,11 @@ export const sendQuestionEmail = onCall(
           requestBody: { raw },
         });
         messageId = resp.data.id || "";
-      } else if (provider === "smtp" || provider === "outlook") {
-        const snap = await db
-          .collection("users")
-          .doc(uid)
-          .collection("emailTokens")
-          .doc(provider)
-          .get();
-        if (!snap.exists) {
-          throw new HttpsError("failed-precondition", "No credentials stored");
-        }
-        const data = snap.data() || {};
-        const { host, port, user } = data;
-        let pass = data.pass || "";
-        const smtpHost = host || (provider === "outlook" ? "smtp.office365.com" : null);
-        const smtpPort = port || 587;
-        if (!smtpHost || !user || !pass) {
-          throw new HttpsError("failed-precondition", "Incomplete SMTP credentials");
-        }
-        if (typeof pass === "string") {
-          try {
-            pass = decrypt(pass, TOKEN_ENCRYPTION_KEY.value());
-          } catch (_) {
-            // assume pass stored plaintext
-          }
-        }
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: Number(smtpPort),
-          secure: Number(smtpPort) === 465,
-          auth: { user, pass },
-        });
-        const info = await transporter.sendMail({
-          from: user,
-          to: recipientEmail,
-          subject,
-          text: message,
-        });
-        messageId = info.messageId || "";
       } else {
-        throw new HttpsError("invalid-argument", "Unknown provider");
+        throw new HttpsError(
+          "invalid-argument",
+          "Unsupported provider for sending"
+        );
       }
 
       await db.collection("users").doc(uid).set({}, { merge: true });

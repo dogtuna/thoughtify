@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, functions, appCheck } from "../firebase";
 import {
@@ -15,7 +15,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { getToken as getAppCheckToken } from "firebase/app-check";
+import { getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
@@ -173,11 +173,12 @@ const DiscoveryHub = () => {
   const [viewingStatus] = useState("");
   const setStatusHistory = () => {};
   const [qaModal, setQaModal] = useState(null);
-  const navigate = useNavigate();
-  const emailConnected = !!emailProvider;
+  const emailConnected = emailProvider === "gmail";
   const providerLabel =
-    emailProvider === "smtp"
-      ? "SMTP"
+    emailProvider === "imap"
+      ? "IMAP"
+      : emailProvider === "pop3"
+      ? "POP3"
       : emailProvider
       ? emailProvider.charAt(0).toUpperCase() + emailProvider.slice(1)
       : "Email";
@@ -582,6 +583,10 @@ const DiscoveryHub = () => {
 
   const sendEmail = async () => {
     if (!emailDraft) return;
+    if (emailProvider !== "gmail") {
+      alert("Sending emails is only supported for Gmail accounts.");
+      return;
+    }
     const emails = emailDraft.recipients
       .map((n) => contacts.find((c) => c.name === n)?.email)
       .filter((e) => e);
@@ -590,9 +595,7 @@ const DiscoveryHub = () => {
       return;
     }
     try {
-      if (appCheck) {
-        await getAppCheckToken(appCheck);
-      }
+      if (appCheck) await getAppCheckToken(appCheck);
       await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
@@ -1699,18 +1702,18 @@ Respond ONLY in this JSON format:
         const gmailSnap = await getDoc(
           doc(db, "users", user.uid, "emailTokens", "gmail"),
         );
-        const outlookSnap = await getDoc(
-          doc(db, "users", user.uid, "emailTokens", "outlook"),
+        const imapSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "imap"),
         );
-        const smtpSnap = await getDoc(
-          doc(db, "users", user.uid, "emailTokens", "smtp"),
+        const popSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "pop3"),
         );
         const provider = gmailSnap.exists()
           ? "gmail"
-          : outlookSnap.exists()
-          ? "outlook"
-          : smtpSnap.exists()
-          ? "smtp"
+          : imapSnap.exists()
+          ? "imap"
+          : popSnap.exists()
+          ? "pop3"
           : null;
         setEmailProvider(provider);
         if (initiativeId) {
