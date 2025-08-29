@@ -6,7 +6,6 @@ import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { google } from "googleapis";
-import nodemailer from "nodemailer";
 
 // --- Firebase Functions v2 (https) ---
 import {

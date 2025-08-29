@@ -101,10 +101,6 @@ export default function UserSettingsSlideOver({ onClose }) {
   };
 
   const saveCredentials = async (data) => {
-    if (appCheck) {
-      await getAppCheckToken(appCheck);
-    }
-    await auth.currentUser.getIdToken(true);
     const saveFn = httpsCallable(functions, "saveEmailCredentials");
     await saveFn(data);
   };

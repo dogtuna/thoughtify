@@ -6,8 +6,6 @@ import { MCP_SERVER_URL, MCP_HEADERS } from "./config.js";
 // Keep one live client per server URL
 const clients = new Map(); // Map<string, { client, transport, initialized }>
 
-const PROTOCOL_VERSION = "2025-03-26";
-
 /** Build a transport with optional auth headers (API key or Bearer). */
 function makeTransport(serverUrl, extraHeaders = MCP_HEADERS) {
   const headers = {
@@ -36,7 +34,7 @@ async function ensureClient(serverUrl = MCP_SERVER_URL, extraHeaders = MCP_HEADE
   return rec;
 }
 
-async function initializeIfNeeded(rec, timeoutMs = 15000) {
+async function initializeIfNeeded(rec) {
   if (rec.initialized) return;
   rec.initialized = true;
 }

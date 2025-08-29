@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db, functions, appCheck } from "../firebase";
+import { auth, db, functions } from "../firebase";
 import {
   doc,
   getDoc,
@@ -15,7 +15,6 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { getToken as getAppCheckToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import ai, { generate } from "../ai";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
@@ -173,7 +172,6 @@ const DiscoveryHub = () => {
   const [viewingStatus] = useState("");
   const setStatusHistory = () => {};
   const [qaModal, setQaModal] = useState(null);
-  const navigate = useNavigate();
   const emailConnected = emailProvider === "gmail";
   const providerLabel =
     emailProvider === "imap"
@@ -596,10 +594,6 @@ const DiscoveryHub = () => {
       return;
     }
     try {
-      if (appCheck) {
-        await getAppCheckToken(appCheck);
-      }
-      await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: emailProvider,

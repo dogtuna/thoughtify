@@ -1,3 +1,6 @@
+/* eslint-env node */
+import process from "node:process";
+
 export async function callZap({ zapUrl, payload = {} }) {
   const token = process.env.ZAPIER_AUTH_TOKEN;
   if (!token) {
