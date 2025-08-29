@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
-import { auth, db, app, functions } from "../firebase";
+import { auth, db, app, functions, appCheck } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import {
   getStorage,
   ref as storageRef,
@@ -79,10 +80,18 @@ export default function UserSettingsSlideOver({ onClose }) {
     setGmailConnected(false);
   };
 
+  const saveCredentials = async (data) => {
+    if (appCheck) {
+      await getAppCheckToken(appCheck);
+    }
+    await auth.currentUser.getIdToken(true);
+    const saveFn = httpsCallable(functions, "saveEmailCredentials");
+    await saveFn(data);
+  };
+
   const saveOutlook = async () => {
     if (!uid) return;
-    const saveFn = httpsCallable(functions, "saveEmailCredentials");
-    await saveFn({
+    await saveCredentials({
       provider: "outlook",
       user: outlookUser.trim(),
       pass: outlookPass,
@@ -100,8 +109,7 @@ export default function UserSettingsSlideOver({ onClose }) {
 
   const saveSmtp = async () => {
     if (!uid) return;
-    const saveFn = httpsCallable(functions, "saveEmailCredentials");
-    await saveFn({
+    await saveCredentials({
       provider: "smtp",
       host: smtpHost.trim(),
       port: smtpPort,
