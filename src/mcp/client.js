@@ -38,17 +38,7 @@ async function ensureClient(serverUrl = MCP_SERVER_URL, extraHeaders = MCP_HEADE
 
 async function initializeIfNeeded(rec, timeoutMs = 15000) {
   if (rec.initialized) return;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    await rec.client.initialize(
-      { protocolVersion: PROTOCOL_VERSION, capabilities: {} },
-      { signal: ctrl.signal }
-    );
-    rec.initialized = true;
-  } finally {
-    clearTimeout(t);
-  }
+  rec.initialized = true;
 }
 
 function isNotInitializedErr(err) {
