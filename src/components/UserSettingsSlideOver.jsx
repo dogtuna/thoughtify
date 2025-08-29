@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
-import { auth, db, app, functions } from "../firebase";
+import { auth, db, app, functions, appCheck } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import {
   getStorage,
   ref as storageRef,
@@ -20,14 +21,16 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [uid, setUid] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("https://placehold.co/80x80/764ba2/FFFFFF?text=ID");
   const [gmailConnected, setGmailConnected] = useState(false);
-  const [outlookConnected, setOutlookConnected] = useState(false);
-  const [smtpConnected, setSmtpConnected] = useState(false);
-  const [outlookUser, setOutlookUser] = useState("");
-  const [outlookPass, setOutlookPass] = useState("");
-  const [smtpHost, setSmtpHost] = useState("");
-  const [smtpPort, setSmtpPort] = useState("");
-  const [smtpUser, setSmtpUser] = useState("");
-  const [smtpPass, setSmtpPass] = useState("");
+  const [imapConnected, setImapConnected] = useState(false);
+  const [popConnected, setPopConnected] = useState(false);
+  const [imapHost, setImapHost] = useState("");
+  const [imapPort, setImapPort] = useState("");
+  const [imapUser, setImapUser] = useState("");
+  const [imapPass, setImapPass] = useState("");
+  const [popHost, setPopHost] = useState("");
+  const [popPort, setPopPort] = useState("");
+  const [popUser, setPopUser] = useState("");
+  const [popPass, setPopPass] = useState("");
   const fileInput = useRef(null);
 
   useEffect(() => {
@@ -37,16 +40,26 @@ export default function UserSettingsSlideOver({ onClose }) {
         setAvatarUrl(user.photoURL || avatarUrl);
         const gmailSnap = await getDoc(doc(db, "users", user.uid, "emailTokens", "gmail"));
         setGmailConnected(gmailSnap.exists());
-        const outlookSnap = await getDoc(
-          doc(db, "users", user.uid, "emailTokens", "outlook"),
+        const imapSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "imap"),
         );
-        if (outlookSnap.exists()) {
-          const data = outlookSnap.data();
-          setOutlookConnected(true);
-          setOutlookUser(data.user || "");
+        if (imapSnap.exists()) {
+          const data = imapSnap.data();
+          setImapConnected(true);
+          setImapHost(data.host || "");
+          setImapPort(String(data.port || ""));
+          setImapUser(data.user || "");
         }
-        const smtpSnap = await getDoc(doc(db, "users", user.uid, "emailTokens", "smtp"));
-        setSmtpConnected(smtpSnap.exists());
+        const popSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "pop3"),
+        );
+        if (popSnap.exists()) {
+          const data = popSnap.data();
+          setPopConnected(true);
+          setPopHost(data.host || "");
+          setPopPort(String(data.port || ""));
+          setPopUser(data.user || "");
+        }
       }
     });
     return () => unsub();
@@ -79,42 +92,57 @@ export default function UserSettingsSlideOver({ onClose }) {
     setGmailConnected(false);
   };
 
-  const saveOutlook = async () => {
-    if (!uid) return;
+  const saveCredentials = async (data) => {
+    if (appCheck) {
+      await getAppCheckToken(appCheck);
+    }
+    await auth.currentUser.getIdToken(true);
     const saveFn = httpsCallable(functions, "saveEmailCredentials");
-    await saveFn({
-      provider: "outlook",
-      user: outlookUser.trim(),
-      pass: outlookPass,
+    await saveFn(data);
+  };
+
+  const saveImap = async () => {
+    if (!uid) return;
+    await saveCredentials({
+      provider: "imap",
+      host: imapHost.trim(),
+      port: imapPort,
+      user: imapUser.trim(),
+      pass: imapPass,
     });
-    setOutlookConnected(true);
+    setImapConnected(true);
   };
 
-  const disconnectOutlook = async () => {
+  const disconnectImap = async () => {
     if (!uid) return;
-    await deleteDoc(doc(db, "users", uid, "emailTokens", "outlook"));
-    setOutlookConnected(false);
-    setOutlookUser("");
-    setOutlookPass("");
+    await deleteDoc(doc(db, "users", uid, "emailTokens", "imap"));
+    setImapConnected(false);
+    setImapHost("");
+    setImapPort("");
+    setImapUser("");
+    setImapPass("");
   };
 
-  const saveSmtp = async () => {
+  const savePop = async () => {
     if (!uid) return;
-    const saveFn = httpsCallable(functions, "saveEmailCredentials");
-    await saveFn({
-      provider: "smtp",
-      host: smtpHost.trim(),
-      port: smtpPort,
-      user: smtpUser.trim(),
-      pass: smtpPass,
+    await saveCredentials({
+      provider: "pop3",
+      host: popHost.trim(),
+      port: popPort,
+      user: popUser.trim(),
+      pass: popPass,
     });
-    setSmtpConnected(true);
+    setPopConnected(true);
   };
 
-  const disconnectSmtp = async () => {
+  const disconnectPop = async () => {
     if (!uid) return;
-    await deleteDoc(doc(db, "users", uid, "emailTokens", "smtp"));
-    setSmtpConnected(false);
+    await deleteDoc(doc(db, "users", uid, "emailTokens", "pop3"));
+    setPopConnected(false);
+    setPopHost("");
+    setPopPort("");
+    setPopUser("");
+    setPopPass("");
   };
 
   return createPortal(
@@ -144,66 +172,80 @@ export default function UserSettingsSlideOver({ onClose }) {
           ) : (
             <button onClick={connectGmail}>Connect Gmail</button>
           )}
-          {outlookConnected ? (
+          {imapConnected ? (
             <div>
-              <p>Outlook account connected.</p>
-              <button onClick={disconnectOutlook}>Disconnect Outlook</button>
+              <p>IMAP account connected.</p>
+              <button onClick={disconnectImap}>Disconnect IMAP</button>
             </div>
           ) : (
             <div className="settings-section">
               <input
                 className="generator-input"
                 type="text"
-                placeholder="Outlook Username"
-                value={outlookUser}
-                onChange={(e) => setOutlookUser(e.target.value)}
+                placeholder="IMAP Host"
+                value={imapHost}
+                onChange={(e) => setImapHost(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="text"
+                placeholder="IMAP Port"
+                value={imapPort}
+                onChange={(e) => setImapPort(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="text"
+                placeholder="IMAP Username"
+                value={imapUser}
+                onChange={(e) => setImapUser(e.target.value)}
               />
               <input
                 className="generator-input"
                 type="password"
-                placeholder="Outlook Password"
-                value={outlookPass}
-                onChange={(e) => setOutlookPass(e.target.value)}
+                placeholder="IMAP Password"
+                value={imapPass}
+                onChange={(e) => setImapPass(e.target.value)}
               />
-              <button onClick={saveOutlook}>Save Outlook</button>
+              <button onClick={saveImap}>Save IMAP</button>
             </div>
           )}
-          {smtpConnected ? (
+          {popConnected ? (
             <div>
-              <p>SMTP credentials saved.</p>
-              <button onClick={disconnectSmtp}>Remove SMTP</button>
+              <p>POP3 account connected.</p>
+              <button onClick={disconnectPop}>Disconnect POP3</button>
             </div>
           ) : (
             <div className="settings-section">
               <input
                 className="generator-input"
                 type="text"
-                placeholder="SMTP Host"
-                value={smtpHost}
-                onChange={(e) => setSmtpHost(e.target.value)}
+                placeholder="POP3 Host"
+                value={popHost}
+                onChange={(e) => setPopHost(e.target.value)}
               />
               <input
                 className="generator-input"
                 type="text"
-                placeholder="SMTP Port"
-                value={smtpPort}
-                onChange={(e) => setSmtpPort(e.target.value)}
+                placeholder="POP3 Port"
+                value={popPort}
+                onChange={(e) => setPopPort(e.target.value)}
               />
               <input
                 className="generator-input"
                 type="text"
-                placeholder="SMTP Username"
-                value={smtpUser}
-                onChange={(e) => setSmtpUser(e.target.value)}
+                placeholder="POP3 Username"
+                value={popUser}
+                onChange={(e) => setPopUser(e.target.value)}
               />
               <input
                 className="generator-input"
                 type="password"
-                placeholder="SMTP Password"
-                value={smtpPass}
-                onChange={(e) => setSmtpPass(e.target.value)}
+                placeholder="POP3 Password"
+                value={popPass}
+                onChange={(e) => setPopPass(e.target.value)}
               />
-              <button onClick={saveSmtp}>Save SMTP</button>
+              <button onClick={savePop}>Save POP3</button>
             </div>
           )}
         </section>
