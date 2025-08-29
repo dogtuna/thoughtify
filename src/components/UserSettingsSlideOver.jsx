@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
 import { auth, db, app } from "../firebase";
 import {
@@ -106,7 +107,7 @@ export default function UserSettingsSlideOver({ onClose }) {
     setSmtpConnected(false);
   };
 
-  return (
+  return createPortal(
     <div className="slide-over-overlay" onClick={onClose}>
       <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
         <h2>User Settings</h2>
@@ -184,7 +185,8 @@ export default function UserSettingsSlideOver({ onClose }) {
           <button onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
