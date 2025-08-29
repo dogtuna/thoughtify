@@ -15,7 +15,7 @@ const ZapierConfig = () => {
     let data = {};
     try {
       data = payload.trim() ? JSON.parse(payload) : {};
-    } catch (e) {
+    } catch {
       setError("Invalid JSON payload");
       setLoading(false);
       return;

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { Buffer } from 'node:buffer';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as client from '../client.js';

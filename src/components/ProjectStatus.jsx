@@ -12,9 +12,8 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
-import { auth, db, functions, appCheck } from "../firebase";
+import { auth, db, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
-import { getToken as getAppCheckToken } from "firebase/app-check";
 import ai from "../ai";
 import PropTypes from "prop-types";
 import useCanonical from "../utils/useCanonical";
@@ -223,11 +222,11 @@ ${JSON.stringify({recommendations, tasks})}
       alert("Missing email address for selected contact");
       return;
     }
+    if (emailProvider !== "gmail") {
+      alert("Sending emails is only supported for Gmail accounts.");
+      return;
+    }
     try {
-      if (appCheck) {
-        await getAppCheckToken(appCheck);
-      }
-      await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
         provider: emailProvider,
