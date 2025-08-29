@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db, functions, appCheck } from "../firebase";
+import { auth, db, functions } from "../firebase";
 import {
   doc,
   getDoc,

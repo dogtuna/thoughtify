@@ -12,7 +12,7 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
-import { auth, db, functions, appCheck } from "../firebase";
+import { auth, db, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
 import { getAppCheckToken } from "firebase/app-check";
 import ai from "../ai";
