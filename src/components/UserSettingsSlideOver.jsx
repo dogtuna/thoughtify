@@ -26,6 +26,8 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [outlookConnected, setOutlookConnected] = useState(false);
   const [smtpConnected, setSmtpConnected] = useState(false);
+  const [outlookUser, setOutlookUser] = useState("");
+  const [outlookPass, setOutlookPass] = useState("");
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("");
   const [smtpUser, setSmtpUser] = useState("");
@@ -39,8 +41,14 @@ export default function UserSettingsSlideOver({ onClose }) {
         setAvatarUrl(user.photoURL || avatarUrl);
         const gmailSnap = await getDoc(doc(db, "users", user.uid, "emailTokens", "gmail"));
         setGmailConnected(gmailSnap.exists());
-        const outlookSnap = await getDoc(doc(db, "users", user.uid, "emailTokens", "outlook"));
-        setOutlookConnected(outlookSnap.exists());
+        const outlookSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "outlook"),
+        );
+        if (outlookSnap.exists()) {
+          const data = outlookSnap.data();
+          setOutlookConnected(true);
+          setOutlookUser(data.user || "");
+        }
         const smtpSnap = await getDoc(doc(db, "users", user.uid, "emailTokens", "smtp"));
         setSmtpConnected(smtpSnap.exists());
       }
@@ -75,19 +83,21 @@ export default function UserSettingsSlideOver({ onClose }) {
     setGmailConnected(false);
   };
 
-  const connectOutlook = () => {
+  const saveOutlook = async () => {
     if (!uid) return;
-    window.open(
-      `${functionsBaseUrl}/getEmailAuthUrl?provider=outlook&state=${uid}`,
-      "_blank",
-      "width=500,height=600"
-    );
+    await setDoc(doc(db, "users", uid, "emailTokens", "outlook"), {
+      user: outlookUser,
+      pass: outlookPass,
+    });
+    setOutlookConnected(true);
   };
 
   const disconnectOutlook = async () => {
     if (!uid) return;
     await deleteDoc(doc(db, "users", uid, "emailTokens", "outlook"));
     setOutlookConnected(false);
+    setOutlookUser("");
+    setOutlookPass("");
   };
 
   const saveSmtp = async () => {
@@ -140,7 +150,23 @@ export default function UserSettingsSlideOver({ onClose }) {
               <button onClick={disconnectOutlook}>Disconnect Outlook</button>
             </div>
           ) : (
-            <button onClick={connectOutlook}>Connect Outlook</button>
+            <div className="settings-section">
+              <input
+                className="generator-input"
+                type="text"
+                placeholder="Outlook Username"
+                value={outlookUser}
+                onChange={(e) => setOutlookUser(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="password"
+                placeholder="Outlook Password"
+                value={outlookPass}
+                onChange={(e) => setOutlookPass(e.target.value)}
+              />
+              <button onClick={saveOutlook}>Save Outlook</button>
+            </div>
           )}
           {smtpConnected ? (
             <div>
