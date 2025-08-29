@@ -35,6 +35,7 @@ import AppShell from "./components/AppShell";
 import ActionDashboard from "./components/ActionDashboard.jsx";
 import ProjectStatus from "./components/ProjectStatus.jsx";
 import ProjectStatusHistory from "./components/ProjectStatusHistory.jsx";
+import ZapierConfig from "./pages/ZapierConfig.jsx";
 
 window.PropTypes = PropTypes;
 
@@ -131,6 +132,10 @@ function Root() {
             }
           />
           <Route path="/settings" element={<Settings />} />
+          <Route
+            path="/zapier-config"
+            element={user ? <ZapierConfig /> : <Navigate to="/login" />}
+          />
           <Route
             path="/leadership-assessment"
             element={user ? <LeadershipAssessmentWizard /> : <Navigate to="/login" />}

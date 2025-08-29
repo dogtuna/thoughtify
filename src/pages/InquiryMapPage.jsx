@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { auth } from "../firebase";
@@ -50,6 +50,9 @@ const InquiryMapContent = () => {
     <main className="min-h-screen pb-40">
       <div className="flex items-center gap-4 mb-4">
         {isAnalyzing && <span>Analyzing evidence...</span>}
+        <Link to="/zapier-config" className="generator-button">
+          Use Zapier
+        </Link>
       </div>
       <InquiryMap hypotheses={parsedHypotheses} />
     </main>
