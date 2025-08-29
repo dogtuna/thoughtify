@@ -229,6 +229,53 @@ export const generateInvitation = functions.https.onCall(async (data, context) =
   return { invitationCode };
 });
 
+export const zapierWebhook = onRequest(async (req, res) => {
+  const secret = process.env.ZAPIER_WEBHOOK_SECRET;
+  const provided = req.get("x-zapier-secret") || req.query.secret;
+
+  if (!secret || provided !== secret) {
+    res.status(403).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const payload = req.body || {};
+
+  try {
+    await db.collection("auditLog").add({
+      payload,
+      receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (payload.hypothesisId && payload.auditEntry) {
+      const ref = db.collection("hypotheses").doc(payload.hypothesisId);
+      await ref.update({
+        auditLog: admin.firestore.FieldValue.arrayUnion({
+          ...payload.auditEntry,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        }),
+      });
+    }
+
+    if (payload.taskId && payload.status) {
+      await db
+        .collection("tasks")
+        .doc(payload.taskId)
+        .set(
+          {
+            status: payload.status,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+    }
+
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("Error handling Zapier webhook", err);
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
 export const generateTrainingPlan = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
