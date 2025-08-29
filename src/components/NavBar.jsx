@@ -30,6 +30,12 @@ export default function NavBar() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const handler = () => setSettingsOpen(true);
+    window.addEventListener("openUserSettings", handler);
+    return () => window.removeEventListener("openUserSettings", handler);
+  }, []);
+
   const handleAddProject = () => {
     const newId = crypto.randomUUID();
     navigate(`/project-setup?initiativeId=${newId}`);
