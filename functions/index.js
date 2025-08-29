@@ -1833,5 +1833,10 @@ export const triggerZap = onCall(async (req) => {
   }
 });
 
-export { getEmailAuthUrl, emailOAuthCallback, sendQuestionEmail } from "./emailProviders.js";
+export {
+  getEmailAuthUrl,
+  emailOAuthCallback,
+  sendQuestionEmail,
+  saveEmailCredentials,
+} from "./emailProviders.js";
 export { mcpServer } from "./mcpServer.js";

@@ -1,11 +1,12 @@
 
-import { Buffer } from "node:buffer";
-import crypto from "node:crypto";
+import { Buffer } from "buffer";
+import crypto from "crypto";
 
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -196,6 +197,60 @@ async function getStoredProviderToken(uid, provider, keyHex) {
 }
 
 // ==============================
+// 3) Save SMTP/Outlook credentials (CALLABLE)
+// ==============================
+export const saveEmailCredentials = onCall(
+  {
+    region: "us-central1",
+    enforceAppCheck: true,
+    secrets: [TOKEN_ENCRYPTION_KEY],
+  },
+  async (request) => {
+    const uid = (request.auth && request.auth.uid) || null;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
+    }
+
+    const { provider, host, port, user, pass } = request.data || {};
+
+    if (provider !== "smtp" && provider !== "outlook") {
+      throw new HttpsError("invalid-argument", "Unknown provider");
+    }
+
+    const trimmedUser = (user || "").trim();
+    const trimmedPass = (pass || "").trim();
+
+    if (!trimmedUser || !trimmedPass) {
+      throw new HttpsError("invalid-argument", "Missing credentials");
+    }
+
+    const data = {
+      user: trimmedUser,
+      pass: encrypt(trimmedPass, TOKEN_ENCRYPTION_KEY.value()),
+    };
+
+    if (provider === "smtp") {
+      const trimmedHost = (host || "").trim();
+      const normalizedPort = Number(port) || 587;
+      if (!trimmedHost || !normalizedPort) {
+        throw new HttpsError("invalid-argument", "Missing SMTP fields");
+      }
+      data.host = trimmedHost;
+      data.port = normalizedPort;
+    }
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("emailTokens")
+      .doc(provider)
+      .set(data);
+
+    return { ok: true };
+  }
+);
+
+// ==============================
 // 3) Send email (CALLABLE with App Check)
 // ==============================
 export const sendQuestionEmail = onCall(
@@ -230,40 +285,79 @@ export const sendQuestionEmail = onCall(
       throw new HttpsError("invalid-argument", "Missing fields");
     }
 
-    if (provider !== "gmail") {
-      throw new HttpsError("invalid-argument", "Unknown provider");
-    }
-
     try {
-      const gmailClient = createGmailClient(
-        GMAIL_CLIENT_ID.value(),
-        GMAIL_CLIENT_SECRET.value(),
-        GMAIL_REDIRECT_URI.value()
-      );
-      const tokens = await getStoredProviderToken(
-        uid,
-        "gmail",
-        TOKEN_ENCRYPTION_KEY.value()
-      );
-      gmailClient.setCredentials(tokens);
+      let messageId = "";
 
-      const gmail = google.gmail({ version: "v1", auth: gmailClient });
+      if (provider === "gmail") {
+        const gmailClient = createGmailClient(
+          GMAIL_CLIENT_ID.value(),
+          GMAIL_CLIENT_SECRET.value(),
+          GMAIL_REDIRECT_URI.value()
+        );
+        const tokens = await getStoredProviderToken(
+          uid,
+          "gmail",
+          TOKEN_ENCRYPTION_KEY.value()
+        );
+        gmailClient.setCredentials(tokens);
 
-      const raw = Buffer.from(
-        `To: ${recipientEmail}\r\nSubject: ${subject}\r\n\r\n${message}`
-      )
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+        const gmail = google.gmail({ version: "v1", auth: gmailClient });
 
-      const resp = await gmail.users.messages.send({
-        userId: "me",
-        requestBody: { raw },
-      });
-      const messageId = resp.data.id || "";
+        const raw = Buffer.from(
+          `To: ${recipientEmail}\r\nSubject: ${subject}\r\n\r\n${message}`
+        )
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
 
-      // Ensure user document exists so the questions subcollection is visible
+        const resp = await gmail.users.messages.send({
+          userId: "me",
+          requestBody: { raw },
+        });
+        messageId = resp.data.id || "";
+      } else if (provider === "smtp" || provider === "outlook") {
+        const snap = await db
+          .collection("users")
+          .doc(uid)
+          .collection("emailTokens")
+          .doc(provider)
+          .get();
+        if (!snap.exists) {
+          throw new HttpsError("failed-precondition", "No credentials stored");
+        }
+        const data = snap.data() || {};
+        const { host, port, user } = data;
+        let pass = data.pass || "";
+        const smtpHost = host || (provider === "outlook" ? "smtp.office365.com" : null);
+        const smtpPort = port || 587;
+        if (!smtpHost || !user || !pass) {
+          throw new HttpsError("failed-precondition", "Incomplete SMTP credentials");
+        }
+        if (typeof pass === "string") {
+          try {
+            pass = decrypt(pass, TOKEN_ENCRYPTION_KEY.value());
+          } catch (_) {
+            // assume pass stored plaintext
+          }
+        }
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(smtpPort),
+          secure: Number(smtpPort) === 465,
+          auth: { user, pass },
+        });
+        const info = await transporter.sendMail({
+          from: user,
+          to: recipientEmail,
+          subject,
+          text: message,
+        });
+        messageId = info.messageId || "";
+      } else {
+        throw new HttpsError("invalid-argument", "Unknown provider");
+      }
+
       await db.collection("users").doc(uid).set({}, { merge: true });
 
       await db
@@ -275,7 +369,22 @@ export const sendQuestionEmail = onCall(
 
       return { messageId };
     } catch (err) {
-      console.error("sendQuestionEmail error", (err && err.response && err.response.data) || err);
+      console.error(
+        "sendQuestionEmail error",
+        (err && err.response && err.response.data) || err
+      );
+      if (
+        err &&
+        (err.code === "EAUTH" ||
+          err.responseCode === 535 ||
+          (typeof err.message === "string" &&
+            err.message.toLowerCase().includes("invalid login")))
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Invalid email credentials"
+        );
+      }
       const msg =
         (err && err.response && err.response.data && JSON.stringify(err.response.data)) ||
         (err && err.message) ||

@@ -26,6 +26,7 @@ const ProjectStatus = ({
   emailConnected = false,
   onHistoryChange = () => {},
   initiativeId: propInitiativeId = "",
+  emailProvider = "gmail",
 }) => {
   const [searchParams] = useSearchParams();
   const initiativeId = propInitiativeId || searchParams.get("initiativeId") || "";
@@ -202,7 +203,9 @@ ${JSON.stringify({recommendations, tasks})}
   // eslint-disable-next-line no-unused-vars
   const openSendModal = () => {
     if (!emailConnected) {
-      alert("Connect your Gmail account in settings.");
+      if (window.confirm("Connect your email account?")) {
+        window.dispatchEvent(new Event("openUserSettings"));
+      }
       return;
     }
     if (!auth.currentUser) {
@@ -227,7 +230,7 @@ ${JSON.stringify({recommendations, tasks})}
       await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
-        provider: "gmail",
+        provider: emailProvider,
         recipientEmail: emails.join(","),
         subject: `Project Status Update - ${new Date().toDateString()}`,
         message: summary,
@@ -332,6 +335,7 @@ ProjectStatus.propTypes = {
   contacts: PropTypes.array,
   setContacts: PropTypes.func,
   emailConnected: PropTypes.bool,
+  emailProvider: PropTypes.string,
   onHistoryChange: PropTypes.func,
   initiativeId: PropTypes.string,
   businessGoal: PropTypes.string,

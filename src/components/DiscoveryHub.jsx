@@ -141,7 +141,7 @@ const DiscoveryHub = () => {
   const [editData, setEditData] = useState(null);
   const [editTask, setEditTask] = useState(null);
   const [completionModal, setCompletionModal] = useState(null);
-  const [emailConnected, setEmailConnected] = useState(false);
+  const [emailProvider, setEmailProvider] = useState(null);
   const [emailDraft, setEmailDraft] = useState(null);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [editingDraft, setEditingDraft] = useState(false);
@@ -174,6 +174,13 @@ const DiscoveryHub = () => {
   const setStatusHistory = () => {};
   const [qaModal, setQaModal] = useState(null);
   const navigate = useNavigate();
+  const emailConnected = !!emailProvider;
+  const providerLabel =
+    emailProvider === "smtp"
+      ? "SMTP"
+      : emailProvider
+      ? emailProvider.charAt(0).toUpperCase() + emailProvider.slice(1)
+      : "Email";
 
   const handleAnswerClick = (e, q) => {
     // Prevent the card's click handlers from firing and grab the
@@ -507,8 +514,8 @@ const DiscoveryHub = () => {
 
   const draftEmail = (q) => {
     if (!emailConnected) {
-      if (window.confirm("Connect your Gmail account in settings?")) {
-        navigate("/settings");
+      if (window.confirm("Connect your email account?")) {
+        window.dispatchEvent(new Event("openUserSettings"));
       }
       return;
     }
@@ -544,8 +551,8 @@ const DiscoveryHub = () => {
 
   const draftTaskEmail = (task) => {
     if (!emailConnected) {
-      if (window.confirm("Connect your Gmail account in settings?")) {
-        navigate("/settings");
+      if (window.confirm("Connect your email account?")) {
+        window.dispatchEvent(new Event("openUserSettings"));
       }
       return;
     }
@@ -589,7 +596,7 @@ const DiscoveryHub = () => {
       await auth.currentUser.getIdToken(true);
       const callable = httpsCallable(functions, "sendQuestionEmail");
       await callable({
-        provider: "gmail",
+        provider: emailProvider,
         recipientEmail: emails.join(","),
         subject: emailDraft.subject,
         message: emailDraft.body,
@@ -1689,10 +1696,23 @@ Respond ONLY in this JSON format:
       if (user) {
         setUid(user.uid);
         setCurrentUserName(user.displayName || user.email || "My Tasks");
-        const tokenSnap = await getDoc(
-          doc(db, "users", user.uid, "emailTokens", "gmail")
+        const gmailSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "gmail"),
         );
-        setEmailConnected(tokenSnap.exists());
+        const outlookSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "outlook"),
+        );
+        const smtpSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "smtp"),
+        );
+        const provider = gmailSnap.exists()
+          ? "gmail"
+          : outlookSnap.exists()
+          ? "outlook"
+          : smtpSnap.exists()
+          ? "smtp"
+          : null;
+        setEmailProvider(provider);
         if (initiativeId) {
           const init = await loadInitiative(user.uid, initiativeId);
           setProjectName(init?.projectName || "");
@@ -2572,6 +2592,7 @@ Respond ONLY in this JSON format:
               contacts={contacts}
               setContacts={setContacts}
               emailConnected={emailConnected}
+              emailProvider={emailProvider}
               onHistoryChange={setStatusHistory}
               initiativeId={initiativeId}
               businessGoal={businessGoal}
@@ -3548,6 +3569,7 @@ Respond ONLY in this JSON format:
             contacts={contacts}
             setContacts={setContacts}
             emailConnected={emailConnected}
+            emailProvider={emailProvider}
             onHistoryChange={setStatusHistory}
             initiativeId={initiativeId}
             businessGoal={businessGoal}
@@ -3590,6 +3612,7 @@ Respond ONLY in this JSON format:
             contacts={contacts}
             setContacts={setContacts}
             emailConnected={emailConnected}
+            emailProvider={emailProvider}
             onHistoryChange={setStatusHistory}
             initiativeId={initiativeId}
             businessGoal={businessGoal}
@@ -3611,7 +3634,7 @@ Respond ONLY in this JSON format:
                       className="generator-button"
                       onClick={sendEmail}
                     >
-                      Send with Gmail
+                      {`Send with ${providerLabel}`}
                     </button>
                     <button
                       className="generator-button"
