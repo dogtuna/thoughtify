@@ -13,7 +13,8 @@ const fft = functionsTest();
 function startServer() {
   const app = express();
   app.use(express.json());
-  app.all('*', (req, res) => mcpServer(req, res));
+  // Use a catch-all regex path; Express 5 no longer accepts "*" directly
+  app.all(/.*/, (req, res) => mcpServer(req, res));
   const server = app.listen(0);
   return new Promise<{ url: string; close: () => void }>((resolve) => {
     server.on('listening', () => {
