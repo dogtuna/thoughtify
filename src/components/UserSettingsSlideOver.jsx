@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
-import { auth, db, app, functions } from "../firebase";
+import { auth, db, app, functions, appCheck } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import {
   getStorage,
   ref as storageRef,
