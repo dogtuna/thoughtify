@@ -25,10 +25,14 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [popConnected, setPopConnected] = useState(false);
   const [imapHost, setImapHost] = useState("");
   const [imapPort, setImapPort] = useState("");
+  const [imapSmtpHost, setImapSmtpHost] = useState("");
+  const [imapSmtpPort, setImapSmtpPort] = useState("");
   const [imapUser, setImapUser] = useState("");
   const [imapPass, setImapPass] = useState("");
   const [popHost, setPopHost] = useState("");
   const [popPort, setPopPort] = useState("");
+  const [popSmtpHost, setPopSmtpHost] = useState("");
+  const [popSmtpPort, setPopSmtpPort] = useState("");
   const [popUser, setPopUser] = useState("");
   const [popPass, setPopPass] = useState("");
   const fileInput = useRef(null);
@@ -48,6 +52,8 @@ export default function UserSettingsSlideOver({ onClose }) {
           setImapConnected(true);
           setImapHost(data.host || "");
           setImapPort(String(data.port || ""));
+          setImapSmtpHost(data.smtpHost || "");
+          setImapSmtpPort(String(data.smtpPort || ""));
           setImapUser(data.user || "");
         }
         const popSnap = await getDoc(
@@ -58,6 +64,8 @@ export default function UserSettingsSlideOver({ onClose }) {
           setPopConnected(true);
           setPopHost(data.host || "");
           setPopPort(String(data.port || ""));
+          setPopSmtpHost(data.smtpHost || "");
+          setPopSmtpPort(String(data.smtpPort || ""));
           setPopUser(data.user || "");
         }
       }
@@ -107,6 +115,8 @@ export default function UserSettingsSlideOver({ onClose }) {
       provider: "imap",
       host: imapHost.trim(),
       port: imapPort,
+      smtpHost: imapSmtpHost.trim(),
+      smtpPort: imapSmtpPort,
       user: imapUser.trim(),
       pass: imapPass,
     });
@@ -119,6 +129,8 @@ export default function UserSettingsSlideOver({ onClose }) {
     setImapConnected(false);
     setImapHost("");
     setImapPort("");
+    setImapSmtpHost("");
+    setImapSmtpPort("");
     setImapUser("");
     setImapPass("");
   };
@@ -129,6 +141,8 @@ export default function UserSettingsSlideOver({ onClose }) {
       provider: "pop3",
       host: popHost.trim(),
       port: popPort,
+      smtpHost: popSmtpHost.trim(),
+      smtpPort: popSmtpPort,
       user: popUser.trim(),
       pass: popPass,
     });
@@ -141,6 +155,8 @@ export default function UserSettingsSlideOver({ onClose }) {
     setPopConnected(false);
     setPopHost("");
     setPopPort("");
+    setPopSmtpHost("");
+    setPopSmtpPort("");
     setPopUser("");
     setPopPass("");
   };
@@ -196,6 +212,20 @@ export default function UserSettingsSlideOver({ onClose }) {
               <input
                 className="generator-input"
                 type="text"
+                placeholder="SMTP Host"
+                value={imapSmtpHost}
+                onChange={(e) => setImapSmtpHost(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="text"
+                placeholder="SMTP Port"
+                value={imapSmtpPort}
+                onChange={(e) => setImapSmtpPort(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="text"
                 placeholder="IMAP Username"
                 value={imapUser}
                 onChange={(e) => setImapUser(e.target.value)}
@@ -230,6 +260,20 @@ export default function UserSettingsSlideOver({ onClose }) {
                 placeholder="POP3 Port"
                 value={popPort}
                 onChange={(e) => setPopPort(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="text"
+                placeholder="SMTP Host"
+                value={popSmtpHost}
+                onChange={(e) => setPopSmtpHost(e.target.value)}
+              />
+              <input
+                className="generator-input"
+                type="text"
+                placeholder="SMTP Port"
+                value={popSmtpPort}
+                onChange={(e) => setPopSmtpPort(e.target.value)}
               />
               <input
                 className="generator-input"

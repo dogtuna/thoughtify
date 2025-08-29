@@ -211,7 +211,15 @@ export const saveEmailCredentials = onCall(
       throw new HttpsError("unauthenticated", "Sign in required.");
     }
 
-    const { provider, host, port, user, pass } = request.data || {};
+    const {
+      provider,
+      host,
+      port,
+      smtpHost,
+      smtpPort,
+      user,
+      pass,
+    } = request.data || {};
 
     if (provider !== "imap" && provider !== "pop3") {
       throw new HttpsError("invalid-argument", "Unknown provider");
@@ -221,6 +229,8 @@ export const saveEmailCredentials = onCall(
     const trimmedPass = (pass || "").trim();
     const trimmedHost = (host || "").trim();
     const normalizedPort = Number(port) || 0;
+    const trimmedSmtpHost = (smtpHost || "").trim();
+    const normalizedSmtpPort = Number(smtpPort) || 0;
 
     if (!trimmedUser || !trimmedPass || !trimmedHost || !normalizedPort) {
       throw new HttpsError("invalid-argument", "Missing credentials");
@@ -232,6 +242,8 @@ export const saveEmailCredentials = onCall(
       host: trimmedHost,
       port: normalizedPort,
     };
+    if (trimmedSmtpHost) data.smtpHost = trimmedSmtpHost;
+    if (normalizedSmtpPort) data.smtpPort = normalizedSmtpPort;
 
     await db
       .collection("users")
