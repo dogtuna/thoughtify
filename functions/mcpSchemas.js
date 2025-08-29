@@ -132,6 +132,10 @@ const toolSchemas = {
     subject: z.string(),
     message: z.string(),
   }),
+  triggerZap: z.object({
+    zapUrl: z.string().url(),
+    payload: z.any().optional(),
+  }),
 };
 
 export default toolSchemas;

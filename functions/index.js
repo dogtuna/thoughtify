@@ -13,6 +13,7 @@ import crypto from "crypto";
 import { Buffer } from "buffer";
 import express from "express";
 import cors from "cors";
+import { callZap } from "./integrations/zapier.js";
 
 const FIREBASE_CONFIG = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
 const PROJECT_ID =
@@ -1770,6 +1771,19 @@ export const savePersona = onCall(async (request) => {
     .doc(personaId)
     .set(persona, { merge: true });
   return { id: personaId };
+});
+
+export const triggerZap = onCall(async (req) => {
+  const { zapUrl, payload } = req.data || {};
+  if (!zapUrl) {
+    throw new HttpsError("invalid-argument", "zapUrl is required");
+  }
+  try {
+    return await callZap({ zapUrl, payload });
+  } catch (err) {
+    console.error("Zapier call failed", err);
+    throw new HttpsError("internal", err.message || "Zapier call failed");
+  }
 });
 
 export { getEmailAuthUrl, emailOAuthCallback, sendQuestionEmail } from "./emailProviders.js";

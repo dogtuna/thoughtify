@@ -64,6 +64,7 @@ const callableFunctions = [
   "generateInvitation",
   "sendEmailBlast",
   "sendEmailReply",
+  "triggerZap",
 ];
 
 const anyObject = z.record(z.any());
