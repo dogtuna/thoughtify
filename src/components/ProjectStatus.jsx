@@ -223,6 +223,10 @@ ${JSON.stringify({recommendations, tasks})}
       alert("Missing email address for selected contact");
       return;
     }
+    if (emailProvider !== "gmail") {
+      alert("Sending emails is only supported for Gmail accounts.");
+      return;
+    }
     try {
       if (appCheck) {
         await getAppCheckToken(appCheck);
