@@ -279,6 +279,8 @@ export const sendQuestionEmail = onCall(
     region: "us-central1",
     enforceAppCheck: true,
     invoker: "public",
+    // Allow requests from production web app to bypass CORS preflight
+    cors: ["https://thoughtify.training"],
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
