@@ -278,6 +278,7 @@ export const sendQuestionEmail = onCall(
   {
     region: "us-central1",
     enforceAppCheck: true,
+    invoker: "public",
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
