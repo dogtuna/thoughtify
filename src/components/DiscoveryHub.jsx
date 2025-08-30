@@ -198,6 +198,8 @@ const DiscoveryHub = () => {
       setActive(section);
     } else if (searchParams.has("actionDashboard")) {
       setActive("actionDashboard");
+    } else {
+      setActive("overview");
     }
     const status = searchParams.get("status");
     if (status) {
