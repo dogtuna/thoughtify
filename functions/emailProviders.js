@@ -3,7 +3,8 @@ import { Buffer } from "buffer";
 import crypto from "crypto";
 
 import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 import { google } from "googleapis";
 import nodemailer from "nodemailer";
@@ -23,6 +24,7 @@ if (!getApps().length) {
   initializeApp();
 }
 const db = getFirestore();
+const auth = getAuth();
 
 // ==============================
 // Secrets (configure via CLI)
@@ -473,5 +475,109 @@ export const sendQuestionEmail = onCall(
         "internal error";
       throw new HttpsError("internal", msg);
     }
+  }
+);
+
+// ==============================
+// Inbound reply handler (HTTP)
+// ==============================
+export const processInboundEmail = onRequest(
+  { secrets: [TOKEN_ENCRYPTION_KEY] },
+  async (req, res) => {
+    // Postmark may send a GET request when verifying the endpoint.
+    // Return 200 for non-POST methods so the check succeeds.
+    if (req.method !== "POST") {
+      res.status(200).send({ status: "ok" });
+      return;
+    }
+
+    const body = req.body || {};
+
+    const rawRecipient =
+      body.MailboxHash ||
+      (Array.isArray(body.ToFull) && body.ToFull[0]?.MailboxHash) ||
+      body.To ||
+      body.to;
+    const from = body.From || body.from;
+    const subject = body.Subject || body.subject;
+
+    let text =
+      body.StrippedTextReply ||
+      body.TextBody ||
+      body.text ||
+      (body.HtmlBody ? body.HtmlBody.replace(/<[^>]+>/g, " ") : "");
+
+    if (!rawRecipient || !from || !subject || !text) {
+      res
+        .status(400)
+        .send({ status: "error", message: "Missing required fields" });
+      return;
+    }
+
+    const match = rawRecipient.match(
+      /QID(\d+)_UID([A-Za-z0-9]+)_SIG([a-f0-9]{16})/i,
+    );
+    if (!match) {
+      res.status(400).send({ status: "error", message: "Invalid reply" });
+      return;
+    }
+    const [, questionId, uid, sig] = match;
+
+    const expected = crypto
+      .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
+      .update(`QID${questionId}_UID${uid}`)
+      .digest("hex")
+      .slice(0, 16);
+
+    if (sig !== expected) {
+      res.status(403).send({ status: "error", message: "Bad signature" });
+      return;
+    }
+
+    const cleaned = text
+      .replace(
+        /Ref:QID\d+\|UID[^\s]+\s*<!--\s*THOUGHTIFY_REF[^>]*-->/gis,
+        "",
+      )
+      .trim();
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("questions")
+      .doc(String(questionId))
+      .collection("answers")
+      .add({
+        answer: cleaned,
+        from,
+        subject,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+    try {
+      const userRecord = await auth.getUser(uid);
+      const userEmail = userRecord.email;
+      if (userEmail && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        const forwarder = nodemailer.createTransport({
+          host: "smtp.zoho.com",
+          port: 465,
+          secure: true,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+        await forwarder.sendMail({
+          from: process.env.SMTP_USER,
+          to: userEmail,
+          subject,
+          text,
+        });
+      }
+    } catch (err) {
+      console.error("Error forwarding reply", err);
+    }
+
+    res.status(200).send({ status: "ok" });
   }
 );
