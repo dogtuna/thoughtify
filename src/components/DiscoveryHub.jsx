@@ -173,7 +173,7 @@ const DiscoveryHub = () => {
   const [viewingStatus] = useState("");
   const setStatusHistory = () => {};
   const [qaModal, setQaModal] = useState(null);
-  const emailConnected = emailProvider === "gmail";
+  const emailConnected = Boolean(emailProvider);
   const providerLabel =
     emailProvider === "imap"
       ? "IMAP"
@@ -198,6 +198,8 @@ const DiscoveryHub = () => {
       setActive(section);
     } else if (searchParams.has("actionDashboard")) {
       setActive("actionDashboard");
+    } else {
+      setActive("overview");
     }
     const status = searchParams.get("status");
     if (status) {
@@ -583,10 +585,6 @@ const DiscoveryHub = () => {
 
   const sendEmail = async () => {
     if (!emailDraft) return;
-    if (emailProvider !== "gmail") {
-      alert("Sending emails is only supported for Gmail accounts.");
-      return;
-    }
     const emails = emailDraft.recipients
       .map((n) => contacts.find((c) => c.name === n)?.email)
       .filter((e) => e);
@@ -1708,12 +1706,17 @@ Respond ONLY in this JSON format:
         const popSnap = await getDoc(
           doc(db, "users", user.uid, "emailTokens", "pop3"),
         );
+        const outlookSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "outlook"),
+        );
         const provider = gmailSnap.exists()
           ? "gmail"
           : imapSnap.exists()
           ? "imap"
           : popSnap.exists()
           ? "pop3"
+          : outlookSnap.exists()
+          ? "outlook"
           : null;
         setEmailProvider(provider);
         if (initiativeId) {
