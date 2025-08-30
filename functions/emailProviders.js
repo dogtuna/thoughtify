@@ -292,8 +292,15 @@ export const sendQuestionEmail = onCall(
       throw new HttpsError("unauthenticated", "Sign in required.");
     }
 
-    const { provider, recipientEmail, subject, message, questionId } =
-      request.data || {};
+    const {
+      provider: rawProvider,
+      recipientEmail,
+      subject,
+      message,
+      questionId,
+    } = request.data || {};
+
+    const provider = (rawProvider || "").toLowerCase();
 
     if (
       !provider ||
@@ -337,6 +344,39 @@ export const sendQuestionEmail = onCall(
           requestBody: { raw },
         });
         messageId = resp.data.id || "";
+      } else if (["imap", "pop3", "outlook"].includes(provider)) {
+        const snap = await db
+          .collection("users")
+          .doc(uid)
+          .collection("emailTokens")
+          .doc(provider)
+          .get();
+        if (!snap.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "No stored credentials for provider"
+          );
+        }
+        const data = snap.data() || {};
+        const pass = decrypt(data.pass, TOKEN_ENCRYPTION_KEY.value());
+        const host = data.smtpHost || data.host;
+        const port = data.smtpPort || 465;
+        const transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure: port === 465,
+          auth: {
+            user: data.user,
+            pass,
+          },
+        });
+        const info = await transporter.sendMail({
+          from: data.user,
+          to: recipientEmail,
+          subject,
+          text: message,
+        });
+        messageId = info.messageId || "";
       } else {
         const snap = await db
           .collection("users")
@@ -387,6 +427,9 @@ export const sendQuestionEmail = onCall(
         "sendQuestionEmail error",
         (err && err.response && err.response.data) || err
       );
+      if (err instanceof HttpsError) {
+        throw err;
+      }
       if (
         err &&
         (err.code === "EAUTH" ||
