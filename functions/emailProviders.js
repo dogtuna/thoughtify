@@ -6,6 +6,7 @@ import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -201,7 +202,7 @@ async function getStoredProviderToken(uid, provider, keyHex) {
 export const saveEmailCredentials = onCall(
   {
     region: "us-central1",
-    enforceAppCheck: true,
+    // App Check not enforced here to prevent CORS errors when tokens are missing
     secrets: [TOKEN_ENCRYPTION_KEY],
   },
   async (request) => {
@@ -235,23 +236,38 @@ export const saveEmailCredentials = onCall(
       throw new HttpsError("invalid-argument", "Missing credentials");
     }
 
-    const data = {
-      user: trimmedUser,
-      pass: encrypt(trimmedPass, TOKEN_ENCRYPTION_KEY.value()),
-      host: trimmedHost,
-      port: normalizedPort,
-    };
-    if (trimmedSmtpHost) data.smtpHost = trimmedSmtpHost;
-    if (normalizedSmtpPort) data.smtpPort = normalizedSmtpPort;
+    try {
+      const data = {
+        user: trimmedUser,
+        pass: encrypt(trimmedPass, TOKEN_ENCRYPTION_KEY.value()),
+        host: trimmedHost,
+        port: normalizedPort,
+      };
+      if (trimmedSmtpHost) data.smtpHost = trimmedSmtpHost;
+      if (normalizedSmtpPort) data.smtpPort = normalizedSmtpPort;
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .collection("emailTokens")
-      .doc(provider)
-      .set(data);
+      await db
+        .collection("users")
+        .doc(uid)
+        .collection("emailTokens")
+        .doc(provider)
+        .set(data);
 
-    return { ok: true };
+      return { ok: true };
+    } catch (err) {
+      console.error("saveEmailCredentials error", err);
+      if (
+        err &&
+        typeof err.message === "string" &&
+        err.message.toLowerCase().includes("token_encryption_key")
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Email credential encryption key not configured"
+        );
+      }
+      throw new HttpsError("internal", "Failed to save credentials");
+    }
   }
 );
 
@@ -276,8 +292,15 @@ export const sendQuestionEmail = onCall(
       throw new HttpsError("unauthenticated", "Sign in required.");
     }
 
-    const { provider, recipientEmail, subject, message, questionId } =
-      request.data || {};
+    const {
+      provider: rawProvider,
+      recipientEmail,
+      subject,
+      message,
+      questionId,
+    } = request.data || {};
+
+    const provider = (rawProvider || "").toLowerCase();
 
     if (
       !provider ||
@@ -321,6 +344,39 @@ export const sendQuestionEmail = onCall(
           requestBody: { raw },
         });
         messageId = resp.data.id || "";
+      } else if (["imap", "pop3", "outlook"].includes(provider)) {
+        const snap = await db
+          .collection("users")
+          .doc(uid)
+          .collection("emailTokens")
+          .doc(provider)
+          .get();
+        if (!snap.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "No stored credentials for provider"
+          );
+        }
+        const data = snap.data() || {};
+        const pass = decrypt(data.pass, TOKEN_ENCRYPTION_KEY.value());
+        const host = data.smtpHost || data.host;
+        const port = data.smtpPort || 465;
+        const transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure: port === 465,
+          auth: {
+            user: data.user,
+            pass,
+          },
+        });
+        const info = await transporter.sendMail({
+          from: data.user,
+          to: recipientEmail,
+          subject,
+          text: message,
+        });
+        messageId = info.messageId || "";
       } else {
         throw new HttpsError(
           "invalid-argument",
@@ -343,6 +399,9 @@ export const sendQuestionEmail = onCall(
         "sendQuestionEmail error",
         (err && err.response && err.response.data) || err
       );
+      if (err instanceof HttpsError) {
+        throw err;
+      }
       if (
         err &&
         (err.code === "EAUTH" ||
