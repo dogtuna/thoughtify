@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../firebase";
 import { loadInitiatives } from "../utils/initiatives";
 import UserSettingsSlideOver from "./UserSettingsSlideOver";
+import { useNotifications } from "../context/NotificationsContext.jsx";
 
 export default function NavBar() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -11,8 +12,15 @@ export default function NavBar() {
   const [addMenu, setAddMenu] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [projects, setProjects] = useState([]);
+  const [notifMenu, setNotifMenu] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { notifications, unreadCounts, markAsRead } = useNotifications();
+
+  const totalUnread = Object.values(unreadCounts).reduce(
+    (sum, c) => sum + c,
+    0
+  );
 
   const initiativeId = searchParams.get("initiativeId");
   const activeProject = projects.find((p) => p.id === initiativeId);
@@ -123,23 +131,53 @@ export default function NavBar() {
         <div className="user-actions">
           {loggedIn && (
             <>
-              <button className="notification-btn" type="button">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              <div className="notification-menu">
+                <button
+                  className="notification-btn"
+                  type="button"
+                  onClick={() => setNotifMenu(!notifMenu)}
                 >
-                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-                </svg>
-                <span className="indicator" />
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                  {totalUnread > 0 && (
+                    <span className="indicator">{totalUnread}</span>
+                  )}
+                </button>
+                {notifMenu && (
+                  <ul className="dropdown">
+                    {notifications.length === 0 ? (
+                      <li>No notifications</li>
+                    ) : (
+                      notifications.map((n) => (
+                        <li key={n.id}>
+                          <a
+                            href={n.href}
+                            onClick={() => {
+                              setNotifMenu(false);
+                              markAsRead(n.id);
+                            }}
+                          >
+                            {n.message}
+                            {n.count > 1 ? ` (${n.count})` : ""}
+                          </a>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
               <img
                 src="https://placehold.co/40x40/764ba2/FFFFFF?text=ID"
                 alt="User Avatar"

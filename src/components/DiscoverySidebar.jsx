@@ -88,6 +88,9 @@ export default function DiscoverySidebar() {
             )}
           </li>
           <li>
+            <Link to={makeUrl("/messages")}>Messages</Link>
+          </li>
+          <li>
             <Link to={makeUrl("/project-status")}>Project Status</Link>
             {statusOpen && (
               <ul>
