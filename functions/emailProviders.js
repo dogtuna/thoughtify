@@ -279,6 +279,8 @@ export const sendQuestionEmail = onCall(
     region: "us-central1",
     enforceAppCheck: true,
     invoker: "public",
+    // Allow requests from production web app to bypass CORS preflight
+    cors: ["https://thoughtify.training"],
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
@@ -323,7 +325,7 @@ export const sendQuestionEmail = onCall(
         .update(`QID${questionId}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
-      const replyTo = `jonny+QID${questionId}_UID${uid}_SIG${hmac}.@thoughtify.training`;
+      const replyTo = `jonny+QID${questionId}_UID${uid}_SIG${hmac}@thoughtify.training`;
 
       let messageId = "";
 
@@ -453,6 +455,16 @@ export const sendQuestionEmail = onCall(
         throw new HttpsError(
           "failed-precondition",
           "Invalid email credentials"
+        );
+      }
+      if (
+        err &&
+        (err.responseCode === 503 ||
+          (err.response && err.response.status === 503))
+      ) {
+        throw new HttpsError(
+          "unavailable",
+          "Email service temporarily unavailable"
         );
       }
       const msg =
