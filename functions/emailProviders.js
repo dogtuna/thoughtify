@@ -34,6 +34,8 @@ const GMAIL_CLIENT_ID = defineSecret("GMAIL_CLIENT_ID");
 const GMAIL_CLIENT_SECRET = defineSecret("GMAIL_CLIENT_SECRET");
 const GMAIL_REDIRECT_URI = defineSecret("GMAIL_REDIRECT_URI");
 const APP_BASE_URL = defineSecret("APP_BASE_URL");
+const SMTP_USER = defineSecret("SMTP_USER");
+const SMTP_PASS = defineSecret("SMTP_PASS");
 
 // ==============================
 // Crypto helpers
@@ -482,102 +484,180 @@ export const sendQuestionEmail = onCall(
 // Inbound reply handler (HTTP)
 // ==============================
 export const processInboundEmail = onRequest(
-  { secrets: [TOKEN_ENCRYPTION_KEY] },
+  {
+    region: "us-central1",
+    cors: true,
+    secrets: [TOKEN_ENCRYPTION_KEY, SMTP_USER, SMTP_PASS],
+    timeoutSeconds: 30,
+  },
   async (req, res) => {
-    // Postmark may send a GET request when verifying the endpoint.
-    // Return 200 for non-POST methods so the check succeeds.
+    // Allow Postmark’s GET “test” pings
     if (req.method !== "POST") {
       res.status(200).send({ status: "ok" });
       return;
     }
 
     const body = req.body || {};
+    // Helpful logs in case of shape surprises
+    console.log("Inbound keys:", Object.keys(body));
 
-    const rawRecipient =
-      body.MailboxHash ||
-      (Array.isArray(body.ToFull) && body.ToFull[0]?.MailboxHash) ||
-      body.To ||
-      body.to;
-    const from = body.From || body.from;
-    const subject = body.Subject || body.subject;
+    const {
+      MailboxHash,
+      OriginalRecipient,
+      To,
+      ToFull,
+      From,
+      Subject,
+      StrippedTextReply,
+      TextBody,
+      HtmlBody,
+      Headers = [],
+    } = body;
 
-    let text =
-      body.StrippedTextReply ||
-      body.TextBody ||
-      body.text ||
-      (body.HtmlBody ? body.HtmlBody.replace(/<[^>]+>/g, " ") : "");
+    // 1) Find the “plus” tag (MailboxHash preferred)
+    const extractPlus = (addr) => {
+      if (!addr || typeof addr !== "string") return "";
+      const local = addr.split("@")[0] || "";
+      const parts = local.split("+");
+      return parts.length > 1 ? parts.slice(1).join("+") : ""; // handle multi-plus just in case
+    };
 
-    if (!rawRecipient || !from || !subject || !text) {
-      res
-        .status(400)
-        .send({ status: "error", message: "Missing required fields" });
+    let tag = MailboxHash || "";
+
+    if (!tag) {
+      // Try ToFull array
+      if (Array.isArray(ToFull)) {
+        for (const t of ToFull) {
+          const a = t?.Email || t?.Address || t;
+          const p = extractPlus(String(a || ""));
+          if (p) { tag = p; break; }
+        }
+      }
+    }
+
+    if (!tag) {
+      // Try To (comma separated)
+      if (typeof To === "string") {
+        for (const raw of To.split(",")) {
+          const p = extractPlus(raw.trim());
+          if (p) { tag = p; break; }
+        }
+      }
+    }
+
+    if (!tag) {
+      // Try OriginalRecipient
+      const p = extractPlus(String(OriginalRecipient || ""));
+      if (p) tag = p;
+    }
+
+    // 2) Parse identifiers
+    // Supported formats:
+    //   A) QID123_UIDabc123_SIGdeadbeefcafebabe
+    //   B) q123.uabc123   (from Reply-To: ref+q<id>.u<uid>@...)
+    let questionId = null, uid = null, sig = null;
+
+    let m = /^QID(\d+)_UID([A-Za-z0-9\-_]+)_SIG([a-f0-9]{16})$/i.exec(tag || "");
+    if (m) {
+      questionId = m[1];
+      uid = m[2];
+      sig = m[3];
+    } else {
+      m = /^q([^\.]+)\.u(.+)$/i.exec(tag || "");
+      if (m) {
+        questionId = m[1];
+        uid = m[2];
+      }
+    }
+
+    // 3) Fallback to custom headers
+    if (!questionId || !uid) {
+      const headerMap = Object.fromEntries(
+        Headers.map(h => [String(h.Name || "").toLowerCase(), h.Value])
+      );
+      if (!questionId && headerMap["x-question-id"]) {
+        questionId = String(headerMap["x-question-id"]).trim();
+      }
+      if (!uid && headerMap["x-user-id"]) {
+        uid = String(headerMap["x-user-id"]).trim();
+      }
+    }
+
+    // Required basics
+    const from = From || body.from;
+    const subject = Subject || body.subject;
+    const rawText =
+      StrippedTextReply || TextBody ||
+      (HtmlBody ? HtmlBody.replace(/<[^>]+>/g, " ") : "");
+
+    if (!questionId || !uid || !from || !subject || !rawText) {
+      console.warn("Missing fields", { questionId, uid, from: !!from, subject: !!subject, hasBody: !!rawText });
+      res.status(400).send({ status: "error", message: "Missing required fields" });
       return;
     }
 
-    const match = rawRecipient.match(
-      /QID(\d+)_UID([A-Za-z0-9]+)_SIG([a-f0-9]{16})/i,
-    );
-    if (!match) {
-      res.status(400).send({ status: "error", message: "Invalid reply" });
-      return;
-    }
-    const [, questionId, uid, sig] = match;
-
-    const expected = crypto
-      .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
-      .update(`QID${questionId}_UID${uid}`)
-      .digest("hex")
-      .slice(0, 16);
-
-    if (sig !== expected) {
-      res.status(403).send({ status: "error", message: "Bad signature" });
-      return;
+    // 4) Enforce HMAC only if SIG was present in tag
+    if (sig) {
+      const expected = crypto
+        .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
+        .update(`QID${questionId}_UID${uid}`)
+        .digest("hex")
+        .slice(0, 16);
+      if (sig !== expected) {
+        console.warn("Bad signature", { questionId, uid });
+        res.status(403).send({ status: "error", message: "Bad signature" });
+        return;
+      }
     }
 
-    const cleaned = text
-      .replace(
-        /Ref:QID\d+\|UID[^\s]+\s*<!--\s*THOUGHTIFY_REF[^>]*-->/gis,
-        "",
-      )
+    // 5) Clean footer markers if present
+    const cleaned = String(rawText)
+      .replace(/Ref:QID\d+\|UID[^\s]+/gi, "")
+      .replace(/<!--\s*THOUGHTIFY_REF.*?-->/gis, "")
       .trim();
 
+    // 6) Store the reply as an answer under the question
     await db
-      .collection("users")
-      .doc(uid)
-      .collection("questions")
-      .doc(String(questionId))
-      .collection("answers")
-      .add({
+      .collection("users").doc(uid)
+      .collection("questions").doc(String(questionId))
+      .collection("answers").add({
         answer: cleaned,
         from,
         subject,
-        createdAt: FieldValue.serverTimestamp(),
+        headers: Headers,
+        receivedAt: new Date().toISOString(),
+        provider: "postmark",
+        rawTag: tag || null,
       });
 
+    // 7) Optional: forward the reply to the Thoughtify user (uses secrets, not process.env)
     try {
       const userRecord = await auth.getUser(uid);
-      const userEmail = userRecord.email;
-      if (userEmail && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      const userEmail = userRecord?.email || null;
+
+      if (userEmail && SMTP_USER.value() && SMTP_PASS.value()) {
         const forwarder = nodemailer.createTransport({
           host: "smtp.zoho.com",
           port: 465,
           secure: true,
           auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
+            user: SMTP_USER.value(),
+            pass: SMTP_PASS.value(),
           },
         });
         await forwarder.sendMail({
-          from: process.env.SMTP_USER,
+          from: SMTP_USER.value(),
           to: userEmail,
           subject,
-          text,
+          text: cleaned,
         });
       }
     } catch (err) {
       console.error("Error forwarding reply", err);
+      // don’t fail the webhook on forward errors
     }
 
     res.status(200).send({ status: "ok" });
   }
 );
+
