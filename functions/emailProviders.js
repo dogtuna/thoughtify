@@ -493,7 +493,7 @@ export const processInboundEmail = onRequest(
       return;
     }
 
-    const match = to.match(/QID(\d+)_UID([A-Za-z0-9]+)_SIG([a-f0-9]{16})/i);
+    const match = to.match(/QID(\d+)_UID([A-Za-z0-9_-]+)_SIG([a-f0-9]{16})/i);
     if (!match) {
       res.status(400).send({ status: "error", message: "Invalid reply" });
       return;
