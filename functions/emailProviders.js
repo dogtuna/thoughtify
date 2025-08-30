@@ -484,16 +484,32 @@ export const sendQuestionEmail = onCall(
 export const processInboundEmail = onRequest(
   { secrets: [TOKEN_ENCRYPTION_KEY] },
   async (req, res) => {
-    const { to, from, subject, text } = req.body || {};
+    const body = req.body || {};
 
-    if (!to || !from || !subject || !text) {
+    const rawRecipient =
+      body.MailboxHash ||
+      (Array.isArray(body.ToFull) && body.ToFull[0]?.MailboxHash) ||
+      body.To ||
+      body.to;
+    const from = body.From || body.from;
+    const subject = body.Subject || body.subject;
+
+    let text =
+      body.StrippedTextReply ||
+      body.TextBody ||
+      body.text ||
+      (body.HtmlBody ? body.HtmlBody.replace(/<[^>]+>/g, " ") : "");
+
+    if (!rawRecipient || !from || !subject || !text) {
       res
         .status(400)
         .send({ status: "error", message: "Missing required fields" });
       return;
     }
 
-    const match = to.match(/QID(\d+)_UID([A-Za-z0-9_-]+)_SIG([a-f0-9]{16})/i);
+    const match = rawRecipient.match(
+      /QID(\d+)_UID([A-Za-z0-9]+)_SIG([a-f0-9]{16})/i,
+    );
     if (!match) {
       res.status(400).send({ status: "error", message: "Invalid reply" });
       return;
@@ -514,7 +530,7 @@ export const processInboundEmail = onRequest(
     const cleaned = text
       .replace(
         /Ref:QID\d+\|UID[^\s]+\s*<!--\s*THOUGHTIFY_REF[^>]*-->/gis,
-        ""
+        "",
       )
       .trim();
 
