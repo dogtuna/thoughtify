@@ -6,6 +6,7 @@ import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -337,10 +338,38 @@ export const sendQuestionEmail = onCall(
         });
         messageId = resp.data.id || "";
       } else {
-        throw new HttpsError(
-          "invalid-argument",
-          "Unsupported provider for sending"
-        );
+        const snap = await db
+          .collection("users")
+          .doc(uid)
+          .collection("emailTokens")
+          .doc(provider)
+          .get();
+        if (!snap.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "No stored credentials for provider"
+          );
+        }
+        const data = snap.data() || {};
+        const pass = decrypt(data.pass, TOKEN_ENCRYPTION_KEY.value());
+        const host = data.smtpHost || data.host;
+        const port = data.smtpPort || 465;
+        const transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure: port === 465,
+          auth: {
+            user: data.user,
+            pass,
+          },
+        });
+        const info = await transporter.sendMail({
+          from: data.user,
+          to: recipientEmail,
+          subject,
+          text: message,
+        });
+        messageId = info.messageId || "";
       }
 
       await db.collection("users").doc(uid).set({}, { merge: true });

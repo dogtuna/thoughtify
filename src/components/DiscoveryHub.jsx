@@ -583,10 +583,6 @@ const DiscoveryHub = () => {
 
   const sendEmail = async () => {
     if (!emailDraft) return;
-    if (emailProvider !== "gmail") {
-      alert("Sending emails is only supported for Gmail accounts.");
-      return;
-    }
     const emails = emailDraft.recipients
       .map((n) => contacts.find((c) => c.name === n)?.email)
       .filter((e) => e);
