@@ -1837,6 +1837,7 @@ export {
   getEmailAuthUrl,
   emailOAuthCallback,
   sendQuestionEmail,
+  processInboundEmail,
   saveEmailCredentials,
 } from "./emailProviders.js";
 export { mcpServer } from "./mcpServer.js";
