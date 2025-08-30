@@ -173,7 +173,7 @@ const DiscoveryHub = () => {
   const [viewingStatus] = useState("");
   const setStatusHistory = () => {};
   const [qaModal, setQaModal] = useState(null);
-  const emailConnected = emailProvider === "gmail";
+  const emailConnected = Boolean(emailProvider);
   const providerLabel =
     emailProvider === "imap"
       ? "IMAP"
@@ -1708,12 +1708,17 @@ Respond ONLY in this JSON format:
         const popSnap = await getDoc(
           doc(db, "users", user.uid, "emailTokens", "pop3"),
         );
+        const outlookSnap = await getDoc(
+          doc(db, "users", user.uid, "emailTokens", "outlook"),
+        );
         const provider = gmailSnap.exists()
           ? "gmail"
           : imapSnap.exists()
           ? "imap"
           : popSnap.exists()
           ? "pop3"
+          : outlookSnap.exists()
+          ? "outlook"
           : null;
         setEmailProvider(provider);
         if (initiativeId) {
