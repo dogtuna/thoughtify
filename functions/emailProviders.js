@@ -484,6 +484,13 @@ export const sendQuestionEmail = onCall(
 export const processInboundEmail = onRequest(
   { secrets: [TOKEN_ENCRYPTION_KEY] },
   async (req, res) => {
+    // Postmark may send a GET request when verifying the endpoint.
+    // Return 200 for non-POST methods so the check succeeds.
+    if (req.method !== "POST") {
+      res.status(200).send({ status: "ok" });
+      return;
+    }
+
     const body = req.body || {};
 
     const rawRecipient =
