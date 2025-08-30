@@ -6,6 +6,7 @@ import App from "./App.jsx";
 import { ProjectProvider } from "./context/ProjectContext.jsx";
 import { InquiryMapProvider } from "./context/InquiryMapContext";
 import { McpProvider } from "./context/McpContext.jsx";
+import { NotificationsProvider } from "./context/NotificationsContext.jsx";
 import PropTypes from "prop-types";
 import { initAnalytics, getAnalyticsConsent } from "./utils/analytics.js";
 import { onAuthStateChanged } from "firebase/auth";
@@ -36,6 +37,7 @@ import ActionDashboard from "./components/ActionDashboard.jsx";
 import ProjectStatus from "./components/ProjectStatus.jsx";
 import ProjectStatusHistory from "./components/ProjectStatusHistory.jsx";
 import ZapierConfig from "./pages/ZapierConfig.jsx";
+import Messages from "./components/Messages.jsx";
 
 window.PropTypes = PropTypes;
 
@@ -118,6 +120,10 @@ function Root() {
             element={user ? <InquiryMapPage /> : <Navigate to="/login" />}
           />
           <Route
+            path="/messages"
+            element={user ? <Messages /> : <Navigate to="/login" />}
+          />
+          <Route
             path="/action-dashboard"
             element={user ? <ActionDashboard /> : <Navigate to="/login" />}
           />
@@ -165,7 +171,9 @@ createRoot(document.getElementById("root")).render(
     <McpProvider>
       <ProjectProvider>
         <InquiryMapProvider>
-          <Root />
+          <NotificationsProvider>
+            <Root />
+          </NotificationsProvider>
         </InquiryMapProvider>
       </ProjectProvider>
     </McpProvider>
