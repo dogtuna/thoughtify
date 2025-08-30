@@ -314,6 +314,16 @@ export const sendQuestionEmail = onCall(
     }
 
     try {
+      const refToken = `Ref:QID${questionId}|UID${uid}`;
+      const subjectWithRef = `${subject} [${refToken}]`;
+      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${questionId} UID${uid} -->`;
+      const hmac = crypto
+        .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
+        .update(`QID${questionId}_UID${uid}`)
+        .digest("hex")
+        .slice(0, 16);
+      const replyTo = `jonny+QID${questionId}_UID${uid}_SIG${hmac}.@thoughtify.training`;
+
       let messageId = "";
 
       if (provider === "gmail") {
@@ -332,7 +342,7 @@ export const sendQuestionEmail = onCall(
         const gmail = google.gmail({ version: "v1", auth: gmailClient });
 
         const raw = Buffer.from(
-          `To: ${recipientEmail}\r\nSubject: ${subject}\r\n\r\n${message}`
+          `To: ${recipientEmail}\r\nSubject: ${subjectWithRef}\r\nReply-To: ${replyTo}\r\n\r\n${bodyWithFooter}`
         )
           .toString("base64")
           .replace(/\+/g, "-")
@@ -373,8 +383,9 @@ export const sendQuestionEmail = onCall(
         const info = await transporter.sendMail({
           from: data.user,
           to: recipientEmail,
-          subject,
-          text: message,
+          subject: subjectWithRef,
+          text: bodyWithFooter,
+          replyTo,
         });
         messageId = info.messageId || "";
       } else {
@@ -406,8 +417,9 @@ export const sendQuestionEmail = onCall(
         const info = await transporter.sendMail({
           from: data.user,
           to: recipientEmail,
-          subject,
-          text: message,
+          subject: subjectWithRef,
+          text: bodyWithFooter,
+          replyTo,
         });
         messageId = info.messageId || "";
       }
