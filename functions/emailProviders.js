@@ -638,14 +638,10 @@ export const processInboundEmail = onRequest(
       .collection("questions")
       .doc(String(questionId));
     const answeredAt = new Date().toISOString();
-    await questionRef.set(
-      {
-        lastAnswer: cleaned,
-        answeredAt,
-        status: "answered",
-      },
-      { merge: true }
-    );
+
+    // Best guess for the contact name corresponding to the reply
+    let answeredBy = from;
+    let initiativeId = null;
 
     try {
       const initsSnap = await db
@@ -658,21 +654,46 @@ export const processInboundEmail = onRequest(
         const data = docSnap.data() || {};
         const qArr = data.clarifyingQuestions || [];
         if (qArr[questionId] !== undefined) {
+          const contacts = data.contacts || [];
+          const name =
+            contacts.find(
+              (c) =>
+                (c.email || "").toLowerCase() === String(from).toLowerCase()
+            )?.name || from;
           const aArr = data.clarifyingAnswers || [];
           const existing = aArr[questionId] || {};
           aArr[questionId] = {
             ...existing,
-            [from]: { text: cleaned, answeredAt, answeredBy: from },
+            [name]: { text: cleaned, answeredAt, answeredBy: name },
           };
+          const askedArr = data.clarifyingAsked || [];
+          const askedEntry = askedArr[questionId] || {};
+          askedEntry[name] = true;
+          askedArr[questionId] = askedEntry;
           updates.push(
-            docSnap.ref.set({ clarifyingAnswers: aArr }, { merge: true })
+            docSnap.ref.set(
+              { clarifyingAnswers: aArr, clarifyingAsked: askedArr },
+              { merge: true }
+            )
           );
+          answeredBy = name;
+          initiativeId = docSnap.id;
         }
       });
       if (updates.length) await Promise.all(updates);
     } catch (err) {
       console.error("Failed to update clarifying answers", err);
     }
+
+    await questionRef.set(
+      {
+        lastAnswer: cleaned,
+        answeredAt,
+        status: "answered",
+        answeredBy,
+      },
+      { merge: true }
+    );
 
     await db
       .collection("users")
@@ -683,6 +704,9 @@ export const processInboundEmail = onRequest(
         body: cleaned,
         questionId: String(questionId),
         createdAt: answeredAt,
+        from: answeredBy,
+        fromEmail: from,
+        initiativeId,
       });
 
     // 7) Optional: forward the reply to the Thoughtify user (uses secrets, not process.env)
