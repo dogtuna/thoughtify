@@ -36,6 +36,7 @@ const GMAIL_REDIRECT_URI = defineSecret("GMAIL_REDIRECT_URI");
 const APP_BASE_URL = defineSecret("APP_BASE_URL");
 const SMTP_USER = defineSecret("SMTP_USER");
 const SMTP_PASS = defineSecret("SMTP_PASS");
+const REPLIES_DOMAIN = defineSecret("REPLIES_DOMAIN");
 
 // ==============================
 // Crypto helpers
@@ -329,7 +330,7 @@ export const sendQuestionEmail = onCall(
         .update(`QID${questionId}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
-      const replyTo = `jonny+QID${questionId}_UID${uid}_SIG${hmac}@thoughtify.training`;
+      const replyTo = `reply+QID${questionId}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
 
       let messageId = "";
 
