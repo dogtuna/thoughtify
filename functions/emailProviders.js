@@ -704,6 +704,7 @@ export const processInboundEmail = onRequest(
         status: "answered",
         answeredBy,
         answeredByContactId: answeredById,
+        
       },
       { merge: true }
     );
