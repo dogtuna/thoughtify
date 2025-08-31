@@ -627,21 +627,7 @@ export const processInboundEmail = onRequest(
       .replace(/<!--\s*THOUGHTIFY_REF.*?-->/gis, "")
       .trim();
 
-    // 6) Store the reply as an answer under the question
-    await db
-      .collection("users").doc(uid)
-      .collection("questions").doc(String(questionId))
-      .collection("answers").add({
-        answer: cleaned,
-        from: fromEmail,
-        subject,
-        headers: Headers,
-        receivedAt: new Date().toISOString(),
-        provider: "postmark",
-        rawTag: tag || null,
-      });
-
-    // 6.5) Mark question as answered and surface the message
+    // 6) Mark question as answered, update clarifying answers, and surface the message
     const questionRef = db
       .collection("users")
       .doc(uid)
