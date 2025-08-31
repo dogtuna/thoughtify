@@ -666,7 +666,7 @@ export const processInboundEmail = onRequest(
         const qArr = data.clarifyingQuestions || [];
         if (qArr[questionId] === undefined) continue;
 
-        const contacts = data.contacts || [];
+        const contacts = data.keyContacts || [];
         const matchedContact = contacts.find(
           (c) => extractEmail(c.email) === fromEmail
         );
@@ -681,9 +681,16 @@ export const processInboundEmail = onRequest(
 
         const aArr = data.clarifyingAnswers || [];
         const existing = aArr[questionId] || {};
+        const existingForName = existing[name] || {};
         aArr[questionId] = {
           ...existing,
-          [name]: { text: cleaned, answeredAt, answeredBy: name, contactId },
+          [name]: {
+            ...existingForName,
+            text: cleaned,
+            answeredAt,
+            answeredBy: name,
+            contactId,
+          },
         };
         askedEntry[name] = true;
         askedArr[questionId] = askedEntry;
