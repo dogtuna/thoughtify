@@ -2,11 +2,19 @@ import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
+import { useMemo } from "react";
 import { auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 const InquiryMapContent = () => {
-  const { hypotheses, loadHypotheses, isAnalyzing } = useInquiryMap();
+  const {
+    hypotheses,
+    suggestedHypotheses,
+    loadHypotheses,
+    isAnalyzing,
+    approveSuggestedHypothesis,
+    rejectSuggestedHypothesis,
+  } = useInquiryMap();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
 
@@ -46,6 +54,11 @@ const InquiryMapContent = () => {
     trend: Math.sign(h.auditLog?.[h.auditLog.length - 1]?.weight || 0),
   }));
 
+  const suggestions = useMemo(
+    () => (Array.isArray(suggestedHypotheses) ? suggestedHypotheses : []),
+    [suggestedHypotheses]
+  );
+
   return (
     <main className="min-h-screen pb-40">
       <div className="flex items-center gap-4 mb-4">
@@ -54,6 +67,22 @@ const InquiryMapContent = () => {
           Use Zapier
         </Link>
       </div>
+      {suggestions.length > 0 && (
+        <section className="mx-auto mb-6 w-[90%]">
+          <h3 className="mb-2 font-semibold">Suggested Hypotheses</h3>
+          <ul className="space-y-2">
+            {suggestions.map((s) => (
+              <li key={s.id} className="initiative-card flex items-center justify-between">
+                <span>{s.statement}</span>
+                <div className="flex gap-2">
+                  <button className="generator-button" onClick={() => approveSuggestedHypothesis(s.id)}>Approve</button>
+                  <button className="generator-button" onClick={() => rejectSuggestedHypothesis(s.id)}>Reject</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <InquiryMap hypotheses={parsedHypotheses} />
     </main>
   );

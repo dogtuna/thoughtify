@@ -113,6 +113,7 @@ const DiscoveryHub = () => {
   const [contacts, setContacts] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [projectTasks, setProjectTasks] = useState([]);
+  const [suggestedTasks, setSuggestedTasks] = useState([]);
   const projectTasksRef = useRef([]);
   const prevHypothesisConfidence = useRef({});
   const [contactFilter, setContactFilter] = useState("");
@@ -1805,6 +1806,64 @@ Respond ONLY in this JSON format:
     return () => unsub();
   }, [uid, initiativeId, currentUserName, normalizeAssignee]);
 
+  // Listen for suggested tasks (pending acceptance)
+  useEffect(() => {
+    if (!uid || !initiativeId) return;
+    const sref = collection(
+      db,
+      "users",
+      uid,
+      "initiatives",
+      initiativeId,
+      "suggestedTasks",
+    );
+    const unsub = onSnapshot(sref, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setSuggestedTasks(list);
+    });
+    return () => unsub();
+  }, [uid, initiativeId]);
+
+  const acceptSuggestedTask = async (t) => {
+    if (!uid || !initiativeId) return;
+    try {
+      const tasksCol = collection(
+        db,
+        "users",
+        uid,
+        "initiatives",
+        initiativeId,
+        "tasks",
+      );
+      const assignees = t.who ? [t.who] : [currentUserName];
+      await addDoc(tasksCol, {
+        name: currentUserName,
+        message: t.message,
+        assignees,
+        assignee: assignees[0],
+        subType: t.subType,
+        status: "open",
+        createdAt: serverTimestamp(),
+        tag: t.subType,
+        provenance: t.source ? [t.source] : [],
+        hypothesisId: t.hypothesisId || null,
+        taskType: t.taskType || "explore",
+      });
+      await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedTasks", t.id));
+    } catch (err) {
+      console.error("acceptSuggestedTask error", err);
+    }
+  };
+
+  const rejectSuggestedTask = async (t) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedTasks", t.id));
+    } catch (err) {
+      console.error("rejectSuggestedTask error", err);
+    }
+  };
+
   useEffect(() => {
     projectTasksRef.current = projectTasks;
   }, [projectTasks]);
@@ -2811,6 +2870,24 @@ Respond ONLY in this JSON format:
         {displayedTasks.length === 0 && (
           <p className="text-gray-400">Looks like you are all caught up!</p>
         )}
+      </div>
+    )}
+
+    {suggestedTasks.length > 0 && (
+      <div className="initiative-card">
+        <h3>Suggested Tasks</h3>
+        {suggestedTasks.map((t) => (
+          <div key={t.id} className="flex items-center justify-between border-b border-gray-700 py-2">
+            <div>
+              <div className="font-medium">{t.message}</div>
+              <div className="text-sm text-gray-400">{t.subType} {t.hypothesisId ? `• Hypothesis ${t.hypothesisId}` : ""}</div>
+            </div>
+            <div className="flex gap-2">
+              <button className="generator-button" onClick={() => acceptSuggestedTask(t)}>Accept</button>
+              <button className="generator-button" onClick={() => rejectSuggestedTask(t)}>Reject</button>
+            </div>
+          </div>
+        ))}
       </div>
     )}
 

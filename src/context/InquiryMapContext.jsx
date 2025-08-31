@@ -24,6 +24,7 @@ const getInquiryData = (data) => ({
   recommendations: toArray(
     data?.inquiryMap?.recommendations ?? data?.recommendations
   ),
+  suggestedHypotheses: toArray(data?.suggestedHypotheses),
 });
 
 const defaultState = {
@@ -36,6 +37,7 @@ export const InquiryMapProvider = ({ children }) => {
   const [hypotheses, setHypotheses] = useState(defaultState.hypotheses);
   const [businessGoal, setBusinessGoal] = useState(defaultState.businessGoal);
   const [recommendations, setRecommendations] = useState(defaultState.recommendations);
+  const [suggestedHypotheses, setSuggestedHypotheses] = useState([]);
   const [activeTriages, setActiveTriages] = useState(0);
   const unsubscribeRef = useRef(null);
 
@@ -63,11 +65,12 @@ export const InquiryMapProvider = ({ children }) => {
           return;
         }
         const data = snap.data();
-        const { hypotheses: hyps, recommendations: recs } = getInquiryData(data);
+        const { hypotheses: hyps, recommendations: recs, suggestedHypotheses: sh } = getInquiryData(data);
         console.log("Snapshot data", { hyps, recs, businessGoal: data?.businessGoal });
         setHypotheses(hyps);
         setBusinessGoal(data?.businessGoal || "");
         setRecommendations(recs);
+        setSuggestedHypotheses(sh || []);
       },
       (error) => {
         console.error("onSnapshot error", error);
@@ -325,6 +328,7 @@ export const InquiryMapProvider = ({ children }) => {
     hypotheses,
     businessGoal,
     recommendations,
+    suggestedHypotheses,
     loadHypotheses,
     addHypothesis,
     addQuestion,
@@ -333,6 +337,49 @@ export const InquiryMapProvider = ({ children }) => {
     refreshInquiryMap,
     updateConfidence,
     isAnalyzing,
+    approveSuggestedHypothesis: async (id) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const data = snap.data();
+        const current = getInquiryData(data);
+        const idx = (current.suggestedHypotheses || []).findIndex((h) => h.id === id);
+        if (idx === -1) return;
+        const sh = [...(current.suggestedHypotheses || [])];
+        const picked = sh.splice(idx, 1)[0];
+        const newHyp = {
+          id: `hyp-${Date.now()}`,
+          statement: picked.statement,
+          confidence: picked.confidence ?? 0,
+          supportingEvidence: [],
+          refutingEvidence: [],
+          sourceContributions: [],
+        };
+        const hyps = [...(current.hypotheses || []), newHyp];
+        await updateDoc(ref, {
+          "inquiryMap.hypotheses": hyps,
+          hypotheses: hyps,
+          suggestedHypotheses: sh,
+        });
+      } catch (err) {
+        console.error("approveSuggestedHypothesis error", err);
+      }
+    },
+    rejectSuggestedHypothesis: async (id) => {
+      if (!currentUser || !currentInitiative) return;
+      const ref = doc(db, "users", currentUser, "initiatives", currentInitiative);
+      try {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error("Initiative not found");
+        const data = snap.data();
+        const sh = toArray(data?.suggestedHypotheses).filter((h) => h.id !== id);
+        await updateDoc(ref, { suggestedHypotheses: sh });
+      } catch (err) {
+        console.error("rejectSuggestedHypothesis error", err);
+      }
+    },
   };
 
   return (
