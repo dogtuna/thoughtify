@@ -3,7 +3,7 @@ import { Buffer } from "buffer";
 import crypto from "crypto";
 
 import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
 import { google } from "googleapis";
@@ -563,9 +563,9 @@ export const processInboundEmail = onRequest(
       questionId = m[1];
       uid = m[2];
       sig = m[3];
-    } else {
-      m = /^q([^\.]+)\.u(.+)$/i.exec(tag || "");
-      if (m) {
+      } else {
+        m = /^q([^.]+)\.u(.+)$/i.exec(tag || "");
+        if (m) {
         questionId = m[1];
         uid = m[2];
       }
@@ -629,6 +629,60 @@ export const processInboundEmail = onRequest(
         receivedAt: new Date().toISOString(),
         provider: "postmark",
         rawTag: tag || null,
+      });
+
+    // 6.5) Mark question as answered and surface the message
+    const questionRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("questions")
+      .doc(String(questionId));
+    const answeredAt = new Date().toISOString();
+    await questionRef.set(
+      {
+        lastAnswer: cleaned,
+        answeredAt,
+        status: "answered",
+      },
+      { merge: true }
+    );
+
+    try {
+      const initsSnap = await db
+        .collection("users")
+        .doc(uid)
+        .collection("initiatives")
+        .get();
+      const updates = [];
+      initsSnap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const qArr = data.clarifyingQuestions || [];
+        if (qArr[questionId] !== undefined) {
+          const aArr = data.clarifyingAnswers || [];
+          const existing = aArr[questionId] || {};
+          aArr[questionId] = {
+            ...existing,
+            [from]: { text: cleaned, answeredAt, answeredBy: from },
+          };
+          updates.push(
+            docSnap.ref.set({ clarifyingAnswers: aArr }, { merge: true })
+          );
+        }
+      });
+      if (updates.length) await Promise.all(updates);
+    } catch (err) {
+      console.error("Failed to update clarifying answers", err);
+    }
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("messages")
+      .add({
+        subject,
+        body: cleaned,
+        questionId: String(questionId),
+        createdAt: answeredAt,
       });
 
     // 7) Optional: forward the reply to the Thoughtify user (uses secrets, not process.env)
