@@ -660,39 +660,51 @@ export const processInboundEmail = onRequest(
         .doc(uid)
         .collection("initiatives")
         .get();
-      const updates = [];
-      initsSnap.forEach((docSnap) => {
+
+      for (const docSnap of initsSnap.docs) {
         const data = docSnap.data() || {};
         const qArr = data.clarifyingQuestions || [];
-        if (qArr[questionId] !== undefined) {
-          const contacts = data.contacts || [];
-          const matchedContact = contacts.find(
-            (c) => extractEmail(c.email) === fromEmail
-          );
-          const name = matchedContact?.name || fromEmail;
-          const contactId = matchedContact?.id || null;
-          const aArr = data.clarifyingAnswers || [];
-          const existing = aArr[questionId] || {};
-          aArr[questionId] = {
-            ...existing,
-            [name]: { text: cleaned, answeredAt, answeredBy: name, contactId },
-          };
-          const askedArr = data.clarifyingAsked || [];
-          const askedEntry = askedArr[questionId] || {};
-          askedEntry[name] = true;
-          askedArr[questionId] = askedEntry;
-          updates.push(
-            docSnap.ref.set(
-              { clarifyingAnswers: aArr, clarifyingAsked: askedArr },
-              { merge: true }
-            )
-          );
-          answeredBy = name;
-          answeredById = contactId;
-          initiativeId = docSnap.id;
-        }
-      });
-      if (updates.length) await Promise.all(updates);
+        if (qArr[questionId] === undefined) continue;
+
+        const contacts = data.keyContacts || [];
+        const matchedContact = contacts.find(
+          (c) => extractEmail(c.email) === fromEmail
+        );
+        if (!matchedContact) continue;
+
+        const name = matchedContact.name;
+        const contactId = matchedContact.id || null;
+
+        const askedArr = data.clarifyingAsked || [];
+        const askedEntry = askedArr[questionId] || {};
+        if (!askedEntry[name]) continue; // question not asked for this initiative/contact
+
+        const aArr = data.clarifyingAnswers || [];
+        const existing = aArr[questionId] || {};
+        const existingForName = existing[name] || {};
+        aArr[questionId] = {
+          ...existing,
+          [name]: {
+            ...existingForName,
+            text: cleaned,
+            answeredAt,
+            answeredBy: name,
+            contactId,
+          },
+        };
+        askedEntry[name] = true;
+        askedArr[questionId] = askedEntry;
+
+        await docSnap.ref.set(
+          { clarifyingAnswers: aArr, clarifyingAsked: askedArr },
+          { merge: true }
+        );
+
+        answeredBy = name;
+        answeredById = contactId;
+        initiativeId = docSnap.id;
+        break; // stop after updating the matching initiative
+      }
     } catch (err) {
       console.error("Failed to update clarifying answers", err);
     }
