@@ -513,6 +513,7 @@ export const processInboundEmail = onRequest(
       TextBody,
       HtmlBody,
       Headers = [],
+      FromFull,
     } = body;
 
     // 1) Find the “plus” tag (MailboxHash preferred)
@@ -585,14 +586,23 @@ export const processInboundEmail = onRequest(
     }
 
     // Required basics
-    const from = From || body.from;
+    const extractEmail = (raw) => {
+      if (!raw) return "";
+      if (typeof raw === "string") {
+        const match = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+        return match ? match[0].toLowerCase() : raw.trim().toLowerCase();
+      }
+      return String(raw).trim().toLowerCase();
+    };
+
+    const fromEmail = extractEmail(FromFull?.Email || From || body.from);
     const subject = Subject || body.subject;
     const rawText =
       StrippedTextReply || TextBody ||
       (HtmlBody ? HtmlBody.replace(/<[^>]+>/g, " ") : "");
 
-    if (!questionId || !uid || !from || !subject || !rawText) {
-      console.warn("Missing fields", { questionId, uid, from: !!from, subject: !!subject, hasBody: !!rawText });
+    if (!questionId || !uid || !fromEmail || !subject || !rawText) {
+      console.warn("Missing fields", { questionId, uid, from: !!fromEmail, subject: !!subject, hasBody: !!rawText });
       res.status(400).send({ status: "error", message: "Missing required fields" });
       return;
     }
@@ -623,7 +633,7 @@ export const processInboundEmail = onRequest(
       .collection("questions").doc(String(questionId))
       .collection("answers").add({
         answer: cleaned,
-        from,
+        from: fromEmail,
         subject,
         headers: Headers,
         receivedAt: new Date().toISOString(),
@@ -640,7 +650,8 @@ export const processInboundEmail = onRequest(
     const answeredAt = new Date().toISOString();
 
     // Best guess for the contact name corresponding to the reply
-    let answeredBy = from;
+    let answeredBy = fromEmail;
+    let answeredById = null;
     let initiativeId = null;
 
     try {
@@ -655,16 +666,16 @@ export const processInboundEmail = onRequest(
         const qArr = data.clarifyingQuestions || [];
         if (qArr[questionId] !== undefined) {
           const contacts = data.contacts || [];
-          const name =
-            contacts.find(
-              (c) =>
-                (c.email || "").toLowerCase() === String(from).toLowerCase()
-            )?.name || from;
+          const matchedContact = contacts.find(
+            (c) => extractEmail(c.email) === fromEmail
+          );
+          const name = matchedContact?.name || fromEmail;
+          const contactId = matchedContact?.id || null;
           const aArr = data.clarifyingAnswers || [];
           const existing = aArr[questionId] || {};
           aArr[questionId] = {
             ...existing,
-            [name]: { text: cleaned, answeredAt, answeredBy: name },
+            [name]: { text: cleaned, answeredAt, answeredBy: name, contactId },
           };
           const askedArr = data.clarifyingAsked || [];
           const askedEntry = askedArr[questionId] || {};
@@ -677,6 +688,7 @@ export const processInboundEmail = onRequest(
             )
           );
           answeredBy = name;
+          answeredById = contactId;
           initiativeId = docSnap.id;
         }
       });
@@ -691,6 +703,8 @@ export const processInboundEmail = onRequest(
         answeredAt,
         status: "answered",
         answeredBy,
+        answeredByContactId: answeredById,
+        
       },
       { merge: true }
     );
@@ -705,7 +719,8 @@ export const processInboundEmail = onRequest(
         questionId: String(questionId),
         createdAt: answeredAt,
         from: answeredBy,
-        fromEmail: from,
+        fromEmail: fromEmail,
+        contactId: answeredById,
         initiativeId,
       });
 
