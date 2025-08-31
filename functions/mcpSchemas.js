@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 const contactSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   role: z.string(),
+  email: z.string().email().optional(),
 });
 
 const toolSchemas = {

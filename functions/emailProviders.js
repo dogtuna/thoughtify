@@ -3,7 +3,7 @@ import { Buffer } from "buffer";
 import crypto from "crypto";
 
 import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
 import { google } from "googleapis";
@@ -513,6 +513,7 @@ export const processInboundEmail = onRequest(
       TextBody,
       HtmlBody,
       Headers = [],
+      FromFull,
     } = body;
 
     // 1) Find the “plus” tag (MailboxHash preferred)
@@ -563,9 +564,9 @@ export const processInboundEmail = onRequest(
       questionId = m[1];
       uid = m[2];
       sig = m[3];
-    } else {
-      m = /^q([^\.]+)\.u(.+)$/i.exec(tag || "");
-      if (m) {
+      } else {
+        m = /^q([^.]+)\.u(.+)$/i.exec(tag || "");
+        if (m) {
         questionId = m[1];
         uid = m[2];
       }
@@ -585,14 +586,23 @@ export const processInboundEmail = onRequest(
     }
 
     // Required basics
-    const from = From || body.from;
+    const extractEmail = (raw) => {
+      if (!raw) return "";
+      if (typeof raw === "string") {
+        const match = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+        return match ? match[0].toLowerCase() : raw.trim().toLowerCase();
+      }
+      return String(raw).trim().toLowerCase();
+    };
+
+    const fromEmail = extractEmail(FromFull?.Email || From || body.from);
     const subject = Subject || body.subject;
     const rawText =
       StrippedTextReply || TextBody ||
       (HtmlBody ? HtmlBody.replace(/<[^>]+>/g, " ") : "");
 
-    if (!questionId || !uid || !from || !subject || !rawText) {
-      console.warn("Missing fields", { questionId, uid, from: !!from, subject: !!subject, hasBody: !!rawText });
+    if (!questionId || !uid || !fromEmail || !subject || !rawText) {
+      console.warn("Missing fields", { questionId, uid, from: !!fromEmail, subject: !!subject, hasBody: !!rawText });
       res.status(400).send({ status: "error", message: "Missing required fields" });
       return;
     }
@@ -623,12 +633,94 @@ export const processInboundEmail = onRequest(
       .collection("questions").doc(String(questionId))
       .collection("answers").add({
         answer: cleaned,
-        from,
+        from: fromEmail,
         subject,
         headers: Headers,
         receivedAt: new Date().toISOString(),
         provider: "postmark",
         rawTag: tag || null,
+      });
+
+    // 6.5) Mark question as answered and surface the message
+    const questionRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("questions")
+      .doc(String(questionId));
+    const answeredAt = new Date().toISOString();
+
+    // Best guess for the contact name corresponding to the reply
+    let answeredBy = fromEmail;
+    let answeredById = null;
+    let initiativeId = null;
+
+    try {
+      const initsSnap = await db
+        .collection("users")
+        .doc(uid)
+        .collection("initiatives")
+        .get();
+      const updates = [];
+      initsSnap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const qArr = data.clarifyingQuestions || [];
+        if (qArr[questionId] !== undefined) {
+          const contacts = data.contacts || [];
+          const matchedContact = contacts.find(
+            (c) => extractEmail(c.email) === fromEmail
+          );
+          const name = matchedContact?.name || fromEmail;
+          const contactId = matchedContact?.id || null;
+          const aArr = data.clarifyingAnswers || [];
+          const existing = aArr[questionId] || {};
+          aArr[questionId] = {
+            ...existing,
+            [name]: { text: cleaned, answeredAt, answeredBy: name, contactId },
+          };
+          const askedArr = data.clarifyingAsked || [];
+          const askedEntry = askedArr[questionId] || {};
+          askedEntry[name] = true;
+          askedArr[questionId] = askedEntry;
+          updates.push(
+            docSnap.ref.set(
+              { clarifyingAnswers: aArr, clarifyingAsked: askedArr },
+              { merge: true }
+            )
+          );
+          answeredBy = name;
+          answeredById = contactId;
+          initiativeId = docSnap.id;
+        }
+      });
+      if (updates.length) await Promise.all(updates);
+    } catch (err) {
+      console.error("Failed to update clarifying answers", err);
+    }
+
+    await questionRef.set(
+      {
+        lastAnswer: cleaned,
+        answeredAt,
+        status: "answered",
+        answeredBy,
+        answeredByContactId: answeredById,
+      },
+      { merge: true }
+    );
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("messages")
+      .add({
+        subject,
+        body: cleaned,
+        questionId: String(questionId),
+        createdAt: answeredAt,
+        from: answeredBy,
+        fromEmail: fromEmail,
+        contactId: answeredById,
+        initiativeId,
       });
 
     // 7) Optional: forward the reply to the Thoughtify user (uses secrets, not process.env)
