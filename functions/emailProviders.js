@@ -425,7 +425,13 @@ export const sendQuestionEmail = onCall(
         for (const docSnap of initsSnap.docs) {
           const data = docSnap.data() || {};
           const qArr = data.projectQuestions || [];
-          if (qArr[questionId] === undefined) continue;
+
+          // Support both numeric indexes and question objects with an `id` field.
+          const qIndex =
+            typeof questionId === "number"
+              ? questionId
+              : qArr.findIndex((q) => q && q.id === questionId);
+          if (qIndex === -1 || qArr[qIndex] === undefined) continue;
 
           const contacts = data.keyContacts || [];
           const emailToContact = new Map(
@@ -438,7 +444,7 @@ export const sendQuestionEmail = onCall(
             .filter(Boolean);
           if (!matched.length) continue;
 
-          const q = qArr[questionId] || {};
+          const q = qArr[qIndex] || {};
           const askedEntry = q.asked || {};
           const ansEntry = q.answers || {};
           const statusEntry = q.contactStatus || {};
@@ -471,7 +477,7 @@ export const sendQuestionEmail = onCall(
           q.asked = askedEntry;
           q.answers = ansEntry;
           q.contactStatus = statusEntry;
-          qArr[questionId] = q;
+          qArr[qIndex] = q;
           await docSnap.ref.set(
             { projectQuestions: qArr },
             { merge: true }
