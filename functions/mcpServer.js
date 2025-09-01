@@ -49,7 +49,7 @@ const callableFunctions = [
   "generateCourseOutline",
   "generateAssessment",
   "generateLessonContent",
-  "generateClarifyingQuestions",
+  "generateProjectQuestions",
   "generateProjectBrief",
   "generateStatusUpdate",
   "generateLearningStrategy",

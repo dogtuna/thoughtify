@@ -496,7 +496,7 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
   }
 );
 
-export const generateClarifyingQuestions = onCall(
+export const generateProjectQuestions = onCall(
   { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
   async (request) => {
     const {
@@ -528,7 +528,7 @@ export const generateClarifyingQuestions = onCall(
             .join("; ")}`
         : "";
     const promptTemplate =
-      `You are an expert Instructional Designer and Performance Consultant. Your primary goal is to generate deeply contextual clarifying questions based on the provided project information and documents.
+      `You are an expert Instructional Designer and Performance Consultant. Your primary goal is to generate deeply contextual discovery questions based on the provided project information and documents.
 
 Follow these steps in order:
 
@@ -536,13 +536,13 @@ Analyze Document Themes: First, meticulously scan the body of any provided docum
 
 Generate Theme-Based Questions: Based only on your analysis in Step 1, generate 2-3 high-priority questions that directly reference or quote the key themes and data points you found. These questions should dig into the "why" behind those specific details.
 
-Generate Broader Strategic Questions: After you have created the theme-based questions, generate additional clarifying questions about the overall project goals, current state, and constraints that may not have been in the documents.
+Generate Broader Strategic Questions: After you have created the theme-based questions, generate additional questions about the overall project goals, current state, and constraints that may not have been in the documents.
 
-Format the Final Output: For every question you've generated, suggest the primary stakeholder roles that should be consulted and assign the question to one of these phases: "The Core Problem & Vision", "The Current State", or "The Project Constraints".
+Format the Final Output: Assign each question to one of these phases: "The Core Problem & Vision", "The Current State", or "The Project Constraints".
 
 Return a valid JSON object with the structure:{
-  "clarifyingQuestions": [
-    {"question":"text","stakeholders":["role1","role2"],"phase":"The Core Problem & Vision"}
+  "projectQuestions": [
+    {"question":"text","phase":"The Core Problem & Vision"}
   ]
 }
 Do not include any code fences or additional formatting.
@@ -563,24 +563,25 @@ Source Material: ${sourceMaterial}${contactsInfo}`;
         throw new HttpsError("internal", "Invalid AI response format.");
       }
 
-      if (!Array.isArray(json.clarifyingQuestions)) {
-        console.error(
-          "AI response missing clarifyingQuestions field:",
-          json
-        );
-        throw new HttpsError(
-          "internal",
-          "AI response missing clarifying questions."
-        );
+      if (!Array.isArray(json.projectQuestions)) {
+        console.error("AI response missing projectQuestions field:", json);
+        throw new HttpsError("internal", "AI response missing project questions.");
       }
 
-      // Must return a plain object for callables
-      return json;
+      const projectQuestions = json.projectQuestions.map((q, idx) => ({
+        id: q.id || `Q${idx + 1}`,
+        phase: q.phase || "General",
+        question: typeof q === "string" ? q : q.question,
+        contacts: [],
+        answers: [],
+      }));
+
+      return { projectQuestions };
     } catch (error) {
-      console.error("Error generating clarifying questions:", error);
+      console.error("Error generating project questions:", error);
       throw new HttpsError(
         "internal",
-        "Failed to generate clarifying questions."
+        "Failed to generate project questions."
       );
     }
   }
@@ -595,8 +596,7 @@ export const generateProjectBrief = onCall(
       sourceMaterial,
       projectConstraints,
       keyContacts = [],
-      clarifyingQuestions = [],
-      clarifyingAnswers = [],
+      projectQuestions = [],
     } = request.data || {};
 
     if (!businessGoal) {
@@ -620,9 +620,14 @@ export const generateProjectBrief = onCall(
             .join("; ")}`
         : "";
     const clarificationsBlock = (() => {
-      const pairs = clarifyingQuestions.map(
-        (q, i) => `Q: ${q?.question || q}\nA: ${clarifyingAnswers[i] || ""}`
-      );
+      const pairs = projectQuestions.map((q) => {
+        const answers = Array.isArray(q.answers)
+          ? q.answers.join("; ")
+          : Object.values(q.answers || {})
+              .map((a) => a?.text || String(a))
+              .join("; ");
+        return `Q: ${q?.question || ""}\nA: ${answers || ""}`;
+      });
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
     })();
 
@@ -770,8 +775,7 @@ export const generateLearningStrategy = onCall(
       projectConstraints,
       keyContacts = [],
       sourceMaterial = "",
-      clarifyingQuestions = [],
-      clarifyingAnswers = [],
+      projectQuestions = [],
       personaCount = 3,
     } = req.data || {};
 
@@ -816,9 +820,14 @@ export const generateLearningStrategy = onCall(
 }`;
 
     const clarificationsBlock = (() => {
-      const pairs = clarifyingQuestions.map(
-        (q, i) => `Q: ${q?.question || q}\nA: ${clarifyingAnswers[i] || ""}`
-      );
+      const pairs = projectQuestions.map((q) => {
+        const answers = Array.isArray(q.answers)
+          ? q.answers.join("; ")
+          : Object.values(q.answers || {})
+              .map((a) => a?.text || String(a))
+              .join("; ");
+        return `Q: ${q?.question || ""}\nA: ${answers || ""}`;
+      });
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
     })();
 
@@ -1672,9 +1681,8 @@ Structure the Output: Respond ONLY in a valid JSON object format. Create a root 
 
 id: A unique identifier (e.g., "A", "B", "C").
 type: "Primary" or "Alternative".
-statement: The full text of the hypothesis.
-supportingEvidence: An empty array.
-refutingEvidence: An empty array.
+hypothesis: The full text of the hypothesis.
+evidence: { "supporting": [], "refuting": [] }
 status: "Unexplored".
 
 Project Data:\n${projectData.join("\n\n")}`;
@@ -1690,15 +1698,25 @@ Project Data:\n${projectData.join("\n\n")}`;
       throw new HttpsError("internal", "Failed to generate hypotheses");
     }
 
-    const hypotheses = Array.isArray(result)
+    const rawHypotheses = Array.isArray(result)
       ? result
       : Array.isArray(result?.hypotheses)
         ? result.hypotheses
         : null;
 
-    if (!hypotheses) {
+    if (!rawHypotheses) {
       throw new HttpsError("internal", "AI did not return hypotheses array");
     }
+    const hypotheses = rawHypotheses.map((h) => ({
+      id: h.id,
+      type: h.type,
+      hypothesis: h.hypothesis || h.statement || h.text || "",
+      evidence: {
+        supporting: h.evidence?.supporting || h.supportingEvidence || [],
+        refuting: h.evidence?.refuting || h.refutingEvidence || [],
+      },
+      status: h.status || "Unexplored",
+    }));
 
     await db
       .collection("users")
