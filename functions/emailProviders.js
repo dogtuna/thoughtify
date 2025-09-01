@@ -746,24 +746,31 @@ export const processInboundEmail = onRequest(
 
         const q = qArr[questionIndex];
         const askedEntry = q.asked || {};
-        if (!askedEntry[contactId]) continue; // question not asked for this initiative/contact
+        const key = contactId || name;
+        let wasAsked = askedEntry[key];
+        if (!wasAsked && contactId && askedEntry[name]) {
+          wasAsked = askedEntry[name];
+          askedEntry[contactId] = askedEntry[name];
+          delete askedEntry[name];
+        }
+        if (!wasAsked) continue; // question not asked for this initiative/contact
 
         const answersEntry = q.answers || {};
-        const existingForId = answersEntry[contactId] || {};
+        const existingForId = answersEntry[key] || {};
         const history = Array.isArray(existingForId.history)
           ? existingForId.history.slice()
           : [];
         history.push({ text: answerText, answeredAt, answeredBy: name });
-        answersEntry[contactId] = {
+        answersEntry[key] = {
           ...existingForId,
           text: answerText,
           answeredAt,
           answeredBy: name,
-          contactId,
+          contactId: key,
           currentStatus: "answered",
           history,
         };
-        askedEntry[contactId] = true;
+        askedEntry[key] = true;
         q.answers = answersEntry;
         q.asked = askedEntry;
         qArr[questionIndex] = q;
@@ -774,7 +781,7 @@ export const processInboundEmail = onRequest(
         );
 
         answeredBy = name;
-        answeredById = contactId;
+        answeredById = key;
         initiativeId = docSnap.id;
         break; // stop after updating the matching initiative
       }
