@@ -413,8 +413,9 @@ const DiscoveryHub = () => {
       if (q.contacts.length === 0) {
         open++;
       } else {
-        q.contacts.forEach((name) => {
-          const ans = q.answers?.[name];
+        q.contacts.forEach((_, i) => {
+          const id = q.contactIds?.[i] || q.contacts[i];
+          const ans = q.answers?.[id];
           const text = typeof ans === "string" ? ans : ans?.text;
           if (typeof text === "string" && text.trim()) {
             answered++;
@@ -1643,8 +1644,10 @@ Respond ONLY in this JSON format:
     const key = `${idx}-${name}`;
     const text = (answerDrafts[key] || "").trim();
     if (text.length < 2) return;
+    const q = questions[idx];
+    const id = q.contactIds[q.contacts.indexOf(name)] || name;
     try {
-      updateAnswer(idx, name, text);
+      updateAnswer(idx, id, text);
       setAnswerDrafts((prev) => {
         const next = { ...prev };
         delete next[key];
@@ -2142,12 +2145,22 @@ Respond ONLY in this JSON format:
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
+      const i = q.contacts.indexOf(name);
       q.contacts = q.contacts.filter((r) => r !== name);
-      if (q.answers[name]) {
-        delete q.answers[name];
-      }
-      if (q.asked[name] !== undefined) {
-        delete q.asked[name];
+      if (i !== -1) {
+        const id = q.contactIds?.[i] || name;
+        if (q.contactIds) {
+          q.contactIds = q.contactIds.filter((_, j) => j !== i);
+        }
+        if (q.answers[id]) {
+          delete q.answers[id];
+        }
+        if (q.asked[id] !== undefined) {
+          delete q.asked[id];
+        }
+        if (q.contactStatus && q.contactStatus[id]) {
+          q.contactStatus[id] = initStatus();
+        }
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -2630,20 +2643,7 @@ Respond ONLY in this JSON format:
     );
     const updatedQuestions = questions.map((q) => {
       const newContacts = q.contacts.map((n) => (n === original ? name : n));
-      const newAnswers = {};
-      Object.entries(q.answers).forEach(([n, v]) => {
-        newAnswers[n === original ? name : n] = v;
-      });
-      const newAsked = {};
-      Object.entries(q.asked).forEach(([n, v]) => {
-        newAsked[n === original ? name : n] = v;
-      });
-      return {
-        ...q,
-        contacts: newContacts,
-        answers: newAnswers,
-        asked: newAsked,
-      };
+      return { ...q, contacts: newContacts };
     });
     setContacts(updatedContacts);
     setQuestions(updatedQuestions);
@@ -2680,31 +2680,59 @@ Respond ONLY in this JSON format:
   
   const items = [];
   questions.forEach((q, idx) => {
-    const toAskNames = q.contacts.filter((n) => !q.asked[n]);
+    const toAskNames = [];
+    const toAskIds = [];
+    const askedNames = [];
+    const askedIds = [];
+    const answeredNames = [];
+    const answeredIds = [];
+    q.contacts.forEach((name, i) => {
+      const id = q.contactIds?.[i] || name;
+      const ans = q.answers?.[id];
+      const text = typeof ans === "string" ? ans : ans?.text;
+      if (!q.asked?.[id]) {
+        toAskNames.push(name);
+        toAskIds.push(id);
+      } else if (typeof text === "string" && text.trim()) {
+        answeredNames.push(name);
+        answeredIds.push(id);
+      } else {
+        askedNames.push(name);
+        askedIds.push(id);
+      }
+    });
     if (toAskNames.length || q.contacts.length === 0) {
-      items.push({ ...q, idx, contacts: toAskNames, status: "toask" });
+      items.push({
+        ...q,
+        idx,
+        contacts: toAskNames,
+        contactIds: toAskIds,
+        status: "toask",
+      });
     }
-    const askedNames = q.contacts.filter((n) => {
-      const ans = q.answers?.[n];
-      const text = typeof ans === "string" ? ans : ans?.text;
-      return q.asked[n] && !(typeof text === "string" && text.trim());
-    });
     if (askedNames.length) {
-      items.push({ ...q, idx, contacts: askedNames, status: "asked" });
+      items.push({
+        ...q,
+        idx,
+        contacts: askedNames,
+        contactIds: askedIds,
+        status: "asked",
+      });
     }
-    const answeredNames = q.contacts.filter((n) => {
-      const ans = q.answers?.[n];
-      const text = typeof ans === "string" ? ans : ans?.text;
-      return typeof text === "string" && text.trim();
-    });
     if (answeredNames.length) {
-      items.push({ ...q, idx, contacts: answeredNames, status: "answered" });
+      items.push({
+        ...q,
+        idx,
+        contacts: answeredNames,
+        contactIds: answeredIds,
+        status: "answered",
+      });
     }
   });
 
   let filtered = items.filter(
     (q) =>
-      (!contactFilter || q.contacts.includes(contactFilter)) &&
+      (!contactFilter || (q.contactIds || []).includes(contactFilter)) &&
       (!statusFilter || q.status === statusFilter)
   );
   sortUnassignedFirst(filtered);
@@ -2714,8 +2742,9 @@ Respond ONLY in this JSON format:
     grouped = {};
     filtered.forEach((q) => {
       const names = q.contacts.length ? q.contacts : ["Unassigned"];
-      names.forEach((n) => {
-        const qCopy = { ...q, contacts: [n] };
+      names.forEach((n, i) => {
+        const id = q.contactIds?.[i];
+        const qCopy = { ...q, contacts: [n], contactIds: id ? [id] : [] };
         grouped[n] = grouped[n] || [];
         grouped[n].push(qCopy);
       });
@@ -2734,19 +2763,24 @@ Respond ONLY in this JSON format:
   } else if (groupBy === "role") {
     grouped = {};
     filtered.forEach((q) => {
-      const roles = q.contacts.length
-        ? q.contacts.map(
-            (n) => contacts.find((c) => c.name === n)?.jobTitle || "No Role"
+      const roles = q.contactIds && q.contactIds.length
+        ? q.contactIds.map(
+            (id) => contacts.find((c) => c.id === id)?.jobTitle || "No Role",
           )
         : ["Unassigned"];
       const uniqueRoles = Array.from(new Set(roles));
       uniqueRoles.forEach((r) => {
         const label = r && r !== "" ? r : "No Role";
-        const namesForRole = q.contacts.filter(
-          (n) =>
-            (contacts.find((c) => c.name === n)?.jobTitle || "No Role") === r
-        );
-        const qCopy = { ...q, contacts: namesForRole };
+        const namesForRole = [];
+        const idsForRole = [];
+        (q.contactIds || []).forEach((id, i) => {
+          const role = contacts.find((c) => c.id === id)?.jobTitle || "No Role";
+          if (role === r) {
+            namesForRole.push(q.contacts[i]);
+            idsForRole.push(id);
+          }
+        });
+        const qCopy = { ...q, contacts: namesForRole, contactIds: idsForRole };
         grouped[label] = grouped[label] || [];
         grouped[label].push(qCopy);
       });
@@ -3345,7 +3379,7 @@ Respond ONLY in this JSON format:
                 >
                   <option value="">All</option>
                   {contacts.map((c) => (
-                    <option key={c.name} value={c.name}>
+                    <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
                   ))}
@@ -3525,6 +3559,7 @@ Respond ONLY in this JSON format:
                       )}
                       {q.status !== "toask" &&
                         q.contacts.map((name, idxAns) => {
+                          const id = q.contactIds?.[idxAns] || name;
                           const key = `${q.idx}-${name}`;
                           const draft = answerDrafts[key];
                           const isActive =
@@ -3560,7 +3595,7 @@ Respond ONLY in this JSON format:
                                 value={
                                   draft !== undefined
                                     ? draft
-                                    : q.answers[name]?.text || ""
+                                    : q.answers[id]?.text || ""
                                 }
                                 onChange={(e) =>
                                   setAnswerDrafts((prev) => ({
@@ -3638,7 +3673,8 @@ Respond ONLY in this JSON format:
           </li>
           <li
             onClick={() => {
-              setContactFilter(menu.name);
+              const id = contacts.find((c) => c.name === menu.name)?.id || menu.name;
+              setContactFilter(id);
               setMenu(null);
             }}
           >
