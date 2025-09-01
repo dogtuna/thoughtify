@@ -16,7 +16,7 @@ const AnswerSlideOver = ({
 }) => {
   // Guard against questions that do not have any associated contacts.
   const [contact, setContact] = useState(
-    (question.contacts && question.contacts[0]) || ""
+    (question.contactIds && question.contactIds[0]) || ""
   );
   const [text, setText] = useState("");
   const [stage, setStage] = useState("compose");
@@ -27,13 +27,13 @@ const AnswerSlideOver = ({
 
   const handleSave = async () => {
     if (text.trim().length < 2) return;
-    updateAnswer(idx, contact, text);
     setStage("loading");
     setAnalyzing(true);
     const result = await analyzeAnswer(question.question || "", text, contact);
     setAnalyzing(false);
     setAnalysis(result.analysis || "");
     setSuggestions(result.suggestions || []);
+    updateAnswer(idx, contact, text, result.analysis);
     setStage("results");
   };
 
@@ -82,11 +82,15 @@ const AnswerSlideOver = ({
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
               >
-                {(question.contacts || []).map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {(question.contactIds || []).map((cid) => {
+                  const name =
+                    allContacts.find((c) => c.id === cid)?.name || cid;
+                  return (
+                    <option key={cid} value={cid}>
+                      {name}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             <textarea
@@ -108,6 +112,16 @@ const AnswerSlideOver = ({
         {stage === "loading" && <p>Analyzing answer...</p>}
         {stage === "results" && (
           <>
+            {question.contactStatus?.[contact]?.answers?.length > 0 && (
+              <details open>
+                <summary>Previous Answers</summary>
+                <ul>
+                  {question.contactStatus[contact].answers.map((a, i) => (
+                    <li key={i}>{a.text}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             <details open>
               <summary>Analysis</summary>
               <p>
