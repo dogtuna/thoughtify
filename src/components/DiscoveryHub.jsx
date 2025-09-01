@@ -25,6 +25,7 @@ import {
   normalizeAssigneeName,
 } from "../utils/taskUtils";
 import { getPriority } from "../utils/priorityMatrix";
+import { markAnswered } from "../utils/questionStatus";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import ActionDashboard from "./ActionDashboard.jsx";
@@ -99,11 +100,6 @@ const parseContactNames = (whoRaw) => {
     .split(/\s*(?:,|and|&)\s*/i)
     .map((p) => p.trim())
     .filter(Boolean);
-};
-
-const normalizeContacts = (value) => {
-  if (!value) return [];
-  return Array.isArray(value) ? value : parseContactNames(value);
 };
 
 const DiscoveryHub = () => {
@@ -1732,43 +1728,32 @@ Respond ONLY in this JSON format:
             color: colorPalette[i % colorPalette.length],
           }));
           setContacts(contactsInit);
-          const qs = (init?.clarifyingQuestions || []).map((q, idx) => {
-            const contactValue =
-              init?.clarifyingContacts?.[idx] ?? q.stakeholders ?? [];
-            const names = normalizeContacts(contactValue).map((c) => {
-              const match = contactsInit.find(
-                (k) => k.role === c || k.name === c
-              );
-              return match?.name || c;
-            });
-            const askedData = init?.clarifyingAsked?.[idx] || {};
+          const contactMap = Object.fromEntries(
+            contactsInit.map((c) => [c.id || c.name, c])
+          );
+          const qs = (init?.projectQuestions || []).map((q, idx) => {
+            const ids = q.contacts || [];
+            const names = ids.map((cid) => contactMap[cid]?.name || cid);
             const asked = {};
-            names.forEach((n) => {
-              if (typeof askedData === "object") {
-                asked[n] = !!askedData[n];
-              } else {
-                asked[n] = !!askedData;
-              }
-            });
-            const rawAnswers = init?.clarifyingAnswers?.[idx] || {};
-            const dateMap = init?.clarifyingAnswerDates?.[idx] || {};
             const answers = {};
-            Object.entries(rawAnswers).forEach(([n, v]) => {
-              if (v && typeof v === "object" && "text" in v) {
-                answers[n] = v;
-              } else {
-                answers[n] = {
-                  text: v,
-                  timestamp: dateMap[n] || null,
-                };
+            ids.forEach((id) => {
+              const status = q.contactStatus?.[id] || {};
+              asked[id] =
+                status.current === "Asked" || status.current === "Answered";
+              const last = status.answers?.[status.answers.length - 1];
+              if (last) {
+                answers[id] = last;
               }
             });
             return {
-              question: typeof q === "string" ? q : q.question,
+              ...q,
+              id: q.id || idx,
+              idx,
               contacts: names,
-              answers,
+              contactIds: ids,
+              contactStatus: q.contactStatus || {},
               asked,
-              id: idx,
+              answers,
             };
           });
           setQuestions(qs);
@@ -1926,29 +1911,32 @@ Respond ONLY in this JSON format:
     return () => unsub();
   }, [uid, initiativeId]);
 
-  const updateAnswer = (idx, name, value) => {
-    const now = new Date().toISOString();
+  const updateAnswer = (idx, contactId, text, analysis) => {
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
-      q.answers = {
-        ...q.answers,
-        [name]: {
-          ...(q.answers?.[name] || {}),
-          text: value,
-          answeredAt: now,
+      const status = markAnswered(
+        q.contactStatus?.[contactId],
+        {
+          text,
+          analysis,
           answeredBy: currentUserName,
-        },
-      };
-      if (value && !q.asked[name]) {
-        q.asked[name] = true;
-        q.answers[name].askedAt = now;
-        q.answers[name].askedBy = currentUserName;
-      }
+        }
+      );
+      q.contactStatus = { ...q.contactStatus, [contactId]: status };
+      // maintain legacy fields for compatibility
+      q.answers = { ...q.answers, [contactId]: status.answers[status.answers.length - 1] };
+      q.asked = { ...q.asked, [contactId]: true };
       if (uid) {
         saveInitiative(uid, initiativeId, {
-          clarifyingAnswers: updated.map((qq) => qq.answers),
-          clarifyingAsked: updated.map((qq) => qq.asked),
+          projectQuestions: updated.map((q) => {
+            const rest = { ...q };
+            delete rest.contactNames;
+            delete rest.idx;
+            delete rest.answers;
+            delete rest.asked;
+            return rest;
+          }),
         });
       }
       return updated;
@@ -1961,12 +1949,13 @@ Respond ONLY in this JSON format:
     const role = prompt("Contact role? (optional)") || "";
     const email = prompt("Contact email? (optional)") || "";
     const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = { role, name, email, color };
+    const newContact = { id: crypto.randomUUID(), role, name, email, color };
     const updated = [...contacts, newContact];
     setContacts(updated);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ name, role, email }) => ({
+        keyContacts: updated.map(({ id, name, role, email }) => ({
+          id,
           name,
           role,
           email,

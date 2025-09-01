@@ -101,12 +101,21 @@ export default function NewInquiries({ user, openReplyModal }) {
         const init = await loadInitiative(user.uid, project);
         const projectQuestions = init?.projectQuestions || [];
         const idx = projectQuestions.length;
+        const cid = inquiry.contactId || inquiry.name;
         projectQuestions.push({
           id: `Q${idx + 1}`,
           phase: "General",
           question: inquiry.message,
-          contacts: [inquiry.contactId || inquiry.name],
-          answers: [],
+          contacts: [cid],
+          contactStatus: {
+            [cid]: {
+              current: "Ask",
+              history: [
+                { status: "Ask", timestamp: new Date().toISOString() },
+              ],
+              answers: [],
+            },
+          },
         });
         await saveInitiative(user.uid, project, { projectQuestions });
         await deleteDoc(doc(db, "inquiries", inquiry.id));

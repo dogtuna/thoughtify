@@ -26,7 +26,7 @@ const ProjectSetup = () => {
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
   const [keyContacts, setKeyContacts] = useState([
-    { name: "", role: "", email: "" },
+    { id: crypto.randomUUID(), name: "", role: "", email: "" },
   ]);
   const [sourceMaterials, setSourceMaterials] = useState([]);
 
@@ -50,7 +50,9 @@ const ProjectSetup = () => {
           setAudienceProfile(init.audienceProfile || "");
           setProjectConstraints(init.projectConstraints || "");
           setKeyContacts(
-            init.keyContacts || [{ name: "", role: "", email: "" }]
+            (init.keyContacts || [
+              { name: "", role: "", email: "" },
+            ]).map((c) => ({ id: c.id || crypto.randomUUID(), ...c }))
           );
           setSourceMaterials(init.sourceMaterials || []);
         }
@@ -186,7 +188,7 @@ const ProjectSetup = () => {
   const addKeyContact = () => {
     setKeyContacts((prev) => [
       ...prev,
-      { name: "", role: "", email: "" },
+      { id: crypto.randomUUID(), name: "", role: "", email: "" },
     ]);
   };
 
@@ -204,9 +206,30 @@ const ProjectSetup = () => {
         audienceProfile,
         sourceMaterial: getCombinedSource(),
         projectConstraints,
-        keyContacts,
+        keyContacts: keyContacts.map((c) => {
+          const copy = { ...c };
+          delete copy.id;
+          return copy;
+        }),
       });
-      const qs = (data.projectQuestions || []).slice(0, 9);
+      const qsRaw = (data.projectQuestions || []).slice(0, 9);
+      const qs = qsRaw.map((q, idx) => {
+        const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
+          const match = keyContacts.find((c) => c.name === name || c.id === name);
+          return match ? match.id : name;
+        });
+        const statusMap = {};
+        contactIds.forEach((cid) => {
+          statusMap[cid] = { current: "Ask", history: [{ status: "Ask", timestamp: new Date().toISOString() }], answers: [] };
+        });
+        return {
+          id: `Q${idx + 1}`,
+          question: typeof q === "string" ? q : q.question,
+          phase: q.phase || "General",
+          contacts: contactIds,
+          contactStatus: statusMap,
+        };
+      });
       const uid = auth.currentUser?.uid;
         if (uid) {
           await saveInitiative(uid, initiativeId, {

@@ -300,7 +300,7 @@ const InitiativesNew = () => {
     sourceMaterials.map((f) => f.content).join("\n");
   const [projectConstraints, setProjectConstraints] = useState("");
   const [keyContacts, setKeyContacts] = useState([
-    { name: "", role: "", email: "" },
+    { id: crypto.randomUUID(), name: "", role: "", email: "" },
   ]);
 
   const [projectBrief, setProjectBrief] = useState("");
@@ -551,6 +551,27 @@ const InitiativesNew = () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     try {
+      const projectQuestions = clarifyingQuestions.map((q, idx) => {
+        const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
+          const match = keyContacts.find((c) => c.name === name || c.id === name);
+          return match ? match.id : name;
+        });
+        const statusMap = {};
+        contactIds.forEach((cid) => {
+          statusMap[cid] = {
+            current: "Ask",
+            history: [{ status: "Ask", timestamp: new Date().toISOString() }],
+            answers: [],
+          };
+        });
+        return {
+          id: `Q${idx + 1}`,
+          question: q.question || q,
+          phase: q.phase || "General",
+          contacts: contactIds,
+          contactStatus: statusMap,
+        };
+      });
       await saveInitiative(uid, initiativeId, {
         projectName,
         businessGoal,
@@ -558,8 +579,7 @@ const InitiativesNew = () => {
         sourceMaterials,
         projectConstraints,
         projectBrief,
-        clarifyingQuestions,
-        clarifyingAnswers,
+        projectQuestions,
         keyContacts,
         strategy,
         selectedModality,
@@ -637,9 +657,10 @@ const InitiativesNew = () => {
           setCourseOutline(data.courseOutline || "");
           setLearningDesignDocument(data.learningDesignDocument || "");
           setKeyContacts(
-            data.keyContacts && data.keyContacts.length
+            (data.keyContacts && data.keyContacts.length
               ? data.keyContacts
               : [{ name: "", role: "", email: "" }]
+            ).map((c) => ({ id: c.id || crypto.randomUUID(), ...c }))
           );
         }
       })
@@ -861,7 +882,7 @@ const InitiativesNew = () => {
   const addKeyContact = () => {
     setKeyContacts((prev) => [
       ...prev,
-      { name: "", role: "", email: "" },
+      { id: crypto.randomUUID(), name: "", role: "", email: "" },
     ]);
   };
 
