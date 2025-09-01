@@ -18,6 +18,7 @@ import TrainingPlanGenerator from "./TrainingPlanGenerator.jsx";
 import { useProject } from "../context/ProjectContext.jsx";
 import "./AIToolsGenerators.css";
 import PersonaDisplay from "./PersonaDisplay.jsx";
+import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 
 const formatKeyword = (kw = "") =>
   kw ? kw.charAt(0).toUpperCase() + kw.slice(1) : "";
@@ -904,13 +905,15 @@ const InitiativesNew = () => {
         setPersonaCount(0);
 
     try {
-      const { data } = await generateClarifyingQuestions({
-        businessGoal,
-        audienceProfile,
-        sourceMaterial: getCombinedSource(),
-        projectConstraints,
-        keyContacts,
-      });
+      const { data } = await generateClarifyingQuestions(
+        omitEmptyStrings({
+          businessGoal,
+          audienceProfile,
+          sourceMaterial: getCombinedSource(),
+          projectConstraints,
+          keyContacts,
+        })
+      );
 
       const qsRaw = (data.clarifyingQuestions || []).slice(0, 9);
       const qs = qsRaw.map((q) =>
@@ -949,15 +952,17 @@ const InitiativesNew = () => {
     setError("");
 
     try {
-      const { data } = await generateProjectBrief({
-        businessGoal,
-        audienceProfile,
-        sourceMaterial: getCombinedSource(),
-        projectConstraints,
-        keyContacts,
-        clarifyingQuestions,
-        clarifyingAnswers,
-      });
+      const { data } = await generateProjectBrief(
+        omitEmptyStrings({
+          businessGoal,
+          audienceProfile,
+          sourceMaterial: getCombinedSource(),
+          projectConstraints,
+          keyContacts,
+          clarifyingQuestions,
+          clarifyingAnswers,
+        })
+      );
 
       if (!data?.projectBrief) {
         throw new Error("No project brief returned.");
@@ -1015,17 +1020,19 @@ const InitiativesNew = () => {
     setNextError("");
 
     try {
-      const { data } = await generateLearningStrategy({
-        projectBrief,
-        businessGoal,
-        audienceProfile,
-        projectConstraints,
-        keyContacts,
-        clarifyingQuestions,
-        clarifyingAnswers,
-        personaCount: personas.length,
-        sourceMaterial: getCombinedSource(),
-      });
+      const { data } = await generateLearningStrategy(
+        omitEmptyStrings({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          keyContacts,
+          clarifyingQuestions,
+          clarifyingAnswers,
+          personaCount: personas.length,
+          sourceMaterial: getCombinedSource(),
+        })
+      );
 
       if (
         !data?.modalityRecommendation ||
@@ -1093,19 +1100,21 @@ const InitiativesNew = () => {
       let usedAdjLocal = [...usedAdjectives];
       let usedNounLocal = [...usedNouns];
       for (let i = 0; i < toGenerate; i++) {
-        const personaRes = await generateLearnerPersona({
-          projectBrief,
-          businessGoal,
-          audienceProfile,
-          projectConstraints,
-          keyContacts,
-          sourceMaterial: getCombinedSource(),
-          existingMotivationKeywords: usedMotivationKeywords,
-          existingChallengeKeywords: usedChallengeKeywords,
-          existingTypes,
-          existingLearningPreferenceKeywords: usedLearningPrefKeywords,
-          selectedTraits: personaQualities,
-        });
+        const personaRes = await generateLearnerPersona(
+          omitEmptyStrings({
+            projectBrief,
+            businessGoal,
+            audienceProfile,
+            projectConstraints,
+            keyContacts,
+            sourceMaterial: getCombinedSource(),
+            existingMotivationKeywords: usedMotivationKeywords,
+            existingChallengeKeywords: usedChallengeKeywords,
+            existingTypes,
+            existingLearningPreferenceKeywords: usedLearningPrefKeywords,
+            selectedTraits: personaQualities,
+          })
+        );
         let personaData = normalizePersona(personaRes.data);
         personaData.summary =
           personaData.summary || getRandomItem(SUMMARY_OPTIONS);
@@ -1218,19 +1227,21 @@ const InitiativesNew = () => {
         ...usedTypes,
         ...existingTypesCurrent,
       ];
-      const personaRes = await generateLearnerPersona({
-        projectBrief,
-        businessGoal,
-        audienceProfile,
-        projectConstraints,
-        keyContacts,
-        sourceMaterial: getCombinedSource(),
-        existingMotivationKeywords: usedMotivationKeywords,
-        existingChallengeKeywords: usedChallengeKeywords,
-        existingTypes,
-        existingLearningPreferenceKeywords: usedLearningPrefKeywords,
-        selectedTraits: personaQualities,
-      });
+      const personaRes = await generateLearnerPersona(
+        omitEmptyStrings({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          keyContacts,
+          sourceMaterial: getCombinedSource(),
+          existingMotivationKeywords: usedMotivationKeywords,
+          existingChallengeKeywords: usedChallengeKeywords,
+          existingTypes,
+          existingLearningPreferenceKeywords: usedLearningPrefKeywords,
+          selectedTraits: personaQualities,
+        })
+      );
       let personaData = normalizePersona(personaRes.data);
       personaData.summary =
         personaData.summary || getRandomItem(SUMMARY_OPTIONS);

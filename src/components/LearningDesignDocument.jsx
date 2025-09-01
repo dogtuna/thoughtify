@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { app, auth } from "../firebase.js";
 import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
+import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
 
@@ -64,19 +65,21 @@ const LearningDesignDocument = ({
     setError("");
     setLearningDesignDocument("");
     try {
-      const { data } = await callGenerate({
-        projectBrief,
-        businessGoal,
-        audienceProfile,
-        projectConstraints,
-        keyContacts,
-        selectedModality,
-        blendModalities,
-        learningObjectives,
-        courseOutline,
-        trainingPlan,
-        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
-      });
+      const { data } = await callGenerate(
+        omitEmptyStrings({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          keyContacts,
+          selectedModality,
+          blendModalities,
+          learningObjectives,
+          courseOutline,
+          trainingPlan,
+          sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
+        })
+      );
       setBaseDocument(data.document);
     } catch (err) {
       console.error("Error generating learning design document:", err);

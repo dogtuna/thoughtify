@@ -4,6 +4,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
 import { app, auth } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
+import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import "./AIToolsGenerators.css";
 
 const ProjectSetup = () => {
@@ -220,19 +221,21 @@ const ProjectSetup = () => {
     setLoading(true);
     setError("");
     try {
-      const { data } = await generateProjectQuestions({
-        businessGoal,
-        audienceProfile,
-        sourceMaterial: getCombinedSource(),
-        projectConstraints,
-        keyContacts: keyContacts.map(({ id, name, jobTitle, profile, info }) => ({
-          id,
-          name,
-          jobTitle,
-          profile,
-          info,
-        })),
-      });
+      const { data } = await generateProjectQuestions(
+        omitEmptyStrings({
+          businessGoal,
+          audienceProfile,
+          sourceMaterial: getCombinedSource(),
+          projectConstraints,
+          keyContacts: keyContacts.map(({ id, name, jobTitle, profile, info }) => ({
+            id,
+            name,
+            jobTitle,
+            profile,
+            info,
+          })),
+        })
+      );
       const qsRaw = (data.projectQuestions || []).slice(0, 9);
       const qs = qsRaw.map((q, idx) => {
         const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
@@ -265,13 +268,15 @@ const ProjectSetup = () => {
 
           const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
           try {
-            const mapResp = await generateInitialInquiryMap({
-              uid,
-              initiativeId,
-              brief,
-              documents: getCombinedSource(),
-              answers: "",
-            });
+            const mapResp = await generateInitialInquiryMap(
+              omitEmptyStrings({
+                uid,
+                initiativeId,
+                brief,
+                documents: getCombinedSource(),
+                answers: "",
+              })
+            );
             const hypotheses = mapResp?.data?.hypotheses || [];
             setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
             await new Promise((res) => setTimeout(res, 1000));
