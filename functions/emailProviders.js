@@ -686,7 +686,7 @@ export const processInboundEmail = onRequest(
           plugins: [googleAI({ apiKey: key })],
           model: gemini("gemini-1.5-pro"),
         });
-        const extractPrompt = `You are reading an email reply and must separate the direct answer to the question from any additional commentary. Respond only in JSON with keys \"answer\" and \"extra\".\n\nEmail Reply:\n${cleaned}`;
+        const extractPrompt = `You are reading an email reply and must separate the direct answer to the question from any additional commentary. Respond only in JSON with keys "answer" and "extra".\n\nEmail Reply:\n${cleaned}`;
         const { text: extractText } = await extractor.generate(extractPrompt);
         const parsed = JSON.parse(extractText.match(/\{[\s\S]*\}/)?.[0] || "{}");
         if (parsed.answer) answerText = String(parsed.answer).trim();
