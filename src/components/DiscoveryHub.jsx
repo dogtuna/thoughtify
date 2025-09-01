@@ -163,7 +163,7 @@ const DiscoveryHub = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectStage, setProjectStage] = useState("");
-  const { triageEvidence, loadHypotheses, hypotheses } = useInquiryMap();
+  const { triageEvidence, loadHypotheses, hypotheses, addHypothesis } = useInquiryMap();
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
@@ -1965,6 +1965,21 @@ Respond ONLY in this JSON format:
     return name;
   };
 
+  const addContactByName = (name) => {
+    if (!name) return;
+    const lower = name.toLowerCase();
+    if (contacts.some((c) => c.name.toLowerCase() === lower)) return;
+    const color = colorPalette[contacts.length % colorPalette.length];
+    const newContact = { id: crypto.randomUUID(), role: "", name, email: "", color };
+    const updated = [...contacts, newContact];
+    setContacts(updated);
+    if (uid) {
+      saveInitiative(uid, initiativeId, {
+        keyContacts: updated.map(({ id, name, role, email }) => ({ id, name, role, email })),
+      });
+    }
+  };
+
   const resolveSuggestionsForContacts = async (suggestions) => {
     let updatedContacts = [...contacts];
     const known = new Set(updatedContacts.map((c) => c.name.toLowerCase()));
@@ -2250,11 +2265,38 @@ Respond ONLY in this JSON format:
     }
   };
 
+  const analyzeDocument = async (name, content) => {
+    try {
+      const prompt = `You are reviewing a document titled "${name}". Provide a JSON object {"analysis": "...", "suggestions": {"tasks": [], "hypotheses": [], "questions": [], "contacts": []}} where each array contains plain text strings. Document:\n\n${content}`;
+      const { text } = await ai.generate(prompt);
+      const parsed = JSON.parse(text);
+      return {
+        analysis: typeof parsed.analysis === "string" ? parsed.analysis : "",
+        suggestions: {
+          tasks: Array.isArray(parsed.suggestions?.tasks) ? parsed.suggestions.tasks : [],
+          hypotheses: Array.isArray(parsed.suggestions?.hypotheses) ? parsed.suggestions.hypotheses : [],
+          questions: Array.isArray(parsed.suggestions?.questions) ? parsed.suggestions.questions : [],
+          contacts: Array.isArray(parsed.suggestions?.contacts) ? parsed.suggestions.contacts : [],
+        },
+      };
+    } catch (err) {
+      console.error("analyzeDocument error", err);
+      return { analysis: "", suggestions: { tasks: [], hypotheses: [], questions: [], contacts: [] } };
+    }
+  };
+
   const handleDocFiles = async (files) => {
     const newDocs = [];
     for (const file of Array.from(files)) {
       const content = await file.text();
-      newDocs.push({ name: file.name, content, addedAt: new Date().toISOString() });
+      const analysis = await analyzeDocument(file.name, content);
+      newDocs.push({
+        name: file.name,
+        content,
+        addedAt: new Date().toISOString(),
+        analysis: analysis.analysis,
+        suggestions: analysis.suggestions,
+      });
       if (uid && initiativeId) {
         try {
           await triageEvidence(`Title: ${file.name}\n\n${content}`);
@@ -2301,10 +2343,13 @@ Respond ONLY in this JSON format:
       const defaultName = `pasted-${documents.length + 1}.txt`;
       const name =
         window.prompt("Enter a filename", defaultName) || defaultName;
+      const analysis = await analyzeDocument(name, text);
       const doc = {
         name,
         content: text,
         addedAt: new Date().toISOString(),
+        analysis: analysis.analysis,
+        suggestions: analysis.suggestions,
       };
       if (uid && initiativeId) {
         try {
@@ -2320,6 +2365,70 @@ Respond ONLY in this JSON format:
         }
         return updated;
       });
+    }
+  };
+
+  const applyDocSuggestions = async (idx) => {
+    const doc = documents[idx];
+    if (!doc || !doc.suggestions) return;
+    const { tasks: taskTexts = [], hypotheses: hypoTexts = [], questions: questionTexts = [], contacts: contactNames = [] } = doc.suggestions;
+    contactNames.forEach((n) => addContactByName(n));
+    hypoTexts.forEach((h) => addHypothesis && addHypothesis(h));
+    if (questionTexts.length) {
+      setQuestions((prev) => {
+        const newQs = questionTexts.map((q) => ({
+          question: q,
+          contacts: [currentUserName],
+          answers: {},
+          asked: { [currentUserName]: false },
+        }));
+        const updated = [...prev, ...newQs];
+        if (uid) {
+          saveInitiative(uid, initiativeId, {
+            clarifyingQuestions: updated.map((qq) => ({ question: qq.question })),
+            clarifyingContacts: Object.fromEntries(updated.map((qq, i) => [i, qq.contacts])),
+            clarifyingAnswers: updated.map((qq) => qq.answers),
+            clarifyingAsked: updated.map((qq) => qq.asked),
+          });
+        }
+        return updated;
+      });
+    }
+    if (taskTexts.length && uid && initiativeId) {
+      const tasksCollection = collection(db, "users", uid, "initiatives", initiativeId, "tasks");
+      for (const t of taskTexts) {
+        const tag = await classifyTask(t);
+        const priority = getPriority("explore", 0);
+        const ref = await addDoc(tasksCollection, {
+          name: currentUserName,
+          message: t,
+          assignees: [currentUserName],
+          assignee: currentUserName,
+          subType: "general",
+          status: "open",
+          createdAt: serverTimestamp(),
+          tag,
+          hypothesisId: null,
+          taskType: "explore",
+          priority,
+        });
+        setProjectTasks((prev) => [
+          ...prev,
+          {
+            id: ref.id,
+            name: currentUserName,
+            message: t,
+            assignees: [currentUserName],
+            assignee: currentUserName,
+            subType: "general",
+            status: "open",
+            tag,
+            hypothesisId: null,
+            taskType: "explore",
+            priority,
+          },
+        ]);
+      }
     }
   };
 
@@ -2617,13 +2726,42 @@ Respond ONLY in this JSON format:
             <ul className="document-list">
               {documents.map((doc, idx) => (
                 <li key={idx} className="document-item">
-                  {doc.name}
-                  <span className="doc-actions">
-                    <button onClick={() => handleSummarize(doc.content)}>
-                      Summarize
-                    </button>
-                    <button onClick={() => removeDocument(idx)}>Remove</button>
-                  </span>
+                  <div className="doc-header">
+                    {doc.name}
+                    <span className="doc-actions">
+                      <button onClick={() => handleSummarize(doc.content)}>
+                        Summarize
+                      </button>
+                      {(doc.suggestions?.tasks?.length ||
+                        doc.suggestions?.hypotheses?.length ||
+                        doc.suggestions?.questions?.length ||
+                        doc.suggestions?.contacts?.length) && (
+                        <button onClick={() => applyDocSuggestions(idx)}>
+                          Apply Suggestions
+                        </button>
+                      )}
+                      <button onClick={() => removeDocument(idx)}>Remove</button>
+                    </span>
+                  </div>
+                  {doc.analysis && (
+                    <p className="doc-analysis">{doc.analysis}</p>
+                  )}
+                  {doc.suggestions && (
+                    <ul className="doc-suggestions">
+                      {doc.suggestions.tasks?.length > 0 && (
+                        <li>{`Tasks: ${doc.suggestions.tasks.join(", ")}`}</li>
+                      )}
+                      {doc.suggestions.hypotheses?.length > 0 && (
+                        <li>{`Hypotheses: ${doc.suggestions.hypotheses.join(", ")}`}</li>
+                      )}
+                      {doc.suggestions.questions?.length > 0 && (
+                        <li>{`Questions: ${doc.suggestions.questions.join(", ")}`}</li>
+                      )}
+                      {doc.suggestions.contacts?.length > 0 && (
+                        <li>{`Contacts: ${doc.suggestions.contacts.join(", ")}`}</li>
+                      )}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
