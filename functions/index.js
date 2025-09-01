@@ -497,7 +497,12 @@ The lesson content should be well-structured, accurate, and engaging.  Prioritiz
 );
 
 export const generateProjectQuestions = onCall(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], invoker: "public" },
+  {
+    region: "us-central1",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    invoker: "public",
+    cors: ["https://thoughtify.training"],
+  },
   async (request) => {
     const {
       businessGoal,
