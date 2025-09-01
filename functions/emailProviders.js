@@ -440,8 +440,11 @@ export const sendQuestionEmail = onCall(
           const contacts = data.keyContacts || [];
           const emailToContact = new Map(
             contacts
-              .filter((c) => c?.email)
-              .map((c) => [String(c.email).toLowerCase(), c])
+              .map((c) => {
+                const addr = c?.email || c?.info?.email;
+                return addr ? [String(addr).toLowerCase(), c] : null;
+              })
+              .filter(Boolean)
           );
           const matched = emails
             .map((e) => emailToContact.get(e))
@@ -734,7 +737,7 @@ export const processInboundEmail = onRequest(
 
         const contacts = data.keyContacts || [];
         const matchedContact = contacts.find(
-          (c) => extractEmail(c.email) === fromEmail
+          (c) => extractEmail(c.email || c.info?.email) === fromEmail
         );
         if (!matchedContact) continue;
 
@@ -805,6 +808,10 @@ export const processInboundEmail = onRequest(
       await nref.set(
         {
           type: "questionsAnswered",
+          message: "A stakeholder answered a question.",
+          href: initiativeId
+            ? `/discovery?initiativeId=${initiativeId}`
+            : undefined,
           count: FieldValue.increment(1),
           createdAt: FieldValue.serverTimestamp(),
         },
@@ -1038,6 +1045,9 @@ Respond ONLY in this JSON format:
               message: "New answer received - Click to view analysis.",
               questionId: String(questionIndex),
               initiativeId,
+              href: initiativeId
+                ? `/discovery?initiativeId=${initiativeId}`
+                : undefined,
               messageId: msgRef.id,
               createdAt: FieldValue.serverTimestamp(),
               count: 1,
