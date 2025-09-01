@@ -287,8 +287,8 @@ export const sendQuestionEmail = onCall(
     region: "us-central1",
     enforceAppCheck: true,
     invoker: "public",
-    // Allow requests from production web app to bypass CORS preflight
-    cors: ["https://thoughtify.training"],
+    // Allow cross-site requests from the web client
+    cors: true,
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
@@ -391,6 +391,7 @@ export const sendQuestionEmail = onCall(
             pass,
           },
         });
+        await transporter.verify();
         const info = await transporter.sendMail({
           from: data.user,
           to: recipientEmail,
@@ -398,45 +399,13 @@ export const sendQuestionEmail = onCall(
           text: bodyWithFooter,
           replyTo,
         });
+        await transporter.close();
         messageId = info.messageId || "";
       } else {
-        const snap = await db
-          .collection("users")
-          .doc(uid)
-          .collection("emailTokens")
-          .doc(provider)
-          .get();
-        if (!snap.exists) {
-          throw new HttpsError(
-            "failed-precondition",
-            "No stored credentials for provider"
-          );
-        }
-        const data = snap.data() || {};
-        const pass = decrypt(data.pass, TOKEN_ENCRYPTION_KEY.value());
-        const host = data.smtpHost || data.host;
-        const port = data.smtpPort || 465;
-        const transporter = nodemailer.createTransport({
-          host,
-          port,
-          secure: port === 465,
-          auth: {
-            user: data.user,
-            pass,
-          },
-        });
-        const info = await transporter.sendMail({
-          from: data.user,
-          to: recipientEmail,
-          subject: subjectWithRef,
-          text: bodyWithFooter,
-          replyTo,
-        });
-        messageId = info.messageId || "";
+        throw new HttpsError("invalid-argument", "Unknown provider");
       }
 
-      await db.collection("users").doc(uid).set({}, { merge: true });
-
+      // Touch user doc to ensure existence
       await db.collection("users").doc(uid).set({}, { merge: true });
 
       // Mark project question as asked for the matching initiative/contact(s)

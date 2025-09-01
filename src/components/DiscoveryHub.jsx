@@ -617,9 +617,6 @@ const DiscoveryHub = () => {
         message: emailDraft.body,
         questionId: emailDraft.questionIds[0],
       });
-      for (const idx of emailDraft.questionIds) {
-        await markAsked(idx, emailDraft.recipients);
-      }
       alert("Email sent");
       nextDraft();
     } catch (err) {
