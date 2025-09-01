@@ -437,12 +437,58 @@ export const sendQuestionEmail = onCall(
 
       await db.collection("users").doc(uid).set({}, { merge: true });
 
-      await db
-        .collection("users")
-        .doc(uid)
-        .collection("questions")
-        .doc(String(questionId))
-        .set({ providerMessageId: messageId }, { merge: true });
+      await db.collection("users").doc(uid).set({}, { merge: true });
+
+      // Mark clarifying question as asked for the matching initiative/contact(s)
+      try {
+        const userRecord = await auth.getUser(uid);
+        const asker = userRecord?.displayName || userRecord?.email || "";
+        const emails = String(recipientEmail)
+          .split(/[;,]/)
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean);
+
+        const initsSnap = await db
+          .collection("users")
+          .doc(uid)
+          .collection("initiatives")
+          .get();
+        for (const docSnap of initsSnap.docs) {
+          const data = docSnap.data() || {};
+          const qArr = data.clarifyingQuestions || [];
+          if (qArr[questionId] === undefined) continue;
+
+          const contacts = data.keyContacts || [];
+          const emailToName = new Map(
+            contacts
+              .filter((c) => c?.email)
+              .map((c) => [String(c.email).toLowerCase(), c.name])
+          );
+          const matchedNames = emails
+            .map((e) => emailToName.get(e))
+            .filter(Boolean);
+          if (!matchedNames.length) continue;
+
+          const askedArr = data.clarifyingAsked || [];
+          const ansArr = data.clarifyingAnswers || [];
+          const askedEntry = askedArr[questionId] || {};
+          const ansEntry = ansArr[questionId] || {};
+          const now = new Date().toISOString();
+          matchedNames.forEach((name) => {
+            askedEntry[name] = true;
+            ansEntry[name] = { ...(ansEntry[name] || {}), askedAt: now, askedBy: asker };
+          });
+          askedArr[questionId] = askedEntry;
+          ansArr[questionId] = ansEntry;
+          await docSnap.ref.set(
+            { clarifyingAsked: askedArr, clarifyingAnswers: ansArr },
+            { merge: true }
+          );
+          break; // we found and updated the matching initiative
+        }
+      } catch (e) {
+        console.error("Failed to mark question as asked from sendQuestionEmail", e);
+      }
 
       return { messageId };
     } catch (err) {
@@ -630,12 +676,7 @@ export const processInboundEmail = onRequest(
       .replace(/<!--\s*THOUGHTIFY_REF.*?-->/gis, "")
       .trim();
 
-    // 6) Mark question as answered, update clarifying answers, and surface the message
-    const questionRef = db
-      .collection("users")
-      .doc(uid)
-      .collection("questions")
-      .doc(String(questionId));
+    // 6) Update clarifying answers on the related initiative and surface the message
     const answeredAt = new Date().toISOString();
 
     // Best guess for the contact name corresponding to the reply
@@ -697,18 +738,6 @@ export const processInboundEmail = onRequest(
     } catch (err) {
       console.error("Failed to update clarifying answers", err);
     }
-
-    await questionRef.set(
-      {
-        lastAnswer: cleaned,
-        answeredAt,
-        status: "answered",
-        answeredBy,
-        answeredByContactId: answeredById,
-        
-      },
-      { merge: true }
-    );
 
     await db
       .collection("users")
