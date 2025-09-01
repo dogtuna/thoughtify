@@ -25,7 +25,11 @@ import {
   normalizeAssigneeName,
 } from "../utils/taskUtils";
 import { getPriority } from "../utils/priorityMatrix";
-import { markAnswered } from "../utils/questionStatus";
+import {
+  markAnswered,
+  markAsked as markAskedStatus,
+  initStatus,
+} from "../utils/questionStatus";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
 import ActionDashboard from "./ActionDashboard.jsx";
@@ -263,12 +267,14 @@ const DiscoveryHub = () => {
       const [idxStr, name] = key.split("-");
       const idx = parseInt(idxStr, 10);
       if (!Number.isNaN(idx) && questions[idx]) {
+        const q = questions[idx];
+        const id = q.contactIds[q.contacts.indexOf(name)] || name;
         setAnswerDrafts((prev) => ({
           ...prev,
           [key]: localStorage.getItem(`answerDraft_${key}`) || "",
         }));
-        markAsked(idx, [name]);
-        setActiveComposer({ idx, name, contacts: questions[idx].contacts });
+        markAsked(idx, [id]);
+        setActiveComposer({ idx, name, contacts: q.contacts });
         setRestoredDraftKey(key);
         restoredRef.current = true;
       }
@@ -611,12 +617,6 @@ const DiscoveryHub = () => {
         message: emailDraft.body,
         questionId: emailDraft.questionIds[0],
       });
-      for (const idx of emailDraft.questionIds) {
-        const names = emailDraft.recipients.map(
-          (id) => contacts.find((c) => c.id === id)?.name || id
-        );
-        await markAsked(idx, names);
-      }
       alert("Email sent");
       nextDraft();
     } catch (err) {
@@ -2203,7 +2203,7 @@ Respond ONLY in this JSON format:
     }
   };
 
-  async function markAsked(idx, names = []) {
+  async function markAsked(idx, ids = []) {
     const text = questions[idx]?.question || "";
     let updatedQuestions = questions;
     const now = new Date().toISOString();
@@ -2211,12 +2211,15 @@ Respond ONLY in this JSON format:
       const updated = [...prev];
       const q = updated[idx];
       if (q) {
-        const targets = names.length ? names : q.contacts;
+        const targets = ids.length ? ids : q.contactIds;
+        q.contactStatus = q.contactStatus || {};
         q.answers = q.answers || {};
-        targets.forEach((n) => {
-          q.asked[n] = true;
-          q.answers[n] = {
-            ...(q.answers[n] || {}),
+        q.asked = q.asked || {};
+        targets.forEach((id) => {
+          q.contactStatus[id] = markAskedStatus(q.contactStatus[id]);
+          q.asked[id] = true;
+          q.answers[id] = {
+            ...(q.answers[id] || {}),
             askedAt: now,
             askedBy: currentUserName,
           };
@@ -2226,11 +2229,14 @@ Respond ONLY in this JSON format:
       return updated;
     });
     if (uid) {
-      const askedArray = updatedQuestions.map((qq) => qq?.asked || {});
-      const answersArray = updatedQuestions.map((qq) => qq?.answers || {});
       await saveInitiative(uid, initiativeId, {
-        clarifyingAsked: askedArray,
-        clarifyingAnswers: answersArray,
+        projectQuestions: updatedQuestions.map((q) => {
+          const rest = { ...q, contacts: q.contactIds };
+          delete rest.idx;
+          delete rest.answers;
+          delete rest.asked;
+          return rest;
+        }),
       });
     }
     return text;
@@ -2242,11 +2248,15 @@ Respond ONLY in this JSON format:
       const updated = [...prev];
       const q = updated[idx];
       if (q) {
-        if (q.asked[name] !== undefined) {
-          delete q.asked[name];
+        const id = q.contactIds[q.contacts.indexOf(name)] || name;
+        if (q.asked[id] !== undefined) {
+          delete q.asked[id];
         }
-        if (q.answers && q.answers[name]) {
-          delete q.answers[name];
+        if (q.answers && q.answers[id]) {
+          delete q.answers[id];
+        }
+        if (q.contactStatus && q.contactStatus[id]) {
+          q.contactStatus[id] = initStatus();
         }
       }
       updatedQuestions = updated;
@@ -2254,8 +2264,13 @@ Respond ONLY in this JSON format:
     });
     if (uid) {
       await saveInitiative(uid, initiativeId, {
-        clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
-        clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
+        projectQuestions: updatedQuestions.map((q) => {
+          const rest = { ...q, contacts: q.contactIds };
+          delete rest.idx;
+          delete rest.answers;
+          delete rest.asked;
+          return rest;
+        }),
       });
     }
   }
@@ -2263,7 +2278,9 @@ Respond ONLY in this JSON format:
   const openComposer = (idx, contactsList) => {
     try {
       const name = contactsList[0];
-      markAsked(idx, [name]);
+      const q = questions[idx];
+      const id = q.contactIds[q.contacts.indexOf(name)] || name;
+      markAsked(idx, [id]);
       const key = `${idx}-${name}`;
       const saved = localStorage.getItem(`answerDraft_${key}`);
       if (saved) {
@@ -2284,7 +2301,9 @@ Respond ONLY in this JSON format:
     const { idx, name: prev } = activeComposer;
     if (newName === prev) return;
     unmarkAsked(idx, prev);
-    markAsked(idx, [newName]);
+    const q = questions[idx];
+    const id = q.contactIds[q.contacts.indexOf(newName)] || newName;
+    markAsked(idx, [id]);
     const key = `${idx}-${newName}`;
     const saved = localStorage.getItem(`answerDraft_${key}`);
     if (saved) {
@@ -3605,7 +3624,9 @@ Respond ONLY in this JSON format:
           </li>
           <li
             onClick={async () => {
-              await markAsked(menu.idx, [menu.name]);
+              const q = questions[menu.idx];
+              const id = q.contactIds[q.contacts.indexOf(menu.name)] || menu.name;
+              await markAsked(menu.idx, [id]);
               setMenu(null);
             }}
           >
