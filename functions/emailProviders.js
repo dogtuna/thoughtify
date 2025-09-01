@@ -3,7 +3,7 @@ import { Buffer } from "buffer";
 import crypto from "crypto";
 
 import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
 import { google } from "googleapis";
@@ -676,6 +676,26 @@ export const processInboundEmail = onRequest(
       .replace(/<!--\s*THOUGHTIFY_REF.*?-->/gis, "")
       .trim();
 
+    // Step 1: Extract the direct answer and any extra commentary via AI
+    let answerText = cleaned;
+    let extraText = "";
+    if (GOOGLE_GENAI_API_KEY.value()) {
+      try {
+        const key = GOOGLE_GENAI_API_KEY.value();
+        const extractor = genkit({
+          plugins: [googleAI({ apiKey: key })],
+          model: gemini("gemini-1.5-pro"),
+        });
+        const extractPrompt = `You are reading an email reply and must separate the direct answer to the question from any additional commentary. Respond only in JSON with keys \"answer\" and \"extra\".\n\nEmail Reply:\n${cleaned}`;
+        const { text: extractText } = await extractor.generate(extractPrompt);
+        const parsed = JSON.parse(extractText.match(/\{[\s\S]*\}/)?.[0] || "{}");
+        if (parsed.answer) answerText = String(parsed.answer).trim();
+        if (parsed.extra) extraText = String(parsed.extra).trim();
+      } catch (err) {
+        console.error("answer extraction failed", err);
+      }
+    }
+
     // 6) Update clarifying answers on the related initiative and surface the message
     const answeredAt = new Date().toISOString();
 
@@ -716,7 +736,7 @@ export const processInboundEmail = onRequest(
           ...existing,
           [name]: {
             ...existingForName,
-            text: cleaned,
+            text: answerText,
             answeredAt,
             answeredBy: name,
             contactId,
@@ -739,13 +759,14 @@ export const processInboundEmail = onRequest(
       console.error("Failed to update clarifying answers", err);
     }
 
-    await db
+    const msgRef = await db
       .collection("users")
       .doc(uid)
       .collection("messages")
       .add({
         subject,
-        body: cleaned,
+        body: answerText,
+        extra: extraText,
         questionId: String(questionId),
         createdAt: answeredAt,
         from: answeredBy,
@@ -841,7 +862,7 @@ Discovery Question:
 ${dhQuestion}
 
 Answer from ${respondent}:
-${cleaned}
+  ${answerText}
 
 Avoid suggesting tasks or questions that already exist in the provided lists.
 
@@ -870,26 +891,69 @@ Respond ONLY in this JSON format:
         const allowedCategories = ["question", "meeting", "email", "research", "instructional-design"];
         const allowedTaskTypes = ["validate", "refute", "explore"];
         const suggestions = Array.isArray(parsed?.suggestions)
-          ? parsed.suggestions.filter(
-              (s) =>
-                s &&
-                typeof s.text === "string" &&
-                typeof s.category === "string" &&
-                typeof s.who === "string" &&
-                allowedCategories.includes(s.category.toLowerCase())
-            ).map((s) => ({
-              text: s.text,
-              category: s.category.toLowerCase(),
-              who: s.who,
-              hypothesisId:
-                typeof s.hypothesisId === "string" && s.hypothesisId.trim()
-                  ? s.hypothesisId.trim()
-                  : null,
-              taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase())
-                ? s.taskType.toLowerCase()
-                : "explore",
-            }))
+          ? parsed.suggestions
+              .filter(
+                (s) =>
+                  s &&
+                  typeof s.text === "string" &&
+                  typeof s.category === "string" &&
+                  typeof s.who === "string" &&
+                  allowedCategories.includes(s.category.toLowerCase())
+              )
+              .map((s) => ({
+                text: s.text,
+                category: s.category.toLowerCase(),
+                who: s.who,
+                hypothesisId:
+                  typeof s.hypothesisId === "string" && s.hypothesisId.trim()
+                    ? s.hypothesisId.trim()
+                    : null,
+                taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase())
+                  ? s.taskType.toLowerCase()
+                  : "explore",
+              }))
           : [];
+
+        // If the email contained additional commentary, analyze it separately for suggestions
+        if (extraText) {
+          try {
+            const extraPrompt = `You are an expert Instructional Designer and Performance Consultant. Review the following unprompted additional information from ${respondent} for possible follow-up actions.\n\nProject Context:\n${projectContext}\n\nExisting Hypotheses:\n${hypothesisList}\n\nInformation:\n${extraText}\n\nRespond ONLY in the JSON format used previously.`;
+            const { text: extraAiText } = await ai.generate(extraPrompt);
+            let extraParsed;
+            try {
+              extraParsed = JSON.parse(extraAiText);
+            } catch {
+              const m2 = extraAiText && extraAiText.match(/\{[\s\S]*\}/);
+              if (m2) extraParsed = JSON.parse(m2[0]);
+            }
+            if (Array.isArray(extraParsed?.suggestions)) {
+              const extraSuggestions = extraParsed.suggestions
+                .filter(
+                  (s) =>
+                    s &&
+                    typeof s.text === "string" &&
+                    typeof s.category === "string" &&
+                    typeof s.who === "string" &&
+                    allowedCategories.includes(s.category.toLowerCase())
+                )
+                .map((s) => ({
+                  text: s.text,
+                  category: s.category.toLowerCase(),
+                  who: s.who,
+                  hypothesisId:
+                    typeof s.hypothesisId === "string" && s.hypothesisId.trim()
+                      ? s.hypothesisId.trim()
+                      : null,
+                  taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase())
+                    ? s.taskType.toLowerCase()
+                    : "explore",
+                }));
+              suggestions.push(...extraSuggestions);
+            }
+          } catch (err) {
+            console.error("extra analysis failed", err);
+          }
+        }
 
         // Persist suggested tasks (non-question)
         const suggestedTasks = suggestions.filter((s) => s.category !== "question");
@@ -942,6 +1006,25 @@ Respond ONLY in this JSON format:
             }, { merge: true });
         }
 
+        // Persist analysis and notify user of the new answer
+        try {
+          await msgRef.set({ analysis: parsed?.analysis || "", suggestions }, { merge: true });
+          await db
+            .collection("users").doc(uid)
+            .collection("notifications")
+            .add({
+              type: "answerReceived",
+              message: "New answer received - Click to view analysis.",
+              questionId: String(questionId),
+              initiativeId,
+              messageId: msgRef.id,
+              createdAt: FieldValue.serverTimestamp(),
+              count: 1,
+            });
+        } catch (err) {
+          console.error("failed to record analysis notification", err);
+        }
+
         // Triage evidence to update hypothesis confidences and suggest new hypotheses
         const triagePrompt = (() => {
           const hypothesesList = hypotheses
@@ -962,7 +1045,7 @@ Respond ONLY in the following JSON format:
 }
 
 ---
-New Evidence:\nQuestion: ${dhQuestion}\nAnswer: ${cleaned}
+New Evidence:\nQuestion: ${dhQuestion}\nAnswer: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}
 
 Existing Hypotheses:\n${hypothesesList}
 
@@ -999,11 +1082,11 @@ Known Project Stakeholders:\n${contactsList}`;
             const delta = weightedImpact * diminishing * multiplier;
             const newScore = baseScore + delta;
             const key = String(link.relationship).toLowerCase() === "refutes" ? "refutingEvidence" : "supportingEvidence";
-            const entry = {
-              text: `Q: ${dhQuestion}\nA: ${cleaned}`,
-              analysisSummary: triage.analysisSummary || "",
-              impact: link.impact,
-              delta,
+              const entry = {
+                text: `Q: ${dhQuestion}\nA: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`,
+                analysisSummary: triage.analysisSummary || "",
+                impact: link.impact,
+                delta,
               source: respondent,
               sourceAuthority: link.sourceAuthority,
               evidenceType: link.evidenceType,
@@ -1077,12 +1160,12 @@ Known Project Stakeholders:\n${contactsList}`;
             pass: SMTP_PASS.value(),
           },
         });
-        await forwarder.sendMail({
-          from: SMTP_USER.value(),
-          to: userEmail,
-          subject,
-          text: cleaned,
-        });
+          await forwarder.sendMail({
+            from: SMTP_USER.value(),
+            to: userEmail,
+            subject,
+            text: answerText + (extraText ? `\n\n${extraText}` : ""),
+          });
       }
     } catch (err) {
       console.error("Error forwarding reply", err);
