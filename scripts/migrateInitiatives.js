@@ -34,12 +34,22 @@ async function migrateInitiatives() {
           contactId: contacts.find((c) => c.name === name)?.id || name,
           text: typeof val === "string" ? val : val?.text || "",
         }));
+        const rawAsked = data.clarifyingAsked
+          ? data.clarifyingAsked[idx] || {}
+          : {};
+        const asked = Object.fromEntries(
+          Object.entries(rawAsked).map(([name, val]) => [
+            contacts.find((c) => c.name === name)?.id || name,
+            val,
+          ]),
+        );
         return {
           id: questionObj.id || `Q${idx + 1}`,
           phase: questionObj.phase || "General",
           question: questionObj.question,
           contacts: contactsIds,
           answers,
+          asked,
         };
       });
 
