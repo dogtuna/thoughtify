@@ -287,13 +287,13 @@ export const sendQuestionEmail = onCall(
     region: "us-central1",
     enforceAppCheck: true,
     invoker: "public",
-    // Allow cross-site requests from the web client
     cors: ["https://thoughtify.training"],
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
       GMAIL_CLIENT_SECRET,
       GMAIL_REDIRECT_URI,
+      REPLIES_DOMAIN
     ],
   },
   async (request) => {
@@ -324,16 +324,23 @@ export const sendQuestionEmail = onCall(
       throw new HttpsError("invalid-argument", "Missing fields");
     }
 
+    const qIndex = Number(questionId);
+    if (isNaN(qIndex)) {
+      throw new HttpsError("invalid-argument", "QuestionId must be a numeric index.");
+    }
+
     try {
-      const refToken = `Ref:QID${questionId}|UID${uid}`;
-      const subjectWithRef = `${subject} [${refToken}]`;
-      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${questionId} UID${uid} -->`;
-      const hmac = crypto
-        .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
-        .update(`QID${questionId}_UID${uid}`)
-        .digest("hex")
-        .slice(0, 16);
-      const replyTo = `reply+QID${questionId}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
+const refToken = `Ref:QID${qIndex}|UID${uid}`;
+    const subjectWithRef = `${subject} [${refToken}]`;
+    const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${qIndex} UID${uid} -->`;
+
+    const hmac = crypto
+      .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
+      .update(`QID${qIndex}_UID${uid}`)
+      .digest("hex")
+      .slice(0, 16);
+
+    const replyTo = `reply+QID${qIndex}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
 
       let messageId = "";
 
@@ -601,23 +608,27 @@ export const processInboundEmail = onRequest(
     }
 
     // 2) Parse identifiers
-    // Supported formats:
-    //   A) QID123_UIDabc123_SIGdeadbeefcafebabe
-    //   B) q123.uabc123   (from Reply-To: ref+q<id>.u<uid>@...)
-    let questionId = null, uid = null, sig = null;
+let questionId = null, uid = null, sig = null;
 
-    let m = /^QID(\d+)_UID([A-Za-z0-9\-_]+)_SIG([a-f0-9]{16})$/i.exec(tag || "");
-    if (m) {
-      questionId = m[1];
-      uid = m[2];
-      sig = m[3];
-      } else {
-        m = /^q([^.]+)\.u(.+)$/i.exec(tag || "");
-        if (m) {
-        questionId = m[1];
-        uid = m[2];
-      }
-    }
+// Force numeric-only question IDs
+let m = /^QID(\d+)_UID([A-Za-z0-9\-_]+)_SIG([a-f0-9]{16})$/i.exec(tag || "");
+if (m) {
+  questionId = parseInt(m[1], 10); // convert to number
+  uid = m[2];
+  sig = m[3];
+} else {
+  m = /^q(\d+)\.u(.+)$/i.exec(tag || "");
+  if (m) {
+    questionId = parseInt(m[1], 10);
+    uid = m[2];
+  }
+}
+
+if (isNaN(questionId)) {
+  console.warn("Invalid questionId in inbound tag", { tag });
+  res.status(400).send({ status: "error", message: "Invalid questionId" });
+  return;
+}
 
     // 3) Fallback to custom headers
     if (!questionId || !uid) {
@@ -712,7 +723,11 @@ export const processInboundEmail = onRequest(
       for (const docSnap of initsSnap.docs) {
         const data = docSnap.data() || {};
         const qArr = data.projectQuestions || [];
-        if (qArr[questionId] === undefined) continue;
+const qIndex = questionId;
+
+if (qIndex < 0 || qIndex >= qArr.length) continue;
+
+const q = qArr[qIndex];
 
         const contacts = data.keyContacts || [];
         const matchedContact = contacts.find(
@@ -723,7 +738,6 @@ export const processInboundEmail = onRequest(
         const name = matchedContact.name;
         const contactId = matchedContact.id || null;
 
-        const q = qArr[questionId];
         const askedEntry = q.asked || {};
         if (!askedEntry[contactId]) continue; // question not asked for this initiative/contact
 
