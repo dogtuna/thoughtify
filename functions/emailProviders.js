@@ -325,15 +325,20 @@ export const sendQuestionEmail = onCall(
     }
 
     try {
-      const refToken = `Ref:QID${questionId}|UID${uid}`;
+      const questionIndex = Number(questionId);
+      if (!Number.isInteger(questionIndex)) {
+        throw new HttpsError("invalid-argument", "Invalid question index");
+      }
+
+      const refToken = `Ref:QID${questionIndex}|UID${uid}`;
       const subjectWithRef = `${subject} [${refToken}]`;
-      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${questionId} UID${uid} -->`;
+      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${questionIndex} UID${uid} -->`;
       const hmac = crypto
         .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
-        .update(`QID${questionId}_UID${uid}`)
+        .update(`QID${questionIndex}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
-      const replyTo = `reply+QID${questionId}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
+      const replyTo = `reply+QID${questionIndex}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
 
       let messageId = "";
 
@@ -425,7 +430,7 @@ export const sendQuestionEmail = onCall(
         for (const docSnap of initsSnap.docs) {
           const data = docSnap.data() || {};
           const qArr = data.projectQuestions || [];
-          if (qArr[questionId] === undefined) continue;
+          if (qArr[questionIndex] === undefined) continue;
 
           const contacts = data.keyContacts || [];
           const emailToContact = new Map(
@@ -438,7 +443,7 @@ export const sendQuestionEmail = onCall(
             .filter(Boolean);
           if (!matched.length) continue;
 
-          const q = qArr[questionId] || {};
+          const q = qArr[questionIndex] || {};
           const askedEntry = q.asked || {};
           const ansEntry = q.answers || {};
           const statusEntry = q.contactStatus || {};
@@ -471,7 +476,7 @@ export const sendQuestionEmail = onCall(
           q.asked = askedEntry;
           q.answers = ansEntry;
           q.contactStatus = statusEntry;
-          qArr[questionId] = q;
+          qArr[questionIndex] = q;
           await docSnap.ref.set(
             { projectQuestions: qArr },
             { merge: true }
@@ -598,28 +603,28 @@ export const processInboundEmail = onRequest(
     // Supported formats:
     //   A) QID123_UIDabc123_SIGdeadbeefcafebabe
     //   B) q123.uabc123   (from Reply-To: ref+q<id>.u<uid>@...)
-    let questionId = null, uid = null, sig = null;
+    let questionIndex = null, uid = null, sig = null;
 
     let m = /^QID(\d+)_UID([A-Za-z0-9\-_]+)_SIG([a-f0-9]{16})$/i.exec(tag || "");
     if (m) {
-      questionId = m[1];
+      questionIndex = parseInt(m[1], 10);
       uid = m[2];
       sig = m[3];
-      } else {
-        m = /^q([^.]+)\.u(.+)$/i.exec(tag || "");
-        if (m) {
-        questionId = m[1];
+    } else {
+      m = /^q(\d+)\.u(.+)$/i.exec(tag || "");
+      if (m) {
+        questionIndex = parseInt(m[1], 10);
         uid = m[2];
       }
     }
 
     // 3) Fallback to custom headers
-    if (!questionId || !uid) {
+    if (!Number.isInteger(questionIndex) || !uid) {
       const headerMap = Object.fromEntries(
-        Headers.map(h => [String(h.Name || "").toLowerCase(), h.Value])
+        Headers.map((h) => [String(h.Name || "").toLowerCase(), h.Value])
       );
-      if (!questionId && headerMap["x-question-id"]) {
-        questionId = String(headerMap["x-question-id"]).trim();
+      if (!Number.isInteger(questionIndex) && headerMap["x-question-id"]) {
+        questionIndex = parseInt(String(headerMap["x-question-id"]).trim(), 10);
       }
       if (!uid && headerMap["x-user-id"]) {
         uid = String(headerMap["x-user-id"]).trim();
@@ -642,9 +647,23 @@ export const processInboundEmail = onRequest(
       StrippedTextReply || TextBody ||
       (HtmlBody ? HtmlBody.replace(/<[^>]+>/g, " ") : "");
 
-    if (!questionId || !uid || !fromEmail || !subject || !rawText) {
-      console.warn("Missing fields", { questionId, uid, from: !!fromEmail, subject: !!subject, hasBody: !!rawText });
-      res.status(400).send({ status: "error", message: "Missing required fields" });
+    if (
+      !Number.isInteger(questionIndex) ||
+      !uid ||
+      !fromEmail ||
+      !subject ||
+      !rawText
+    ) {
+      console.warn("Missing fields", {
+        questionIndex,
+        uid,
+        from: !!fromEmail,
+        subject: !!subject,
+        hasBody: !!rawText,
+      });
+      res
+        .status(400)
+        .send({ status: "error", message: "Missing required fields" });
       return;
     }
 
@@ -652,11 +671,11 @@ export const processInboundEmail = onRequest(
     if (sig) {
       const expected = crypto
         .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
-        .update(`QID${questionId}_UID${uid}`)
+        .update(`QID${questionIndex}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
       if (sig !== expected) {
-        console.warn("Bad signature", { questionId, uid });
+        console.warn("Bad signature", { questionIndex, uid });
         res.status(403).send({ status: "error", message: "Bad signature" });
         return;
       }
@@ -706,7 +725,7 @@ export const processInboundEmail = onRequest(
       for (const docSnap of initsSnap.docs) {
         const data = docSnap.data() || {};
         const qArr = data.projectQuestions || [];
-        if (qArr[questionId] === undefined) continue;
+        if (qArr[questionIndex] === undefined) continue;
 
         const contacts = data.keyContacts || [];
         const matchedContact = contacts.find(
@@ -717,7 +736,7 @@ export const processInboundEmail = onRequest(
         const name = matchedContact.name;
         const contactId = matchedContact.id || null;
 
-        const q = qArr[questionId];
+        const q = qArr[questionIndex];
         const askedEntry = q.asked || {};
         if (!askedEntry[contactId]) continue; // question not asked for this initiative/contact
 
@@ -739,7 +758,7 @@ export const processInboundEmail = onRequest(
         askedEntry[contactId] = true;
         q.answers = answersEntry;
         q.asked = askedEntry;
-        qArr[questionId] = q;
+        qArr[questionIndex] = q;
 
         await docSnap.ref.set(
           { projectQuestions: qArr },
@@ -763,7 +782,7 @@ export const processInboundEmail = onRequest(
         subject,
         body: answerText,
         extra: extraText,
-        questionId: String(questionId),
+        questionId: String(questionIndex),
         createdAt: answeredAt,
         from: answeredBy,
         fromEmail: fromEmail,
@@ -846,7 +865,8 @@ export const processInboundEmail = onRequest(
           .map((h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`)
           .join("\n");
 
-        const dhQuestion = (questionsArr?.[questionId]?.question) || subject || "Incoming answer";
+        const dhQuestion =
+          questionsArr?.[questionIndex]?.question || subject || "Incoming answer";
         const respondent = answeredBy || fromEmail;
 
         const analysisPrompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
@@ -973,7 +993,7 @@ Respond ONLY in this JSON format:
                 taskType: s.taskType,
                 status: "pending",
                 createdAt: FieldValue.serverTimestamp(),
-                source: { kind: "email", questionIndex: questionId, respondent },
+                source: { kind: "email", questionIndex, respondent },
               })
             )
           );
@@ -1011,7 +1031,7 @@ Respond ONLY in this JSON format:
             .add({
               type: "answerReceived",
               message: "New answer received - Click to view analysis.",
-              questionId: String(questionId),
+              questionId: String(questionIndex),
               initiativeId,
               messageId: msgRef.id,
               createdAt: FieldValue.serverTimestamp(),
