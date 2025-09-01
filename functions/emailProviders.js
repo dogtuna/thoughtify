@@ -472,6 +472,7 @@ export const sendQuestionEmail = onCall(
           const q = qArr[questionId] || {};
           const askedEntry = q.asked || {};
           const ansEntry = q.answers || {};
+          const statusEntry = q.contactStatus || {};
           const now = new Date().toISOString();
           matched.forEach((contact) => {
             if (!contact.id) return;
@@ -484,9 +485,23 @@ export const sendQuestionEmail = onCall(
               currentStatus: "asked",
               history: Array.isArray(existing.history) ? existing.history : [],
             };
+            const statusExisting = statusEntry[contact.id] || {};
+            const statusHistory = Array.isArray(statusExisting.history)
+              ? statusExisting.history.slice()
+              : [];
+            statusHistory.push({ status: "Asked", timestamp: now });
+            statusEntry[contact.id] = {
+              ...statusExisting,
+              current: "Asked",
+              history: statusHistory,
+              answers: Array.isArray(statusExisting.answers)
+                ? statusExisting.answers
+                : [],
+            };
           });
           q.asked = askedEntry;
           q.answers = ansEntry;
+          q.contactStatus = statusEntry;
           qArr[questionId] = q;
           await docSnap.ref.set(
             { projectQuestions: qArr },
