@@ -287,13 +287,13 @@ export const sendQuestionEmail = onCall(
     region: "us-central1",
     enforceAppCheck: true,
     invoker: "public",
-    // Allow cross-site requests from the web client
     cors: ["https://thoughtify.training"],
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
       GMAIL_CLIENT_SECRET,
       GMAIL_REDIRECT_URI,
+      REPLIES_DOMAIN
     ],
   },
   async (request) => {
@@ -322,6 +322,11 @@ export const sendQuestionEmail = onCall(
       questionId === null
     ) {
       throw new HttpsError("invalid-argument", "Missing fields");
+    }
+
+    const qIndex = Number(questionId);
+    if (isNaN(qIndex)) {
+      throw new HttpsError("invalid-argument", "QuestionId must be a numeric index.");
     }
 
     try {
