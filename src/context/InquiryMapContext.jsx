@@ -111,6 +111,7 @@ export const InquiryMapProvider = ({ children }) => {
 
         let updatedHypotheses = [...currentHypotheses];
         let allNewRecommendations = [...(analysis.strategicRecommendations || [])];
+        let newProjectQuestions = [...(analysis.projectQuestions || [])];
 
         analysis.hypothesisLinks.forEach((link) => {
           const targetIndex = updatedHypotheses.findIndex(h => h.id === link.hypothesisId);
@@ -143,8 +144,7 @@ export const InquiryMapProvider = ({ children }) => {
                 id: `hyp-${Date.now()}`,
                 statement: analysis.newHypothesis.statement,
                 confidence: newConf,
-                supportingEvidence: [],
-                refutingEvidence: [],
+                evidence: { supporting: [], refuting: [] },
                 sourceContributions: [],
               });
             }
@@ -152,12 +152,14 @@ export const InquiryMapProvider = ({ children }) => {
         }
 
         const finalRecommendations = [...currentRecommendations, ...allNewRecommendations];
+        const finalQuestions = [...(data.projectQuestions || []), ...newProjectQuestions];
 
         await updateDoc(ref, {
           "inquiryMap.hypotheses": updatedHypotheses,
           hypotheses: updatedHypotheses,
           "inquiryMap.recommendations": finalRecommendations,
           recommendations: finalRecommendations,
+          projectQuestions: finalQuestions,
         });
 
         return analysis;
@@ -184,8 +186,8 @@ export const InquiryMapProvider = ({ children }) => {
 
         const existingEvidence = new Set();
         currentHypotheses.forEach((h) => {
-          (h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
-          (h.refutingEvidence || []).forEach((e) => existingEvidence.add(e.text));
+          (h.evidence?.supporting || h.supportingEvidence || []).forEach((e) => existingEvidence.add(e.text));
+          (h.evidence?.refuting || h.refutingEvidence || []).forEach((e) => existingEvidence.add(e.text));
         });
 
         for (const docItem of (data?.sourceMaterials || [])) {
@@ -195,7 +197,7 @@ export const InquiryMapProvider = ({ children }) => {
           }
         }
 
-        const qList = data?.projectQuestions || data?.questions || [];
+        const qList = data?.projectQuestions || [];
         for (const qItem of qList) {
           const questionText =
             typeof qItem === "string" ? qItem : qItem.question || "";
@@ -236,8 +238,7 @@ export const InquiryMapProvider = ({ children }) => {
           id: `hyp-${Date.now()}`,
           statement,
           confidence: 0,
-          supportingEvidence: [],
-          refutingEvidence: [],
+          evidence: { supporting: [], refuting: [] },
           sourceContributions: [],
         };
         const updated = [...currentHypotheses, newHypothesis];
@@ -284,10 +285,16 @@ export const InquiryMapProvider = ({ children }) => {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
         const currentHypotheses = getInquiryData(snap.data()).hypotheses;
-        const key = supporting ? "supportingEvidence" : "refutingEvidence";
+        const key = supporting ? "supporting" : "refuting";
         const updatedHypotheses = currentHypotheses.map((h) =>
           h.id === hypothesisId
-            ? { ...h, [key]: [...(h[key] || []), { text: evidence }] }
+            ? {
+                ...h,
+                evidence: {
+                  ...(h.evidence || {}),
+                  [key]: [...(h.evidence?.[key] || []), { text: evidence }],
+                },
+              }
             : h
         );
         await updateDoc(ref, {
@@ -353,8 +360,7 @@ export const InquiryMapProvider = ({ children }) => {
           id: `hyp-${Date.now()}`,
           statement: picked.statement,
           confidence: picked.confidence ?? 0,
-          supportingEvidence: [],
-          refutingEvidence: [],
+          evidence: { supporting: [], refuting: [] },
           sourceContributions: [],
         };
         const hyps = [...(current.hypotheses || []), newHyp];

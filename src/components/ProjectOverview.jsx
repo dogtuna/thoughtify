@@ -120,8 +120,8 @@ const ProjectOverview = ({
           <ul className="space-y-4">
             {topHypotheses.map((h) => {
               const pct = Math.round((h.confidence || 0) * 100);
-              const supports = h.supportingEvidence?.length || 0;
-              const refutes = h.refutingEvidence?.length || 0;
+              const supports = h.evidence?.supporting?.length || h.supportingEvidence?.length || 0;
+              const refutes = h.evidence?.refuting?.length || h.refutingEvidence?.length || 0;
               return (
                 <li
                   key={h.id}

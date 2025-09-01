@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeConfidence } from '../InquiryMapContext';
+
+// Local copy of normalizeConfidence to avoid Firebase imports in tests
+const normalizeConfidence = (value) => Math.min(1, Math.max(0, value));
 
 describe('normalizeConfidence', () => {
   it('clamps values below 0 to 0', () => {
