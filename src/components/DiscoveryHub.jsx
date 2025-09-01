@@ -438,10 +438,12 @@ const DiscoveryHub = () => {
     }
   };
 
-  const generateDraft = (recipients, questionObjs) => {
+  const generateDraft = (recipientIds, questionObjs) => {
     const userName =
       auth.currentUser?.displayName || auth.currentUser?.email || "";
-    const toNames = recipients.join(", ");
+    const toNames = recipientIds
+      .map((id) => contacts.find((c) => c.id === id)?.name || id)
+      .join(", ");
     const questionsText =
       questionObjs.length === 1
         ? questionObjs[0].text
@@ -456,7 +458,7 @@ const DiscoveryHub = () => {
     return {
       subject,
       body,
-      recipients,
+      recipients: recipientIds,
       questionIds: questionObjs.map((q) => q.id),
     };
   };
@@ -524,29 +526,37 @@ const DiscoveryHub = () => {
       console.warn("auth.currentUser is null when drafting email");
       return;
     }
-    const targets = q.contacts || [];
+    const targets = q.contactIds || [];
     if (!targets.length) return;
-    const handleSelection = (chosen) => {
-      if (!chosen.length) return;
-      const drafts = chosen.map((name) =>
-        generateDraft([name], [{ text: q.question, id: q.id }])
+    const targetNames = targets.map((id) =>
+      contacts.find((c) => c.id === id)?.name || id
+    );
+    const handleSelection = (chosenNames) => {
+      if (!chosenNames.length) return;
+      const ids = chosenNames.map(
+        (n) => contacts.find((c) => c.name === n)?.id || n
+      );
+      const drafts = ids.map((id) =>
+        generateDraft([id], [{ text: q.question, id: q.id }])
       );
       startDraftQueue(drafts);
     };
     if (targets.length === 1) {
-      handleSelection(targets);
+      handleSelection([targetNames[0]]);
     } else {
-      openRecipientModal(targets, handleSelection);
+      openRecipientModal(targetNames, handleSelection);
     }
   };
 
-  const generateTaskEmail = (recipients, task) => {
+  const generateTaskEmail = (recipientIds, task) => {
     const userName =
       auth.currentUser?.displayName || auth.currentUser?.email || "";
-    const toNames = recipients.join(", ");
+    const toNames = recipientIds
+      .map((id) => contacts.find((c) => c.id === id)?.name || id)
+      .join(", ");
     const subject = `Regarding: ${task.message}`;
     const body = `Hi ${toNames},\n\n${task.message}\n\nBest regards,\n${userName}`;
-    return { subject, body, recipients, taskIds: [task.id] };
+    return { subject, body, recipients: recipientIds, taskIds: [task.id] };
   };
 
   const draftTaskEmail = (task) => {
@@ -566,11 +576,12 @@ const DiscoveryHub = () => {
         ? task.assignees
         : [task.assignee || currentUserName];
     if (!targets.length) return;
-    const handleSelection = (chosen) => {
-      if (!chosen.length) return;
-      const drafts = chosen.map((name) =>
-        generateTaskEmail([name], task)
+    const handleSelection = (chosenNames) => {
+      if (!chosenNames.length) return;
+      const ids = chosenNames.map(
+        (n) => contacts.find((c) => c.name === n)?.id || n
       );
+      const drafts = ids.map((id) => generateTaskEmail([id], task));
       startDraftQueue(drafts);
     };
     if (targets.length === 1) {
@@ -583,7 +594,7 @@ const DiscoveryHub = () => {
   const sendEmail = async () => {
     if (!emailDraft) return;
     const emails = emailDraft.recipients
-      .map((n) => contacts.find((c) => c.name === n)?.email)
+      .map((id) => contacts.find((c) => c.id === id)?.info?.email)
       .filter((e) => e);
     if (!emails.length) {
       alert("Missing email address for selected contact");
@@ -601,7 +612,10 @@ const DiscoveryHub = () => {
         questionId: emailDraft.questionIds[0],
       });
       for (const idx of emailDraft.questionIds) {
-        await markAsked(idx, emailDraft.recipients);
+        const names = emailDraft.recipients.map(
+          (id) => contacts.find((c) => c.id === id)?.name || id
+        );
+        await markAsked(idx, names);
       }
       alert("Email sent");
       nextDraft();
@@ -632,7 +646,7 @@ const DiscoveryHub = () => {
       if (contacts.length) {
         contextPieces.push(
           `Key Contacts: ${contacts
-            .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
+            .map((c) => `${c.name}${c.jobTitle ? ` (${c.jobTitle})` : ""}`)
             .join(", ")}`
         );
       }
@@ -1724,7 +1738,15 @@ Respond ONLY in this JSON format:
           setAudienceProfile(init?.audienceProfile || "");
           setProjectConstraints(init?.projectConstraints || "");
           const contactsInit = (init?.keyContacts || []).map((c, i) => ({
-            ...c,
+            id: c.id || crypto.randomUUID(),
+            name: c.name || "",
+            jobTitle: c.jobTitle || c.role || "",
+            profile: c.profile || "",
+            info: {
+              email: c.info?.email || c.email || "",
+              slack: c.info?.slack || "",
+              teams: c.info?.teams || "",
+            },
             color: colorPalette[i % colorPalette.length],
           }));
           setContacts(contactsInit);
@@ -1946,19 +1968,27 @@ Respond ONLY in this JSON format:
   const addContact = () => {
     const name = prompt("Contact name?");
     if (!name) return null;
-    const role = prompt("Contact role? (optional)") || "";
+    const jobTitle = prompt("Job title? (optional)") || "";
     const email = prompt("Contact email? (optional)") || "";
     const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = { id: crypto.randomUUID(), role, name, email, color };
+    const newContact = {
+      id: crypto.randomUUID(),
+      name,
+      jobTitle,
+      profile: "",
+      info: { email, slack: "", teams: "" },
+      color,
+    };
     const updated = [...contacts, newContact];
     setContacts(updated);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ id, name, role, email }) => ({
+        keyContacts: updated.map(({ id, name, jobTitle, profile, info }) => ({
           id,
           name,
-          role,
-          email,
+          jobTitle,
+          profile,
+          info,
         })),
       });
     }
@@ -1970,12 +2000,25 @@ Respond ONLY in this JSON format:
     const lower = name.toLowerCase();
     if (contacts.some((c) => c.name.toLowerCase() === lower)) return;
     const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = { id: crypto.randomUUID(), role: "", name, email: "", color };
+    const newContact = {
+      id: crypto.randomUUID(),
+      name,
+      jobTitle: "",
+      profile: "",
+      info: { email: "", slack: "", teams: "" },
+      color,
+    };
     const updated = [...contacts, newContact];
     setContacts(updated);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ id, name, role, email }) => ({ id, name, role, email })),
+        keyContacts: updated.map(({ id, name, jobTitle, profile, info }) => ({
+          id,
+          name,
+          jobTitle,
+          profile,
+          info,
+        })),
       });
     }
   };
@@ -2033,17 +2076,29 @@ Respond ONLY in this JSON format:
           [lower]: create ? "create" : "self",
         }));
         if (create) {
-          const color = colorPalette[updatedContacts.length % colorPalette.length];
-          const newContact = { role: "", name, email: "", color };
+          const color =
+            colorPalette[updatedContacts.length % colorPalette.length];
+          const newContact = {
+            id: crypto.randomUUID(),
+            name,
+            jobTitle: "",
+            profile: "",
+            info: { email: "", slack: "", teams: "" },
+            color,
+          };
           updatedContacts = [...updatedContacts, newContact];
           setContacts(updatedContacts);
           if (uid) {
             saveInitiative(uid, initiativeId, {
-              keyContacts: updatedContacts.map(({ name, role, email }) => ({
-                name,
-                role,
-                email,
-              })),
+              keyContacts: updatedContacts.map(
+                ({ id, name, jobTitle, profile, info }) => ({
+                  id,
+                  name,
+                  jobTitle,
+                  profile,
+                  info,
+                })
+              ),
             });
           }
           known.add(lower);
@@ -2535,18 +2590,20 @@ Respond ONLY in this JSON format:
     setEditData({
       original: name,
       name: contact.name,
-      role: contact.role,
-      email: contact.email || "",
+      jobTitle: contact.jobTitle || "",
+      email: contact.info?.email || "",
     });
   };
 
   const saveEditContact = () => {
     if (!editData) return;
-    const { original, name, role, email } = editData;
+    const { original, name, jobTitle, email } = editData;
     const idx = contacts.findIndex((c) => c.name === original);
     if (idx === -1) return;
     const updatedContacts = contacts.map((c, i) =>
-      i === idx ? { ...c, name, role, email } : c
+      i === idx
+        ? { ...c, name, jobTitle, info: { ...c.info, email } }
+        : c
     );
     const updatedQuestions = questions.map((q) => {
       const newContacts = q.contacts.map((n) => (n === original ? name : n));
@@ -2569,11 +2626,15 @@ Respond ONLY in this JSON format:
     setQuestions(updatedQuestions);
     if (uid) {
       saveInitiative(uid, initiativeId, {
-        keyContacts: updatedContacts.map(({ name, role, email }) => ({
-          name,
-          role,
-          email,
-        })),
+        keyContacts: updatedContacts.map(
+          ({ id, name, jobTitle, profile, info }) => ({
+            id,
+            name,
+            jobTitle,
+            profile,
+            info,
+          })
+        ),
         clarifyingContacts: Object.fromEntries(
           updatedQuestions.map((qq, i) => [i, qq.contacts])
         ),
@@ -2652,14 +2713,15 @@ Respond ONLY in this JSON format:
     filtered.forEach((q) => {
       const roles = q.contacts.length
         ? q.contacts.map(
-            (n) => contacts.find((c) => c.name === n)?.role || "No Role"
+            (n) => contacts.find((c) => c.name === n)?.jobTitle || "No Role"
           )
         : ["Unassigned"];
       const uniqueRoles = Array.from(new Set(roles));
       uniqueRoles.forEach((r) => {
         const label = r && r !== "" ? r : "No Role";
         const namesForRole = q.contacts.filter(
-          (n) => (contacts.find((c) => c.name === n)?.role || "No Role") === r
+          (n) =>
+            (contacts.find((c) => c.name === n)?.jobTitle || "No Role") === r
         );
         const qCopy = { ...q, contacts: namesForRole };
         grouped[label] = grouped[label] || [];
@@ -3560,7 +3622,7 @@ Respond ONLY in this JSON format:
             <li
               onClick={() => {
                 const role =
-                  contacts.find((c) => c.name === menu.name)?.role || "No Role";
+                  contacts.find((c) => c.name === menu.name)?.jobTitle || "No Role";
                 setGroupBy("role");
                 setFocusRole(role);
                 setMenu(null);
@@ -3876,12 +3938,12 @@ Respond ONLY in this JSON format:
               />
             </label>
             <label>
-              Role:
+              Job Title:
               <input
                 className="generator-input"
-                value={editData.role}
+                value={editData.jobTitle}
                 onChange={(e) =>
-                  setEditData((d) => ({ ...d, role: e.target.value }))
+                  setEditData((d) => ({ ...d, jobTitle: e.target.value }))
                 }
               />
             </label>
