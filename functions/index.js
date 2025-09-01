@@ -621,12 +621,12 @@ export const generateProjectBrief = onCall(
         : "";
     const clarificationsBlock = (() => {
       const pairs = projectQuestions.map((q) => {
-        const answers = Array.isArray(q.answers)
-          ? q.answers.join("; ")
-          : Object.values(q.answers || {})
-              .map((a) => a?.text || String(a))
-              .join("; ");
-        return `Q: ${q?.question || ""}\nA: ${answers || ""}`;
+        const answersArray = Array.isArray(q.answers)
+          ? q.answers.map((a) => (typeof a === "string" ? a : a.text || ""))
+          : Object.values(q.answers || {}).map((a) =>
+              typeof a === "string" ? a : a?.text || "",
+            );
+        return `Q: ${q?.question || ""}\nA: ${answersArray.join("; ")}`;
       });
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
     })();
@@ -821,12 +821,12 @@ export const generateLearningStrategy = onCall(
 
     const clarificationsBlock = (() => {
       const pairs = projectQuestions.map((q) => {
-        const answers = Array.isArray(q.answers)
-          ? q.answers.join("; ")
-          : Object.values(q.answers || {})
-              .map((a) => a?.text || String(a))
-              .join("; ");
-        return `Q: ${q?.question || ""}\nA: ${answers || ""}`;
+        const answersArray = Array.isArray(q.answers)
+          ? q.answers.map((a) => (typeof a === "string" ? a : a.text || ""))
+          : Object.values(q.answers || {}).map((a) =>
+              typeof a === "string" ? a : a?.text || "",
+            );
+        return `Q: ${q?.question || ""}\nA: ${answersArray.join("; ")}`;
       });
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
     })();
@@ -1710,7 +1710,7 @@ Project Data:\n${projectData.join("\n\n")}`;
     const hypotheses = rawHypotheses.map((h) => ({
       id: h.id,
       type: h.type,
-      hypothesis: h.hypothesis || h.statement || h.text || "",
+      hypothesis: h.hypothesis || h.text || "",
       evidence: {
         supporting: h.evidence?.supporting || h.supportingEvidence || [],
         refuting: h.evidence?.refuting || h.refutingEvidence || [],
