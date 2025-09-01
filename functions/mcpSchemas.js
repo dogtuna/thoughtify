@@ -1,11 +1,45 @@
 import { z } from "zod";
 
-const contactSchema = z.object({
+export const contactSchema = z.object({
   id: z.string().optional(),
   name: z.string(),
   role: z.string(),
   email: z.string().email().optional(),
 });
+
+export const contactsSchema = z.array(contactSchema);
+
+export const projectQuestionSchema = z.object({
+  question: z.string(),
+  stakeholders: z.array(z.string()).optional(),
+  phase: z.string().optional(),
+  answer: z.string().optional(),
+  asked: z.record(z.boolean()).optional(),
+  contacts: z.array(z.string()).optional(),
+});
+
+export const projectQuestionsSchema = z.array(projectQuestionSchema);
+
+export const sourceMaterialSchema = z.object({
+  name: z.string(),
+  content: z.string(),
+});
+
+export const sourceMaterialsSchema = z.array(sourceMaterialSchema);
+
+export const audienceProfileSchema = z.string().min(1);
+export const briefSchema = z.string().min(1);
+export const businessGoalSchema = z.string().min(1);
+
+/**
+ * Utility types derived from schemas
+ * @typedef {z.infer<typeof contactSchema>} Contact
+ * @typedef {z.infer<typeof contactsSchema>} Contacts
+ * @typedef {z.infer<typeof projectQuestionSchema>} ProjectQuestion
+ * @typedef {z.infer<typeof projectQuestionsSchema>} ProjectQuestions
+ * @typedef {z.infer<typeof sourceMaterialSchema>} SourceMaterial
+ * @typedef {z.infer<typeof sourceMaterialsSchema>} SourceMaterials
+ */
 
 const toolSchemas = {
   generateTrainingPlan: z.object({ prompt: z.string() }),
@@ -14,19 +48,19 @@ const toolSchemas = {
   generateAssessment: z.object({ topic: z.string() }),
   generateLessonContent: z.object({ topic: z.string() }),
   generateClarifyingQuestions: z.object({
-    businessGoal: z.string(),
-    audienceProfile: z.string().optional(),
+    businessGoal: businessGoalSchema,
+    audienceProfile: audienceProfileSchema.optional(),
     sourceMaterial: z.string().optional(),
     projectConstraints: z.string().optional(),
-    keyContacts: z.array(contactSchema).optional(),
+    keyContacts: contactsSchema.optional(),
   }),
   generateProjectBrief: z.object({
-    businessGoal: z.string(),
-    audienceProfile: z.string().optional(),
+    businessGoal: businessGoalSchema,
+    audienceProfile: audienceProfileSchema.optional(),
     sourceMaterial: z.string().optional(),
     projectConstraints: z.string().optional(),
-    keyContacts: z.array(contactSchema).optional(),
-    clarifyingQuestions: z.array(z.any()).optional(),
+    keyContacts: contactsSchema.optional(),
+    clarifyingQuestions: projectQuestionsSchema.optional(),
     clarifyingAnswers: z.array(z.any()).optional(),
   }),
   generateStatusUpdate: z.object({
@@ -39,13 +73,13 @@ const toolSchemas = {
     allOutstandingTasks: z.string().optional(),
   }),
   generateLearningStrategy: z.object({
-    projectBrief: z.string(),
-    businessGoal: z.string().optional(),
-    audienceProfile: z.string().optional(),
+    projectBrief: briefSchema,
+    businessGoal: businessGoalSchema.optional(),
+    audienceProfile: audienceProfileSchema.optional(),
     projectConstraints: z.string().optional(),
-    keyContacts: z.array(contactSchema).optional(),
+    keyContacts: contactsSchema.optional(),
     sourceMaterial: z.string().optional(),
-    clarifyingQuestions: z.array(z.any()).optional(),
+    clarifyingQuestions: projectQuestionsSchema.optional(),
     clarifyingAnswers: z.array(z.any()).optional(),
     personaCount: z.number().optional(),
   }),
@@ -56,11 +90,11 @@ const toolSchemas = {
     jobId: z.string().optional(),
   }),
   generateLearnerPersona: z.object({
-    projectBrief: z.string(),
-    businessGoal: z.string().optional(),
-    audienceProfile: z.string().optional(),
+    projectBrief: briefSchema,
+    businessGoal: businessGoalSchema.optional(),
+    audienceProfile: audienceProfileSchema.optional(),
     projectConstraints: z.string().optional(),
-    keyContacts: z.array(contactSchema).optional(),
+    keyContacts: contactsSchema.optional(),
     sourceMaterial: z.string().optional(),
     existingMotivationKeywords: z.array(z.string()).optional(),
     existingChallengeKeywords: z.array(z.string()).optional(),
@@ -71,20 +105,20 @@ const toolSchemas = {
     selectedTraits: z.array(z.string()).optional(),
   }),
   generateHierarchicalOutline: z.object({
-    projectBrief: z.string(),
+    projectBrief: briefSchema,
     learningObjectives: z.any(),
-    businessGoal: z.string().optional(),
-    audienceProfile: z.string().optional(),
+    businessGoal: businessGoalSchema.optional(),
+    audienceProfile: audienceProfileSchema.optional(),
     projectConstraints: z.string().optional(),
     selectedModality: z.string().optional(),
     blendModalities: z.array(z.string()).optional(),
     sourceMaterial: z.string().optional(),
-    keyContacts: z.array(contactSchema).optional(),
+    keyContacts: contactsSchema.optional(),
   }),
   generateLearningDesignDocument: z.object({
-    projectBrief: z.string(),
-    businessGoal: z.string().optional(),
-    audienceProfile: z.string().optional(),
+    projectBrief: briefSchema,
+    businessGoal: businessGoalSchema.optional(),
+    audienceProfile: audienceProfileSchema.optional(),
     projectConstraints: z.string().optional(),
     selectedModality: z.string().optional(),
     blendModalities: z.array(z.string()).optional(),
@@ -92,14 +126,14 @@ const toolSchemas = {
     courseOutline: z.string().optional(),
     trainingPlan: z.string().optional(),
     sourceMaterial: z.string().optional(),
-    keyContacts: z.array(contactSchema).optional(),
+    keyContacts: contactsSchema.optional(),
   }),
   generateStoryboard: z.object({
     topic: z.string(),
     targetAudience: z.string().optional(),
   }),
   generateInitialInquiryMap: z.object({
-    brief: z.string(),
+    brief: briefSchema,
     uid: z.string(),
     initiativeId: z.string(),
     documents: z.string().optional(),
