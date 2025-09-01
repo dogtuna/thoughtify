@@ -11,7 +11,7 @@ const HypothesisCard = ({ hypothesis }) => {
     <div>
       <div className="font-semibold mb-1">
         {titleId ? `Hypothesis ${titleId}: ` : ""}
-        {hypothesis.statement || hypothesis.label || ""}
+        {hypothesis.statement || hypothesis.hypothesis || hypothesis.label || ""}
       </div>
       <div className="text-sm text-gray-600">
         {pct}% confidence • {evidenceCount} items of evidence

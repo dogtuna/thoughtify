@@ -680,7 +680,7 @@ const DiscoveryHub = () => {
       const questionSet = new Set(questions.map((q) => q.question.toLowerCase()));
 
       const hypothesisList = hypotheses
-        .map((h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`)
+        .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
         .join("\n");
 
       const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
@@ -3270,7 +3270,7 @@ Respond ONLY in this JSON format:
                 <option value="">None</option>
                 {hypotheses.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.statement || h.text || h.label || h.id}
+                    {h.statement || h.hypothesis || h.text || h.label || h.id}
                   </option>
                 ))}
               </select>

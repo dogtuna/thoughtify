@@ -143,6 +143,7 @@ export const InquiryMapProvider = ({ children }) => {
               updatedHypotheses.push({
                 id: `hyp-${Date.now()}`,
                 statement: analysis.newHypothesis.statement,
+                hypothesis: analysis.newHypothesis.statement,
                 confidence: newConf,
                 evidence: { supporting: [], refuting: [] },
                 sourceContributions: [],
@@ -237,6 +238,7 @@ export const InquiryMapProvider = ({ children }) => {
         const newHypothesis = {
           id: `hyp-${Date.now()}`,
           statement,
+          hypothesis: statement,
           confidence: 0,
           evidence: { supporting: [], refuting: [] },
           sourceContributions: [],
@@ -358,7 +360,8 @@ export const InquiryMapProvider = ({ children }) => {
         const picked = sh.splice(idx, 1)[0];
         const newHyp = {
           id: `hyp-${Date.now()}`,
-          statement: picked.statement,
+          statement: picked.statement || picked.hypothesis,
+          hypothesis: picked.hypothesis || picked.statement,
           confidence: picked.confidence ?? 0,
           evidence: { supporting: [], refuting: [] },
           sourceContributions: [],
