@@ -501,7 +501,7 @@ export const generateProjectQuestions = onCall(
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY"],
     invoker: "public",
-    cors: ["https://thoughtify.training"],
+    cors: true,
   },
   async (request) => {
     const {
@@ -912,7 +912,7 @@ export const generateContentAssets = onCall(
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 300,
-    cors: ["https://thoughtify.training"],
+    cors: true,
   },
   async (req) => {
     const { ldd, component, components, jobId } = req.data || {};

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { app, auth } from "../firebase";
+import { functions, auth } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import "./AIToolsGenerators.css";
@@ -12,7 +12,6 @@ const ProjectSetup = () => {
   const initiativeId = searchParams.get("initiativeId");
   const navigate = useNavigate();
 
-  const functions = getFunctions(app, "us-central1");
   const generateProjectQuestions = httpsCallable(
     functions,
     "generateProjectQuestions"
