@@ -465,7 +465,7 @@ const DiscoveryHub = () => {
       subject,
       body,
       recipients: recipientIds,
-      questionIds: questionObjs.map((q) => q.id),
+      questionIds: questionObjs.map((q) => q.idx),
     };
   };
 
@@ -543,7 +543,7 @@ const DiscoveryHub = () => {
         (n) => contacts.find((c) => c.name === n)?.id || n
       );
       const drafts = ids.map((id) =>
-        generateDraft([id], [{ text: q.question, id: q.id }])
+        generateDraft([id], [{ text: q.question, idx: q.idx }])
       );
       startDraftQueue(drafts);
     };
@@ -2557,7 +2557,7 @@ Respond ONLY in this JSON format:
       const targets = s.names.length ? s.names : q.contacts;
       targets.forEach((n) => {
         if (!contactMap[n]) contactMap[n] = [];
-        contactMap[n].push({ text: q.question, id: s.idx });
+        contactMap[n].push({ text: q.question, idx: s.idx });
       });
     });
     const allContacts = Object.keys(contactMap);

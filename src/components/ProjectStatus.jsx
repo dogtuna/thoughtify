@@ -232,7 +232,7 @@ ${JSON.stringify({recommendations, tasks})}
         recipientEmail: emails.join(","),
         subject: `Project Status Update - ${new Date().toDateString()}`,
         message: summary,
-        questionId: `status-${Date.now()}`,
+        questionId: -1,
       });
       alert("Email sent");
       markSent();
