@@ -288,7 +288,7 @@ export const sendQuestionEmail = onCall(
     enforceAppCheck: true,
     invoker: "public",
     // Allow cross-site requests from the web client
-    cors: true,
+    cors: ["https://thoughtify.training"],
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
