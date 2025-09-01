@@ -330,6 +330,10 @@ export const sendQuestionEmail = onCall(
     }
 
     try {
+        const qIndex = Number(questionId);
+  if (isNaN(qIndex)) {
+    throw new HttpsError("invalid-argument", "QuestionId must be a numeric index.");
+  }
 const refToken = `Ref:QID${qIndex}|UID${uid}`;
     const subjectWithRef = `${subject} [${refToken}]`;
     const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${qIndex} UID${uid} -->`;
