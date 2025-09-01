@@ -25,9 +25,15 @@ const ProjectSetup = () => {
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
-  const [keyContacts, setKeyContacts] = useState([
-    { id: crypto.randomUUID(), name: "", role: "", email: "" },
-  ]);
+  const genId = () => crypto.randomUUID();
+  const emptyContact = () => ({
+    id: genId(),
+    name: "",
+    jobTitle: "",
+    profile: "",
+    info: { email: "", slack: "", teams: "" },
+  });
+  const [keyContacts, setKeyContacts] = useState([emptyContact()]);
   const [sourceMaterials, setSourceMaterials] = useState([]);
 
   const [loading, setLoading] = useState(false);
@@ -50,9 +56,17 @@ const ProjectSetup = () => {
           setAudienceProfile(init.audienceProfile || "");
           setProjectConstraints(init.projectConstraints || "");
           setKeyContacts(
-            (init.keyContacts || [
-              { name: "", role: "", email: "" },
-            ]).map((c) => ({ id: c.id || crypto.randomUUID(), ...c }))
+            (init.keyContacts || [emptyContact()]).map((c) => ({
+              id: c.id || genId(),
+              name: c.name || "",
+              jobTitle: c.jobTitle || c.role || "",
+              profile: c.profile || "",
+              info: {
+                email: c.info?.email || c.email || "",
+                slack: c.info?.slack || "",
+                teams: c.info?.teams || "",
+              },
+            }))
           );
           setSourceMaterials(init.sourceMaterials || []);
         }
@@ -180,16 +194,21 @@ const ProjectSetup = () => {
   const handleContactChange = (index, field, value) => {
     setKeyContacts((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      if (field.startsWith("info.")) {
+        const key = field.split(".")[1];
+        updated[index] = {
+          ...updated[index],
+          info: { ...updated[index].info, [key]: value },
+        };
+      } else {
+        updated[index] = { ...updated[index], [field]: value };
+      }
       return updated;
     });
   };
 
   const addKeyContact = () => {
-    setKeyContacts((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), name: "", role: "", email: "" },
-    ]);
+    setKeyContacts((prev) => [...prev, emptyContact()]);
   };
 
   const removeKeyContact = (index) => {
@@ -206,11 +225,13 @@ const ProjectSetup = () => {
         audienceProfile,
         sourceMaterial: getCombinedSource(),
         projectConstraints,
-        keyContacts: keyContacts.map((c) => {
-          const copy = { ...c };
-          delete copy.id;
-          return copy;
-        }),
+        keyContacts: keyContacts.map(({ id, name, jobTitle, profile, info }) => ({
+          id,
+          name,
+          jobTitle,
+          profile,
+          info,
+        })),
       });
       const qsRaw = (data.projectQuestions || []).slice(0, 9);
       const qs = qsRaw.map((q, idx) => {
@@ -318,17 +339,19 @@ const ProjectSetup = () => {
                     />
                     <input
                       type="text"
-                      value={c.role}
-                      placeholder="Role"
-                      onChange={(e) => handleContactChange(idx, "role", e.target.value)}
+                      value={c.jobTitle}
+                      placeholder="Job Title"
+                      onChange={(e) =>
+                        handleContactChange(idx, "jobTitle", e.target.value)
+                      }
                       className="generator-input"
                     />
                     <input
                       type="email"
-                      value={c.email}
+                      value={c.info.email}
                       placeholder="Email"
                       onChange={(e) =>
-                        handleContactChange(idx, "email", e.target.value)
+                        handleContactChange(idx, "info.email", e.target.value)
                       }
                       className="generator-input"
                     />

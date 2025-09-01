@@ -122,7 +122,7 @@ ${JSON.stringify(hypotheses)}
 
 **Project Baseline:**
 Goal: ${businessGoal}
-Sponsor: ${(contacts.find(c => /sponsor/i.test(c.role)) || {}).name || 'Unknown'}
+Sponsor: ${(contacts.find(c => /sponsor/i.test(c.jobTitle)) || {}).name || 'Unknown'}
 
 **Current Recommendations & Outstanding Tasks:**
 ${JSON.stringify({recommendations, tasks})}
@@ -215,9 +215,9 @@ ${JSON.stringify({recommendations, tasks})}
     setRecipientModal({ selected: [] });
   };
 
-  const sendEmail = async (names) => {
-    const emails = names
-      .map((n) => contacts.find((c) => c.name === n)?.email)
+  const sendEmail = async (ids) => {
+    const emails = ids
+      .map((id) => contacts.find((c) => c.id === id)?.info?.email)
       .filter((e) => e);
     if (!emails.length) {
       alert("Missing email address for selected contact");
@@ -254,7 +254,7 @@ ${JSON.stringify({recommendations, tasks})}
     setContacts(updated);
     setNewContact(null);
     setRecipientModal((m) =>
-      m ? { ...m, selected: [...m.selected, newContact.name] } : m
+      m ? { ...m, selected: [...m.selected, newContact.id] } : m
     );
   };
   
