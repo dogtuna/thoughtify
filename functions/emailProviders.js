@@ -881,7 +881,7 @@ export const processInboundEmail = onRequest(
         const projectContext = contextPieces.join("\n\n");
         const hypotheses = (init.inquiryMap && init.inquiryMap.hypotheses) || init.hypotheses || [];
         const hypothesisList = hypotheses
-          .map((h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`)
+          .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
           .join("\n");
 
         const dhQuestion =
@@ -1066,7 +1066,7 @@ Respond ONLY in this JSON format:
         // Triage evidence to update hypothesis confidences and suggest new hypotheses
         const triagePrompt = (() => {
           const hypothesesList = hypotheses
-            .map((h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`)
+            .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
             .join("\n");
           const contactsList = (contacts || [])
             .map((c) => `${c.name} (${c.role || "Unknown Role"})`)
@@ -1177,7 +1177,7 @@ Known Project Stakeholders:\n${contactsList}`;
               await db
                 .collection("users").doc(uid)
                 .collection("notifications").doc(`hyp-${h.id}`)
-                .set({ type: "hypothesisConfidence", message: `${h.statement || h.id} confidence now at ${(now * 100).toFixed(0)}%`, count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
+                .set({ type: "hypothesisConfidence", message: `${h.statement || h.hypothesis || h.id} confidence now at ${(now * 100).toFixed(0)}%`, count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
             }
           }
         }

@@ -45,7 +45,7 @@ const InquiryMapContent = () => {
 
   const parsedHypotheses = (Array.isArray(hypotheses) ? hypotheses : []).map((h) => ({
     id: h.id,
-    statement: h.statement || h.text || h.label || h.id,
+    statement: h.statement || h.hypothesis || h.text || h.label || h.id,
     confidence: typeof h.confidence === "number" ? h.confidence : 0,
     supportingEvidence: h.evidence?.supporting || h.supportingEvidence || [],
     refutingEvidence: h.evidence?.refuting || h.refutingEvidence || [],

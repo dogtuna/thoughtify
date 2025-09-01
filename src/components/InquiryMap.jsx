@@ -48,7 +48,7 @@ const InquiryMap = ({ hypotheses = [] }) => {
                 
               </div>
               <div className="text-white mb-2">
-                {h.statement || h.label || ""}
+                {h.statement || h.hypothesis || h.label || ""}
               </div>
               <div className="flex items-center justify-end gap-4">
                 {up && <span className="text-green-600">▲</span>}

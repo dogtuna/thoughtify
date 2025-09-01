@@ -23,7 +23,7 @@ export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
     .map((h) => {
       const sup = (h.evidence?.supporting || h.supportingEvidence || []).length;
       const ref = (h.evidence?.refuting || h.refutingEvidence || []).length;
-      return `${h.id}: ${h.statement || h.text || h.label || h.id} (Supports: ${sup}, Refutes: ${ref})`;
+      return `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id} (Supports: ${sup}, Refutes: ${ref})`;
     })
     .join("\n");
   

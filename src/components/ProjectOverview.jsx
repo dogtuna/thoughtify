@@ -84,7 +84,7 @@ const ProjectOverview = ({
       arr.push({ text: `Status update (${s.audience})`, date: s.date });
     });
     hypotheses.forEach((h) => {
-      arr.push({ text: `Hypothesis added: ${h.statement || h.label}`, date: h.createdAt });
+      arr.push({ text: `Hypothesis added: ${h.statement || h.hypothesis || h.label}`, date: h.createdAt });
     });
     return arr
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
@@ -132,7 +132,7 @@ const ProjectOverview = ({
                     <div className="font-semibold">Hypothesis {h.displayId}</div>
                   </div>
                   <div className="text-white mb-2">
-                    {h.statement || h.label || ""}
+                    {h.statement || h.hypothesis || h.label || ""}
                   </div>
                   <div className="flex items-center justify-end gap-4">
                     {h.trend > 0 && <span className="text-green-600">▲</span>}
