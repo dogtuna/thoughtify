@@ -47,7 +47,7 @@ const toolSchemas = {
   generateCourseOutline: z.object({ topic: z.string() }),
   generateAssessment: z.object({ topic: z.string() }),
   generateLessonContent: z.object({ topic: z.string() }),
-  generateClarifyingQuestions: z.object({
+  generateProjectQuestions: z.object({
     businessGoal: businessGoalSchema,
     audienceProfile: audienceProfileSchema.optional(),
     sourceMaterial: z.string().optional(),
@@ -60,8 +60,7 @@ const toolSchemas = {
     sourceMaterial: z.string().optional(),
     projectConstraints: z.string().optional(),
     keyContacts: contactsSchema.optional(),
-    clarifyingQuestions: projectQuestionsSchema.optional(),
-    clarifyingAnswers: z.array(z.any()).optional(),
+    projectQuestions: projectQuestionsSchema.optional(),
   }),
   generateStatusUpdate: z.object({
     audience: z.string().optional(),
@@ -79,8 +78,7 @@ const toolSchemas = {
     projectConstraints: z.string().optional(),
     keyContacts: contactsSchema.optional(),
     sourceMaterial: z.string().optional(),
-    clarifyingQuestions: projectQuestionsSchema.optional(),
-    clarifyingAnswers: z.array(z.any()).optional(),
+    projectQuestions: projectQuestionsSchema.optional(),
     personaCount: z.number().optional(),
   }),
   generateContentAssets: z.object({

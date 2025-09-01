@@ -35,7 +35,7 @@ functions:
 - `generateCourseOutline`
 - `generateAssessment`
 - `generateLessonContent`
-- `generateClarifyingQuestions`
+- `generateProjectQuestions`
 - `generateProjectBrief`
 - `generateStatusUpdate`
 - `generateLearningStrategy`

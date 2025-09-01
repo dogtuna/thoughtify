@@ -439,7 +439,7 @@ export const sendQuestionEmail = onCall(
 
       await db.collection("users").doc(uid).set({}, { merge: true });
 
-      // Mark clarifying question as asked for the matching initiative/contact(s)
+      // Mark project question as asked for the matching initiative/contact(s)
       try {
         const userRecord = await auth.getUser(uid);
         const asker = userRecord?.displayName || userRecord?.email || "";
@@ -455,33 +455,38 @@ export const sendQuestionEmail = onCall(
           .get();
         for (const docSnap of initsSnap.docs) {
           const data = docSnap.data() || {};
-          const qArr = data.clarifyingQuestions || [];
+          const qArr = data.projectQuestions || [];
           if (qArr[questionId] === undefined) continue;
 
           const contacts = data.keyContacts || [];
-          const emailToName = new Map(
+          const emailToContact = new Map(
             contacts
               .filter((c) => c?.email)
-              .map((c) => [String(c.email).toLowerCase(), c.name])
+              .map((c) => [String(c.email).toLowerCase(), c])
           );
-          const matchedNames = emails
-            .map((e) => emailToName.get(e))
+          const matched = emails
+            .map((e) => emailToContact.get(e))
             .filter(Boolean);
-          if (!matchedNames.length) continue;
+          if (!matched.length) continue;
 
-          const askedArr = data.clarifyingAsked || [];
-          const ansArr = data.clarifyingAnswers || [];
-          const askedEntry = askedArr[questionId] || {};
-          const ansEntry = ansArr[questionId] || {};
+          const q = qArr[questionId] || {};
+          const askedEntry = q.asked || {};
+          const ansEntry = q.answers || {};
           const now = new Date().toISOString();
-          matchedNames.forEach((name) => {
-            askedEntry[name] = true;
-            ansEntry[name] = { ...(ansEntry[name] || {}), askedAt: now, askedBy: asker };
+          matched.forEach((contact) => {
+            if (!contact.id) return;
+            askedEntry[contact.id] = true;
+            ansEntry[contact.id] = {
+              ...(ansEntry[contact.id] || {}),
+              askedAt: now,
+              askedBy: asker,
+            };
           });
-          askedArr[questionId] = askedEntry;
-          ansArr[questionId] = ansEntry;
+          q.asked = askedEntry;
+          q.answers = ansEntry;
+          qArr[questionId] = q;
           await docSnap.ref.set(
-            { clarifyingAsked: askedArr, clarifyingAnswers: ansArr },
+            { projectQuestions: qArr },
             { merge: true }
           );
           break; // we found and updated the matching initiative
@@ -696,7 +701,7 @@ export const processInboundEmail = onRequest(
       }
     }
 
-    // 6) Update clarifying answers on the related initiative and surface the message
+    // 6) Update project question answers on the related initiative and surface the message
     const answeredAt = new Date().toISOString();
 
     // Best guess for the contact name corresponding to the reply
@@ -713,7 +718,7 @@ export const processInboundEmail = onRequest(
 
       for (const docSnap of initsSnap.docs) {
         const data = docSnap.data() || {};
-        const qArr = data.clarifyingQuestions || [];
+        const qArr = data.projectQuestions || [];
         if (qArr[questionId] === undefined) continue;
 
         const contacts = data.keyContacts || [];
@@ -725,28 +730,26 @@ export const processInboundEmail = onRequest(
         const name = matchedContact.name;
         const contactId = matchedContact.id || null;
 
-        const askedArr = data.clarifyingAsked || [];
-        const askedEntry = askedArr[questionId] || {};
-        if (!askedEntry[name]) continue; // question not asked for this initiative/contact
+        const q = qArr[questionId];
+        const askedEntry = q.asked || {};
+        if (!askedEntry[contactId]) continue; // question not asked for this initiative/contact
 
-        const aArr = data.clarifyingAnswers || [];
-        const existing = aArr[questionId] || {};
-        const existingForName = existing[name] || {};
-        aArr[questionId] = {
-          ...existing,
-          [name]: {
-            ...existingForName,
-            text: answerText,
-            answeredAt,
-            answeredBy: name,
-            contactId,
-          },
+        const answersEntry = q.answers || {};
+        const existingForId = answersEntry[contactId] || {};
+        answersEntry[contactId] = {
+          ...existingForId,
+          text: answerText,
+          answeredAt,
+          answeredBy: name,
+          contactId,
         };
-        askedEntry[name] = true;
-        askedArr[questionId] = askedEntry;
+        askedEntry[contactId] = true;
+        q.answers = answersEntry;
+        q.asked = askedEntry;
+        qArr[questionId] = q;
 
         await docSnap.ref.set(
-          { clarifyingAnswers: aArr, clarifyingAsked: askedArr },
+          { projectQuestions: qArr },
           { merge: true }
         );
 
@@ -756,7 +759,7 @@ export const processInboundEmail = onRequest(
         break; // stop after updating the matching initiative
       }
     } catch (err) {
-      console.error("Failed to update clarifying answers", err);
+      console.error("Failed to update project question answers", err);
     }
 
     const msgRef = await db
@@ -821,14 +824,17 @@ export const processInboundEmail = onRequest(
               .join(", ")}`,
           );
         }
-        const questionsArr = init.clarifyingQuestions || [];
-        const answersArr = init.clarifyingAnswers || [];
+        const questionsArr = init.projectQuestions || [];
         if (questionsArr.length) {
           const qa = questionsArr
-            .map((q, i) => {
-              const aMap = answersArr?.[i] || {};
+            .map((q) => {
+              const aMap = q.answers || {};
               const answers = Object.entries(aMap)
-                .map(([name, value]) => `${name}: ${value?.text || ""}`)
+                .map(([cid, value]) => {
+                  const contact = contacts.find((c) => c.id === cid);
+                  const name = contact?.name || cid;
+                  return `${name}: ${value?.text || ""}`;
+                })
                 .filter((s) => String(s).trim())
                 .join("; ");
               return answers ? `${q?.question || q}: ${answers}` : `${q?.question || q}`;
@@ -984,26 +990,23 @@ Respond ONLY in this JSON format:
             .set({ type: "suggestedTasks", count: FieldValue.increment(suggestedTasks.length), createdAt: FieldValue.serverTimestamp() }, { merge: true });
         }
 
-        // Persist question suggestions into clarifyingQuestions arrays
+        // Persist question suggestions into projectQuestions array
         const questionSuggestions = suggestions.filter((s) => s.category === "question");
         if (questionSuggestions.length) {
-          const newQs = questionSuggestions.map((s) => ({ question: s.text }));
-          const clarifyingQ = (init.clarifyingQuestions || []).slice();
-          const clarifyingAns = (init.clarifyingAnswers || []).slice();
-          const clarifyingAsked = (init.clarifyingAsked || []).slice();
-          for (const q of newQs) {
-            clarifyingQ.push(q);
-            clarifyingAns.push({});
-            clarifyingAsked.push({});
+          const projectQs = (init.projectQuestions || []).slice();
+          for (const s of questionSuggestions) {
+            projectQs.push({
+              id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              phase: "General",
+              question: s.text,
+              contacts: [],
+              answers: [],
+            });
           }
           await db
             .collection("users").doc(uid)
             .collection("initiatives").doc(initiativeId)
-            .set({
-              clarifyingQuestions: clarifyingQ,
-              clarifyingAnswers: clarifyingAns,
-              clarifyingAsked: clarifyingAsked,
-            }, { merge: true });
+            .set({ projectQuestions: projectQs }, { merge: true });
         }
 
         // Persist analysis and notify user of the new answer
