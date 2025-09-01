@@ -540,9 +540,11 @@ Generate Broader Strategic Questions: After you have created the theme-based que
 
 Format the Final Output: Assign each question to one of these phases: "The Core Problem & Vision", "The Current State", or "The Project Constraints".
 
+For each question, include which of the provided key contacts would be the best person to answer it. Only use names from the key contact list.
+
 Return a valid JSON object with the structure:{
   "projectQuestions": [
-    {"question":"text","phase":"The Core Problem & Vision"}
+    {"question":"text","phase":"The Core Problem & Vision","contacts":["Contact Name"]}
   ]
 }
 Do not include any code fences or additional formatting.
@@ -568,13 +570,37 @@ Source Material: ${sourceMaterial}${contactsInfo}`;
         throw new HttpsError("internal", "AI response missing project questions.");
       }
 
-      const projectQuestions = json.projectQuestions.map((q, idx) => ({
-        id: q.id || `Q${idx + 1}`,
-        phase: q.phase || "General",
-        question: typeof q === "string" ? q : q.question,
-        contacts: [],
-        answers: [],
-      }));
+      const projectQuestions = json.projectQuestions.map((q, idx) => {
+        const rawContacts = Array.isArray(q.contacts)
+          ? q.contacts
+          : Array.isArray(q.stakeholders)
+            ? q.stakeholders
+            : [];
+        const contacts = rawContacts.map((name) => {
+          const match = keyContacts.find(
+            (c) => c.name === name || c.id === name,
+          );
+          return match ? match.id : name;
+        });
+        const contactStatus = {};
+        contacts.forEach((cid) => {
+          contactStatus[cid] = {
+            current: "Ask",
+            history: [
+              { status: "Ask", timestamp: new Date().toISOString() },
+            ],
+            answers: [],
+          };
+        });
+        return {
+          id: q.id || `Q${idx + 1}`,
+          phase: q.phase || "General",
+          question: typeof q === "string" ? q : q.question,
+          contacts,
+          contactStatus,
+          answers: [],
+        };
+      });
 
       return { projectQuestions };
     } catch (error) {
