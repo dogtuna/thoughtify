@@ -2,20 +2,20 @@ import PropTypes from "prop-types";
 
 const EvidenceSlideOver = ({ hypothesis, onClose }) => {
   const allEvidence = [
-    ...(hypothesis.supportingEvidence || []).map((e) => ({ ...e, relation: "Supports" })),
-    ...(hypothesis.refutingEvidence || []).map((e) => ({ ...e, relation: "Refutes" })),
+    ...((hypothesis.evidence?.supporting || hypothesis.supportingEvidence || []).map((e) => ({ ...e, relation: "Supports" }))),
+    ...((hypothesis.evidence?.refuting || hypothesis.refutingEvidence || []).map((e) => ({ ...e, relation: "Refutes" }))),
   ];
   const sorted = allEvidence.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 
   let conflictBanner = null;
   if (
-    (hypothesis.supportingEvidence?.length || 0) > 0 &&
-    (hypothesis.refutingEvidence?.length || 0) > 0
+    (hypothesis.evidence?.supporting?.length || hypothesis.supportingEvidence?.length || 0) > 0 &&
+    (hypothesis.evidence?.refuting?.length || hypothesis.refutingEvidence?.length || 0) > 0
   ) {
-    const topSupport = [...(hypothesis.supportingEvidence || [])].sort(
+    const topSupport = [...(hypothesis.evidence?.supporting || hypothesis.supportingEvidence || [])].sort(
       (a, b) => Math.abs(b.delta) - Math.abs(a.delta)
     )[0];
-    const topRefute = [...(hypothesis.refutingEvidence || [])].sort(
+    const topRefute = [...(hypothesis.evidence?.refuting || hypothesis.refutingEvidence || [])].sort(
       (a, b) => Math.abs(b.delta) - Math.abs(a.delta)
     )[0];
     conflictBanner = (

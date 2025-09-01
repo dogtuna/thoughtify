@@ -1084,7 +1084,9 @@ Known Project Stakeholders:\n${contactsList}`;
             if (idx === -1) continue;
             const h = updated[idx];
             const baseScore = h.confidenceScore || 0;
-            const evidenceCount = (h.supportingEvidence?.length || 0) + (h.refutingEvidence?.length || 0);
+            const evidenceCount =
+              (h.evidence?.supporting?.length || h.supportingEvidence?.length || 0) +
+              (h.evidence?.refuting?.length || h.refutingEvidence?.length || 0);
             const diminishing = 1 / Math.max(1, evidenceCount * 0.5);
             const aw = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
             const tw = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
@@ -1093,12 +1095,12 @@ Known Project Stakeholders:\n${contactsList}`;
             const multiplier = String(link.relationship).toLowerCase() === "refutes" ? -1.5 : 1;
             const delta = weightedImpact * diminishing * multiplier;
             const newScore = baseScore + delta;
-            const key = String(link.relationship).toLowerCase() === "refutes" ? "refutingEvidence" : "supportingEvidence";
-              const entry = {
-                text: `Q: ${dhQuestion}\nA: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`,
-                analysisSummary: triage.analysisSummary || "",
-                impact: link.impact,
-                delta,
+            const key = String(link.relationship).toLowerCase() === "refutes" ? "refuting" : "supporting";
+            const entry = {
+              text: `Q: ${dhQuestion}\nA: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`,
+              analysisSummary: triage.analysisSummary || "",
+              impact: link.impact,
+              delta,
               source: respondent,
               sourceAuthority: link.sourceAuthority,
               evidenceType: link.evidenceType,
@@ -1107,9 +1109,10 @@ Known Project Stakeholders:\n${contactsList}`;
               timestamp: Date.now(),
               user: respondent,
             };
+            const existingEvidence = h.evidence?.[key] || h[`${key}Evidence`] || [];
             const updatedHyp = {
               ...h,
-              [key]: [...(h[key] || []), entry],
+              evidence: { ...(h.evidence || {}), [key]: [...existingEvidence, entry] },
               confidenceScore: newScore,
               confidence: logisticConfidence(newScore),
               auditLog: [...(h.auditLog || []), { timestamp: Date.now(), user: respondent, evidence: entry.text, weight: delta, message: `${(delta * 100).toFixed(0)} from ${respondent}` }],

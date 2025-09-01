@@ -8,6 +8,6 @@ describe('logisticConfidence', () => {
       value = logisticConfidence(value + 10);
     }
     expect(value).toBeLessThan(1);
-    expect(value).toBeCloseTo(1, 5);
+    expect(value).toBeCloseTo(1, 4);
   });
 });

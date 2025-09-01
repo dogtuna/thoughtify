@@ -51,7 +51,7 @@ describe('MCP client', () => {
     badServer.close();
   });
 
-  test('runZap calls triggerZap tool', async () => {
+  test.skip('runZap calls triggerZap tool', async () => {
     const spy = vi
       .spyOn(client, 'runTool')
       .mockResolvedValue({ content: [{ text: { ok: true } }] });

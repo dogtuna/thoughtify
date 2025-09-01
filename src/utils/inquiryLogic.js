@@ -20,7 +20,11 @@ const scoreFromImpact = (impact) => {
  */
 export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
   const hypothesesList = hypotheses
-    .map((h) => `${h.id}: ${h.statement || h.text || h.label || h.id}`)
+    .map((h) => {
+      const sup = (h.evidence?.supporting || h.supportingEvidence || []).length;
+      const ref = (h.evidence?.refuting || h.refutingEvidence || []).length;
+      return `${h.id}: ${h.statement || h.text || h.label || h.id} (Supports: ${sup}, Refutes: ${ref})`;
+    })
     .join("\n");
   
   const contactsList = (contacts || [])
@@ -81,7 +85,9 @@ export const calculateNewConfidence = (
   user
 ) => {
   const baseScore = hypothesis.confidenceScore ?? 0;
-  const evidenceCount = (hypothesis.supportingEvidence?.length || 0) + (hypothesis.refutingEvidence?.length || 0);
+  const evidenceCount =
+    (hypothesis.evidence?.supporting?.length || hypothesis.supportingEvidence?.length || 0) +
+    (hypothesis.evidence?.refuting?.length || hypothesis.refutingEvidence?.length || 0);
   const diminishingFactor = 1 / Math.max(1, evidenceCount * 0.5);
 
   const authorityWeight = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
@@ -109,11 +115,14 @@ export const calculateNewConfidence = (
     user,
   };
 
-  const key = link.relationship === "Supports" ? "supportingEvidence" : "refutingEvidence";
-  const updatedEvidence = [...(hypothesis[key] || []), newEvidenceEntry];
+  const key = link.relationship === "Supports" ? "supporting" : "refuting";
+  const existingEvidenceArr =
+    hypothesis.evidence?.[key] || hypothesis[`${key}Evidence`] || [];
+  const updatedEvidenceArr = [...existingEvidenceArr, newEvidenceEntry];
+  const updatedEvidence = { ...(hypothesis.evidence || {}), [key]: updatedEvidenceArr };
 
   // --- Corroboration Check ---
-  const existingSup = hypothesis.supportingEvidence || [];
+  const existingSup = hypothesis.evidence?.supporting || hypothesis.supportingEvidence || [];
   const beforeHasQuant = existingSup.some(e => e.evidenceType === "Quantitative");
   const beforeHasQual = existingSup.some(e => e.evidenceType === "Qualitative");
   const beforeSources = new Set(existingSup.map(e => e.source));
@@ -134,8 +143,9 @@ export const calculateNewConfidence = (
   let contested = hypothesis.contested || false;
   const extraRecommendations = [];
   if (link.sourceAuthority === "High") {
-    const oppositeKey = link.relationship === "Supports" ? "refutingEvidence" : "supportingEvidence";
-    const oppositeEvidence = hypothesis[oppositeKey] || [];
+    const oppositeKey = link.relationship === "Supports" ? "refuting" : "supporting";
+    const oppositeEvidence =
+      hypothesis.evidence?.[oppositeKey] || hypothesis[`${oppositeKey}Evidence`] || [];
     const highAuthorityConflict = oppositeEvidence.find(e => e.sourceAuthority === "High");
     if (highAuthorityConflict) {
       contested = true;
@@ -158,9 +168,12 @@ export const calculateNewConfidence = (
     message: `${deltaPct >= 0 ? '+' : ''}${(deltaPct * 100).toFixed(0)}% from ${link.source}`,
   };
 
+  const rest = { ...hypothesis };
+  delete rest.supportingEvidence;
+  delete rest.refutingEvidence;
   const updatedHypothesis = {
-    ...hypothesis,
-    [key]: updatedEvidence,
+    ...rest,
+    evidence: updatedEvidence,
     confidenceScore: newScore,
     confidence: newConfidence,
     contested,

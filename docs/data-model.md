@@ -2,7 +2,7 @@
 
 The application models project knowledge as an evidence graph. Core nodes include:
 
-- **Hypothesis** – a proposed explanation with `confidence`, `supportingEvidence`, `refutingEvidence`, and an append-only `auditLog` that records every change in confidence.
+- **Hypothesis** – a proposed explanation with `confidence`, `evidence.supporting`, `evidence.refuting`, and an append-only `auditLog` that records every change in confidence.
 - **Answer** – a stakeholder response to a question. Answers can contribute evidence toward hypotheses.
 - **Document** – source material such as briefs or transcripts that may yield evidence.
 - **MetricSnapshot** – quantitative observations captured at a point in time.

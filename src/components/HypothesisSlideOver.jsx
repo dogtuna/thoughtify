@@ -33,13 +33,13 @@ const HypothesisSlideOver = ({
   const [selectedEvidence, setSelectedEvidence] = useState(null);
 
   const evidenceCount =
-    (hypothesis.supportingEvidence?.length || 0) +
-    (hypothesis.refutingEvidence?.length || 0);
+    (hypothesis.evidence?.supporting?.length || hypothesis.supportingEvidence?.length || 0) +
+    (hypothesis.evidence?.refuting?.length || hypothesis.refutingEvidence?.length || 0);
   const pct = Math.round((hypothesis.confidence || 0) * 100);
   const titleId = hypothesis.displayId || hypothesis.id;
 
-  const supports = hypothesis.supportingEvidence || [];
-  const refutes = hypothesis.refutingEvidence || [];
+  const supports = hypothesis.evidence?.supporting || hypothesis.supportingEvidence || [];
+  const refutes = hypothesis.evidence?.refuting || hypothesis.refutingEvidence || [];
   const allEvidence = [
     ...supports.map((e) => ({ ...e, relation: "Supports" })),
     ...refutes.map((e) => ({ ...e, relation: "Refutes" })),

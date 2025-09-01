@@ -10,16 +10,17 @@ Each hypothesis in the inquiry map is represented with the following properties:
 - `statement` or `label` (string): Text description of the hypothesis.
 - `confidence` (number): Overall confidence value between 0 and 1.
 - `confidenceScore` (number, optional): Internal raw score used to compute `confidence` via a logistic transform.
-- `supportingEvidence` (array): Evidence items that support the hypothesis. Each item has:
-  - `text` (string): Source text.
-  - `analysisSummary` (string): Summary from the triage analysis.
-  - `impact` ("High" | "Medium" | "Low"): Impact assessment.
-  - `delta` (number): Contribution of the evidence toward confidence.
-  - `source` (string): Name or description of the source.
-  - `sourceAuthority` ("High" | "Medium" | "Low"): Authority level of the source.
-  - `evidenceType` ("Quantitative" | "Qualitative"): Nature of the evidence.
-  - `directness` ("Direct" | "Indirect"): How directly the evidence relates to the hypothesis.
-- `refutingEvidence` (array): Evidence items that refute the hypothesis with the same shape as `supportingEvidence`.
+- `evidence` (object): Evidence related to the hypothesis.
+  - `supporting` (array): Items that support the hypothesis. Each item has:
+    - `text` (string): Source text.
+    - `analysisSummary` (string): Summary from the triage analysis.
+    - `impact` ("High" | "Medium" | "Low"): Impact assessment.
+    - `delta` (number): Contribution of the evidence toward confidence.
+    - `source` (string): Name or description of the source.
+    - `sourceAuthority` ("High" | "Medium" | "Low"): Authority level of the source.
+    - `evidenceType` ("Quantitative" | "Qualitative"): Nature of the evidence.
+    - `directness` ("Direct" | "Indirect"): How directly the evidence relates to the hypothesis.
+  - `refuting` (array): Items that refute the hypothesis with the same shape as `evidence.supporting`.
 - `sourceContributions` (array): Breakdown of confidence contributions per evidence source. Each entry contains:
   - `source` (string): Text of the evidence source.
   - `percent` (number): Signed fractional contribution of that source to the overall confidence. Positive values indicate supporting evidence while negative values indicate refuting evidence.

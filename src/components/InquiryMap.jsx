@@ -35,8 +35,8 @@ const InquiryMap = ({ hypotheses = [] }) => {
           const trend = h.trend || 0;
           const up = trend > 0;
           const down = trend < 0;
-          const supports = h.supportingEvidence?.length || 0;
-          const refutes = h.refutingEvidence?.length || 0;
+          const supports = h.evidence?.supporting?.length || h.supportingEvidence?.length || 0;
+          const refutes = h.evidence?.refuting?.length || h.refutingEvidence?.length || 0;
           return (
             <li
               key={h.id}
