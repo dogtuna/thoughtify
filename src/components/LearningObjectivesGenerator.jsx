@@ -6,6 +6,7 @@ import { saveInitiative } from "../utils/initiatives.js";
 import { useProject } from "../context/ProjectContext.jsx";
 import PropTypes from "prop-types";
 import "./AIToolsGenerators.css";
+import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 
 const APPROACHES = [
   { value: "Bloom", label: "Bloom's Taxonomy" },
@@ -60,18 +61,20 @@ const LearningObjectivesGenerator = ({
     setLoading(true);
     setError("");
     try {
-      const { data } = await callGenerate({
-        projectBrief,
-        businessGoal,
-        audienceProfile,
-        projectConstraints,
-        keyContacts,
-        selectedModality,
-        blendModalities,
-        sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
-        approach,
-        bloomLevel,
-      });
+      const { data } = await callGenerate(
+        omitEmptyStrings({
+          projectBrief,
+          businessGoal,
+          audienceProfile,
+          projectConstraints,
+          keyContacts,
+          selectedModality,
+          blendModalities,
+          sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
+          approach,
+          bloomLevel,
+        })
+      );
       const result = {
         approach: data.approach,
         bloomLevel: data.bloomLevel,
@@ -110,22 +113,24 @@ const LearningObjectivesGenerator = ({
     setLoading(true);
     setError("");
     try {
-        const { data } = await callGenerate({
-          projectBrief,
-          businessGoal,
-          audienceProfile,
-          projectConstraints,
-          keyContacts,
-          selectedModality,
-          blendModalities,
-          sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
-          approach: learningObjectives.approach,
-          bloomLevel: learningObjectives.bloomLevel,
-        ...(learningObjectives.category
-          ? { category: learningObjectives.category }
-          : {}),
-        refresh: { type, index, existing: getAllTexts() },
-      });
+        const { data } = await callGenerate(
+          omitEmptyStrings({
+            projectBrief,
+            businessGoal,
+            audienceProfile,
+            projectConstraints,
+            keyContacts,
+            selectedModality,
+            blendModalities,
+            sourceMaterial: sourceMaterials.map((f) => f.content).join("\n"),
+            approach: learningObjectives.approach,
+            bloomLevel: learningObjectives.bloomLevel,
+            ...(learningObjectives.category
+              ? { category: learningObjectives.category }
+              : {}),
+            refresh: { type, index, existing: getAllTexts() },
+          })
+        );
       const obj = transform(data.options || []);
       setLearningObjectives((prev) => {
         const updated = { ...prev };
