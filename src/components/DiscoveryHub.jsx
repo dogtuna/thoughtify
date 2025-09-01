@@ -1952,7 +1952,7 @@ Respond ONLY in this JSON format:
       if (uid) {
         saveInitiative(uid, initiativeId, {
           projectQuestions: updated.map((q) => {
-            const rest = { ...q };
+            const rest = { ...q, contacts: q.contactIds };
             delete rest.contactNames;
             delete rest.idx;
             delete rest.answers;
@@ -2242,21 +2242,20 @@ Respond ONLY in this JSON format:
     return text;
   }
 
-  async function unmarkAsked(idx, name) {
+  async function unmarkAsked(idx, contactId) {
     let updatedQuestions = questions;
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
       if (q) {
-        const id = q.contactIds[q.contacts.indexOf(name)] || name;
-        if (q.asked[id] !== undefined) {
-          delete q.asked[id];
+        if (q.asked[contactId] !== undefined) {
+          delete q.asked[contactId];
         }
-        if (q.answers && q.answers[id]) {
-          delete q.answers[id];
+        if (q.answers && q.answers[contactId]) {
+          delete q.answers[contactId];
         }
-        if (q.contactStatus && q.contactStatus[id]) {
-          q.contactStatus[id] = initStatus();
+        if (q.contactStatus && q.contactStatus[contactId]) {
+          q.contactStatus[contactId] = initStatus();
         }
       }
       updatedQuestions = updated;
@@ -2300,8 +2299,9 @@ Respond ONLY in this JSON format:
     if (!activeComposer) return;
     const { idx, name: prev } = activeComposer;
     if (newName === prev) return;
-    unmarkAsked(idx, prev);
     const q = questions[idx];
+    const prevId = q.contactIds[q.contacts.indexOf(prev)] || prev;
+    unmarkAsked(idx, prevId);
     const id = q.contactIds[q.contacts.indexOf(newName)] || newName;
     markAsked(idx, [id]);
     const key = `${idx}-${newName}`;
@@ -2316,7 +2316,9 @@ Respond ONLY in this JSON format:
   };
 
   const cancelComposer = (idx, name) => {
-    unmarkAsked(idx, name);
+    const q = questions[idx];
+    const id = q.contactIds[q.contacts.indexOf(name)] || name;
+    unmarkAsked(idx, id);
     const key = `${idx}-${name}`;
     setAnswerDrafts((prev) => {
       const next = { ...prev };
