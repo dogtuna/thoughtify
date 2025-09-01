@@ -99,25 +99,16 @@ export default function NewInquiries({ user, openReplyModal }) {
       const project = inquiry.project || "General";
       if (questionCheck) {
         const init = await loadInitiative(user.uid, project);
-        const clarifyingQuestions = init?.clarifyingQuestions || [];
-        const clarifyingContacts = init?.clarifyingContacts || {};
-        const clarifyingAnswers = init?.clarifyingAnswers || [];
-        const clarifyingAsked = init?.clarifyingAsked || [];
-        const idx = clarifyingQuestions.length;
-        clarifyingQuestions.push({
-          question: inquiry.message,
-          stakeholders: [],
+        const projectQuestions = init?.projectQuestions || [];
+        const idx = projectQuestions.length;
+        projectQuestions.push({
+          id: `Q${idx + 1}`,
           phase: "General",
+          question: inquiry.message,
+          contacts: [inquiry.contactId || inquiry.name],
+          answers: [],
         });
-        clarifyingContacts[idx] = [inquiry.name];
-        clarifyingAnswers.push({});
-        clarifyingAsked.push({ [inquiry.name]: false });
-        await saveInitiative(user.uid, project, {
-          clarifyingQuestions,
-          clarifyingContacts,
-          clarifyingAnswers,
-          clarifyingAsked,
-        });
+        await saveInitiative(user.uid, project, { projectQuestions });
         await deleteDoc(doc(db, "inquiries", inquiry.id));
         setAllInquiries((prev) => prev.filter((item) => item.id !== inquiry.id));
         return;

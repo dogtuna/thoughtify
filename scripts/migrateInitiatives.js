@@ -13,16 +13,35 @@ async function migrateInitiatives() {
     for (const docSnap of initSnap.docs) {
       const data = docSnap.data();
 
-      const projectQuestions = (data.clarifyingQuestions || []).map((q, idx) => ({
-        ...(typeof q === "object" ? q : { question: q }),
-        answer: data.clarifyingAnswers ? data.clarifyingAnswers[idx] : undefined,
-        asked: data.clarifyingAsked ? data.clarifyingAsked[idx] : undefined,
-        contacts: data.clarifyingContacts
-          ? data.clarifyingContacts[idx]
-          : undefined,
-      }));
+      const contacts = (data.contacts || data.keyContacts || []).map(
+        (c, i) => ({ id: c.id || `C${i + 1}`, ...c }),
+      );
 
-      const contacts = data.contacts || data.keyContacts || [];
+      const projectQuestions = (data.clarifyingQuestions || []).map((q, idx) => {
+        const questionObj =
+          typeof q === "object" ? q : { question: q, phase: "General" };
+        const contactNames = data.clarifyingContacts
+          ? data.clarifyingContacts[idx] || []
+          : [];
+        const contactsIds = contactNames.map((n) => {
+          const match = contacts.find((c) => c.name === n);
+          return match?.id || n;
+        });
+        const rawAnswers = data.clarifyingAnswers
+          ? data.clarifyingAnswers[idx] || {}
+          : {};
+        const answers = Object.entries(rawAnswers).map(([name, val]) => ({
+          contactId: contacts.find((c) => c.name === name)?.id || name,
+          text: typeof val === "string" ? val : val?.text || "",
+        }));
+        return {
+          id: questionObj.id || `Q${idx + 1}`,
+          phase: questionObj.phase || "General",
+          question: questionObj.question,
+          contacts: contactsIds,
+          answers,
+        };
+      });
 
       const update = {
         audienceProfile: data.audienceProfile || "",

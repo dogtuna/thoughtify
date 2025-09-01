@@ -195,14 +195,14 @@ export const InquiryMapProvider = ({ children }) => {
           }
         }
 
-        const qList = data?.clarifyingQuestions || data?.questions || [];
-        const aList = data?.clarifyingAnswers || [];
-        for (let i = 0; i < qList.length; i++) {
-          const qItem = qList[i];
+        const qList = data?.projectQuestions || data?.questions || [];
+        for (const qItem of qList) {
           const questionText =
             typeof qItem === "string" ? qItem : qItem.question || "";
-          const answerMap = aList[i] || (qItem?.answers || {});
-          for (const ans of Object.values(answerMap)) {
+          const answersArray = Array.isArray(qItem?.answers)
+            ? qItem.answers
+            : Object.values(qItem?.answers || {});
+          for (const ans of answersArray) {
             const ansText =
               typeof ans === "string" ? ans : ans?.text || "";
             if (

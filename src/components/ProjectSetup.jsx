@@ -12,9 +12,9 @@ const ProjectSetup = () => {
   const navigate = useNavigate();
 
   const functions = getFunctions(app, "us-central1");
-  const generateClarifyingQuestions = httpsCallable(
+  const generateProjectQuestions = httpsCallable(
     functions,
-    "generateClarifyingQuestions"
+    "generateProjectQuestions"
   );
   const generateInitialInquiryMap = httpsCallable(
     functions,
@@ -199,67 +199,46 @@ const ProjectSetup = () => {
     setLoading(true);
     setError("");
     try {
-      const { data } = await generateClarifyingQuestions({
+      const { data } = await generateProjectQuestions({
         businessGoal,
         audienceProfile,
         sourceMaterial: getCombinedSource(),
         projectConstraints,
         keyContacts,
       });
-      const qsRaw = (data.clarifyingQuestions || []).slice(0, 9);
-      const qs = qsRaw.map((q) =>
-        typeof q === "string"
-          ? { question: q, stakeholders: [], phase: "General" }
-          : q
-      );
+      const qs = (data.projectQuestions || []).slice(0, 9);
       const uid = auth.currentUser?.uid;
-      if (uid) {
-        const contactsMap = Object.fromEntries(
-          qs.map((q, idx) => {
-            const names = (q.stakeholders || []).map((role) => {
-              const match = keyContacts.find((c) => c.role === role);
-              return match?.name || role;
-            });
-            return [idx, names];
-          })
-        );
-        const clarifyingAsked = qs.map((_, idx) => {
-          const names = contactsMap[idx] || [];
-          return Object.fromEntries(names.map((n) => [n, false]));
-        });
-        await saveInitiative(uid, initiativeId, {
-          projectName,
-          businessGoal,
-          audienceProfile,
-          sourceMaterials,
-          projectConstraints,
-          keyContacts,
-          clarifyingQuestions: qs,
-          clarifyingContacts: contactsMap,
-          clarifyingAnswers: qs.map(() => ({})),
-          clarifyingAsked,
-        });
-
-        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
-        try {
-          const mapResp = await generateInitialInquiryMap({
-            uid,
-            initiativeId,
-            brief,
-            documents: getCombinedSource(),
-            answers: "",
+        if (uid) {
+          await saveInitiative(uid, initiativeId, {
+            projectName,
+            businessGoal,
+            audienceProfile,
+            sourceMaterials,
+            projectConstraints,
+            keyContacts,
+            projectQuestions: qs,
           });
-          const hypotheses = mapResp?.data?.hypotheses || [];
-          setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
-          await new Promise((res) => setTimeout(res, 1000));
-        } catch (mapErr) {
-          console.error("Error generating inquiry map:", mapErr);
+
+          const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
+          try {
+            const mapResp = await generateInitialInquiryMap({
+              uid,
+              initiativeId,
+              brief,
+              documents: getCombinedSource(),
+              answers: "",
+            });
+            const hypotheses = mapResp?.data?.hypotheses || [];
+            setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
+            await new Promise((res) => setTimeout(res, 1000));
+          } catch (mapErr) {
+            console.error("Error generating inquiry map:", mapErr);
+          }
         }
-      }
       navigate(`/discovery?initiativeId=${initiativeId}`);
     } catch (err) {
-      console.error("Error generating clarifying questions:", err);
-      setError(err?.message || "Error generating clarifying questions.");
+      console.error("Error generating project questions:", err);
+      setError(err?.message || "Error generating project questions.");
     } finally {
       setLoading(false);
     }
