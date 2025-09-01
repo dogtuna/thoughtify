@@ -476,10 +476,13 @@ export const sendQuestionEmail = onCall(
           matched.forEach((contact) => {
             if (!contact.id) return;
             askedEntry[contact.id] = true;
+            const existing = ansEntry[contact.id] || {};
             ansEntry[contact.id] = {
-              ...(ansEntry[contact.id] || {}),
+              ...existing,
               askedAt: now,
               askedBy: asker,
+              currentStatus: "asked",
+              history: Array.isArray(existing.history) ? existing.history : [],
             };
           });
           q.asked = askedEntry;
@@ -736,12 +739,18 @@ export const processInboundEmail = onRequest(
 
         const answersEntry = q.answers || {};
         const existingForId = answersEntry[contactId] || {};
+        const history = Array.isArray(existingForId.history)
+          ? existingForId.history.slice()
+          : [];
+        history.push({ text: answerText, answeredAt, answeredBy: name });
         answersEntry[contactId] = {
           ...existingForId,
           text: answerText,
           answeredAt,
           answeredBy: name,
           contactId,
+          currentStatus: "answered",
+          history,
         };
         askedEntry[contactId] = true;
         q.answers = answersEntry;
