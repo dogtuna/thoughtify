@@ -16,6 +16,17 @@ export const projectQuestionSchema = z.object({
   answer: z.string().optional(),
   asked: z.record(z.boolean()).optional(),
   contacts: z.array(z.string()).optional(),
+  contactStatus: z
+    .record(
+      z.object({
+        current: z.string(),
+        history: z
+          .array(z.object({ status: z.string(), timestamp: z.string() }))
+          .optional(),
+        answers: z.array(z.any()).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const projectQuestionsSchema = z.array(projectQuestionSchema);
