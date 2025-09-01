@@ -1997,30 +1997,32 @@ Respond ONLY in this JSON format:
 
   const addContactByName = (name) => {
     if (!name) return;
-    const lower = name.toLowerCase();
-    if (contacts.some((c) => c.name.toLowerCase() === lower)) return;
-    const color = colorPalette[contacts.length % colorPalette.length];
-    const newContact = {
-      id: crypto.randomUUID(),
-      name,
-      jobTitle: "",
-      profile: "",
-      info: { email: "", slack: "", teams: "" },
-      color,
-    };
-    const updated = [...contacts, newContact];
-    setContacts(updated);
-    if (uid) {
-      saveInitiative(uid, initiativeId, {
-        keyContacts: updated.map(({ id, name, jobTitle, profile, info }) => ({
-          id,
-          name,
-          jobTitle,
-          profile,
-          info,
-        })),
-      });
-    }
+    setContacts((prev) => {
+      const lower = name.toLowerCase();
+      if (prev.some((c) => c.name.toLowerCase() === lower)) return prev;
+      const color = colorPalette[prev.length % colorPalette.length];
+      const newContact = {
+        id: crypto.randomUUID(),
+        name,
+        jobTitle: "",
+        profile: "",
+        info: { email: "", slack: "", teams: "" },
+        color,
+      };
+      const updated = [...prev, newContact];
+      if (uid) {
+        saveInitiative(uid, initiativeId, {
+          keyContacts: updated.map(({ id, name, jobTitle, profile, info }) => ({
+            id,
+            name,
+            jobTitle,
+            profile,
+            info,
+          })),
+        });
+      }
+      return updated;
+    });
   };
 
   const resolveSuggestionsForContacts = async (suggestions) => {
