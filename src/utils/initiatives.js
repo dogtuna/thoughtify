@@ -46,6 +46,18 @@ function deepMerge(target = {}, source = {}) {
   return output;
 }
 
+// Merge project questions by id so that updates to a single question
+// do not clobber the rest of the array. Each question's fields are
+// deep merged to preserve asked/answers/contactStatus history.
+function mergeQuestionArrays(existing = [], updates = []) {
+  const byId = Object.fromEntries(existing.map((q) => [q.id, q]));
+  updates.forEach((q) => {
+    if (!q || q.id === undefined) return;
+    byId[q.id] = deepMerge(byId[q.id] || {}, q);
+  });
+  return Object.values(byId);
+}
+
 export async function loadInitiatives(uid) {
   const initiativesRef = collection(db, "users", uid, "initiatives");
   const snap = await getDocs(initiativesRef);
@@ -62,7 +74,15 @@ export async function saveInitiative(uid, initiativeId, data) {
   const ref = doc(db, "users", uid, "initiatives", initiativeId);
   const snap = await getDoc(ref);
   const existing = snap.exists() ? snap.data() : {};
-  const merged = deepMerge(existing, data);
+  let toMerge = data;
+  if (data.projectQuestions) {
+    const mergedQuestions = mergeQuestionArrays(
+      existing.projectQuestions || [],
+      data.projectQuestions,
+    );
+    toMerge = { ...data, projectQuestions: mergedQuestions };
+  }
+  const merged = deepMerge(existing, toMerge);
   await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
   return initiativeId;
 }

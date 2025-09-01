@@ -1953,16 +1953,11 @@ Respond ONLY in this JSON format:
       q.answers = { ...q.answers, [contactId]: status.answers[status.answers.length - 1] };
       q.asked = { ...q.asked, [contactId]: true };
       if (uid) {
-        saveInitiative(uid, initiativeId, {
-          projectQuestions: updated.map((q) => {
-            const rest = { ...q, contacts: q.contactIds };
-            delete rest.contactNames;
-            delete rest.idx;
-            delete rest.answers;
-            delete rest.asked;
-            return rest;
-          }),
-        });
+        const saveQ = { ...q, contacts: q.contactIds };
+        delete saveQ.contactNames;
+        delete saveQ.contactIds;
+        delete saveQ.idx;
+        saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
       }
       return updated;
     });
@@ -2244,15 +2239,11 @@ Respond ONLY in this JSON format:
       return updated;
     });
     if (uid) {
-      await saveInitiative(uid, initiativeId, {
-        projectQuestions: updatedQuestions.map((q) => {
-          const rest = { ...q, contacts: q.contactIds };
-          delete rest.idx;
-          delete rest.answers;
-          delete rest.asked;
-          return rest;
-        }),
-      });
+      const q = updatedQuestions[idx];
+      const saveQ = { ...q, contacts: q.contactIds };
+      delete saveQ.idx;
+      delete saveQ.contactIds;
+      await saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
     }
     return text;
   }
@@ -2277,15 +2268,11 @@ Respond ONLY in this JSON format:
       return updated;
     });
     if (uid) {
-      await saveInitiative(uid, initiativeId, {
-        projectQuestions: updatedQuestions.map((q) => {
-          const rest = { ...q, contacts: q.contactIds };
-          delete rest.idx;
-          delete rest.answers;
-          delete rest.asked;
-          return rest;
-        }),
-      });
+      const q = updatedQuestions[idx];
+      const saveQ = { ...q, contacts: q.contactIds };
+      delete saveQ.idx;
+      delete saveQ.contactIds;
+      await saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
     }
   }
 
