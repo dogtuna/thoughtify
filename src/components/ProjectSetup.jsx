@@ -5,6 +5,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { functions, auth } from "../firebase";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
+import { generateQuestionId } from "../utils/questions.js";
 import "./AIToolsGenerators.css";
 
 const ProjectSetup = () => {
@@ -236,7 +237,7 @@ const ProjectSetup = () => {
         })
       );
       const qsRaw = (data.projectQuestions || []).slice(0, 9);
-      const qs = qsRaw.map((q, idx) => {
+      const qs = qsRaw.map((q) => {
         const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
           const match = keyContacts.find((c) => c.name === name || c.id === name);
           return match ? match.id : name;
@@ -246,7 +247,7 @@ const ProjectSetup = () => {
           statusMap[cid] = { current: "Ask", history: [{ status: "Ask", timestamp: new Date().toISOString() }], answers: [] };
         });
         return {
-          id: `Q${idx + 1}`,
+          id: generateQuestionId(),
           question: typeof q === "string" ? q : q.question,
           phase: q.phase || "General",
           contacts: contactIds,

@@ -15,6 +15,7 @@ import { db } from "../firebase";
 import { classifyTask, isQuestionTask } from "../utils/taskUtils";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import { useMcp } from "../context/McpContext";
+import { generateQuestionId } from "../utils/questions";
 
 const LRS_AUTH = "Basic " + btoa(import.meta.env.VITE_XAPI_BASIC_AUTH);
 const LRS_HEADERS = {
@@ -100,23 +101,22 @@ export default function NewInquiries({ user, openReplyModal }) {
       if (questionCheck) {
         const init = await loadInitiative(user.uid, project);
         const projectQuestions = init?.projectQuestions || [];
-        const idx = projectQuestions.length;
-        const cid = inquiry.contactId || inquiry.name;
-        projectQuestions.push({
-          id: `Q${idx + 1}`,
-          phase: "General",
-          question: inquiry.message,
-          contacts: [cid],
-          contactStatus: {
-            [cid]: {
-              current: "Ask",
-              history: [
-                { status: "Ask", timestamp: new Date().toISOString() },
-              ],
-              answers: [],
+          const cid = inquiry.contactId || inquiry.name;
+          projectQuestions.push({
+            id: generateQuestionId(),
+            phase: "General",
+            question: inquiry.message,
+            contacts: [cid],
+            contactStatus: {
+              [cid]: {
+                current: "Ask",
+                history: [
+                  { status: "Ask", timestamp: new Date().toISOString() },
+                ],
+                answers: [],
+              },
             },
-          },
-        });
+          });
         await saveInitiative(user.uid, project, { projectQuestions });
         await deleteDoc(doc(db, "inquiries", inquiry.id));
         setAllInquiries((prev) => prev.filter((item) => item.id !== inquiry.id));
