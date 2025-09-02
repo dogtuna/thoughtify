@@ -587,23 +587,19 @@ Source Material: ${sourceMaterial}${contactsInfo}`;
           );
           return match ? match.id : name;
         });
-        const contactStatus = {};
-        contacts.forEach((cid) => {
-          contactStatus[cid] = {
-            current: "Ask",
-            history: [
-              { status: "Ask", timestamp: new Date().toISOString() },
-            ],
-            answers: [],
-          };
-        });
+        const contactStatus = contacts.map((cid) => ({
+          contactId: cid,
+          currentStatus: "Ask",
+          askedAt: new Date().toISOString(),
+          askedBy: request.auth?.uid || null,
+          answers: [],
+        }));
         return {
           id: q.id || `Q${idx + 1}`,
           phase: q.phase || "General",
           question: typeof q === "string" ? q : q.question,
           contacts,
           contactStatus,
-          answers: [],
         };
       });
 
@@ -652,11 +648,13 @@ export const generateProjectBrief = onCall(
         : "";
     const clarificationsBlock = (() => {
       const pairs = projectQuestions.map((q) => {
-        const answersArray = Array.isArray(q.answers)
-          ? q.answers.map((a) => (typeof a === "string" ? a : a.text || ""))
-          : Object.values(q.answers || {}).map((a) =>
-              typeof a === "string" ? a : a?.text || "",
-            );
+        const answersArray = Array.isArray(q.contactStatus)
+          ? q.contactStatus.flatMap((cs) =>
+              (cs.answers || []).map((a) =>
+                typeof a === "string" ? a : a?.text || "",
+              ),
+            )
+          : [];
         return `Q: ${q?.question || ""}\nA: ${answersArray.join("; ")}`;
       });
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";
@@ -852,11 +850,13 @@ export const generateLearningStrategy = onCall(
 
     const clarificationsBlock = (() => {
       const pairs = projectQuestions.map((q) => {
-        const answersArray = Array.isArray(q.answers)
-          ? q.answers.map((a) => (typeof a === "string" ? a : a.text || ""))
-          : Object.values(q.answers || {}).map((a) =>
-              typeof a === "string" ? a : a?.text || "",
-            );
+        const answersArray = Array.isArray(q.contactStatus)
+          ? q.contactStatus.flatMap((cs) =>
+              (cs.answers || []).map((a) =>
+                typeof a === "string" ? a : a?.text || "",
+              ),
+            )
+          : [];
         return `Q: ${q?.question || ""}\nA: ${answersArray.join("; ")}`;
       });
       return pairs.length ? `\nClarifications:\n${pairs.join("\n")}` : "";

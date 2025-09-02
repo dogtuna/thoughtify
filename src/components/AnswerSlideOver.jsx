@@ -113,13 +113,15 @@ const AnswerSlideOver = ({
         {stage === "loading" && <p>Analyzing answer...</p>}
         {stage === "results" && (
           <>
-            {question.contactStatus?.[contact]?.answers?.length > 0 && (
+            {question.contactStatus?.find((cs) => cs.contactId === contact)?.answers?.length > 0 && (
               <details open>
                 <summary>Previous Answers</summary>
                 <ul>
-                  {question.contactStatus[contact].answers.map((a, i) => (
-                    <li key={i}>{a.text}</li>
-                  ))}
+                  {question.contactStatus
+                    .find((cs) => cs.contactId === contact)
+                    .answers.map((a, i) => (
+                      <li key={i}>{a.text}</li>
+                    ))}
                 </ul>
               </details>
             )}

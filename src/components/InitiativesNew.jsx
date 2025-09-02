@@ -557,20 +557,19 @@ const InitiativesNew = () => {
           const match = keyContacts.find((c) => c.name === name || c.id === name);
           return match ? match.id : name;
         });
-        const statusMap = {};
-        contactIds.forEach((cid) => {
-          statusMap[cid] = {
-            current: "Ask",
-            history: [{ status: "Ask", timestamp: new Date().toISOString() }],
-            answers: [],
-          };
-        });
+        const statusArr = contactIds.map((cid) => ({
+          contactId: cid,
+          currentStatus: "Ask",
+          askedAt: new Date().toISOString(),
+          askedBy: auth.currentUser?.uid || null,
+          answers: [],
+        }));
         return {
           id: `Q${idx + 1}`,
           question: q.question || q,
           phase: q.phase || "General",
           contacts: contactIds,
-          contactStatus: statusMap,
+          contactStatus: statusArr,
         };
       });
       await saveInitiative(uid, initiativeId, {
