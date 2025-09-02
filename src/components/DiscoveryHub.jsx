@@ -310,6 +310,30 @@ const DiscoveryHub = () => {
     }
   }, [searchParams, questions, openQAModal, focusQuestionCard]);
 
+  useEffect(() => {
+    const qId = searchParams.get("questionId");
+    const msgId = searchParams.get("messageId");
+    if (qId && msgId && questions.length && uid) {
+      const idx = questions.findIndex((q) => String(q.id) === String(qId));
+      if (idx !== -1) {
+        openQAModal(idx);
+        getDoc(doc(db, "users", uid, "messages", msgId)).then((snap) => {
+          const data = snap.data();
+          if (data) {
+            setAnalysisModal({
+              idx,
+              name: data.from || currentUserName,
+              loading: false,
+              analysis: data.analysis || "",
+              suggestions: data.suggestions || [],
+              selected: data.suggestions || [],
+            });
+          }
+        });
+      }
+    }
+  }, [searchParams, questions, uid, openQAModal, currentUserName]);
+
   const taskProjects = useMemo(() => {
     const set = new Set();
     projectTasks.forEach((t) => {
