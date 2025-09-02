@@ -126,10 +126,37 @@ export async function saveContentAssets(
 
 export async function deleteInitiative(uid, initiativeId) {
   const ref = doc(db, "users", uid, "initiatives", initiativeId);
+
+  // Fetch initiative data to collect hypothesis IDs for related notifications.
+  const initSnap = await getDoc(ref);
+  const init = initSnap.exists() ? initSnap.data() : {};
+  const hypothesisIds = new Set([
+    ...(init.hypotheses || []).map((h) => h.id),
+    ...(init.inquiryMap?.hypotheses || []).map((h) => h.id),
+    ...(init.suggestedHypotheses || []).map((h) => h.id),
+  ]);
+
   const statusRef = collection(ref, "statusUpdates");
   const snap = await getDocs(statusRef);
   const batch = writeBatch(db);
   snap.forEach((d) => batch.delete(d.ref));
+
+  // Remove notifications that reference this initiative.
+  const notifsRef = collection(db, "users", uid, "notifications");
+  const notifSnap = await getDocs(notifsRef);
+  notifSnap.forEach((n) => {
+    const data = n.data() || {};
+    const related =
+      data.initiativeId === initiativeId ||
+      (typeof data.href === "string" && data.href.includes(initiativeId)) ||
+      n.id === "suggestedTasks" ||
+      n.id === "suggestedHypotheses" ||
+      (n.id.startsWith("hyp-") && hypothesisIds.has(n.id.slice(4)));
+    if (related) {
+      batch.delete(n.ref);
+    }
+  });
+
   await batch.commit();
   await deleteDoc(ref);
 }
