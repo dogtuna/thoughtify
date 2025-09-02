@@ -1758,17 +1758,26 @@ Respond ONLY in this JSON format:
             contactsInit.map((c) => [c.id || c.name, c])
           );
           const qs = (init?.projectQuestions || []).map((q, idx) => {
-            const ids = q.contacts || [];
+            const statusArr = Array.isArray(q.contactStatus)
+              ? q.contactStatus
+              : Object.entries(q.contactStatus || {}).map(
+                  ([contactId, status]) => ({ contactId, ...status })
+                );
+            const ids = (q.contacts && q.contacts.length)
+              ? q.contacts
+              : statusArr.map((cs) => cs.contactId);
             const names = ids.map((cid) => contactMap[cid]?.name || cid);
+            const statusObj = Object.fromEntries(
+              statusArr.map((cs) => [cs.contactId, cs])
+            );
             const asked = {};
             const answers = {};
-            ids.forEach((id) => {
-              const status = q.contactStatus?.[id] || {};
-              asked[id] =
-                status.current === "Asked" || status.current === "Answered";
-              const last = status.answers?.[status.answers.length - 1];
+            statusArr.forEach((cs) => {
+              asked[cs.contactId] =
+                cs.currentStatus === "Asked" || cs.currentStatus === "Answered";
+              const last = cs.answers?.[cs.answers.length - 1];
               if (last) {
-                answers[id] = last;
+                answers[cs.contactId] = last;
               }
             });
             return {
@@ -1777,7 +1786,7 @@ Respond ONLY in this JSON format:
               idx,
               contacts: names,
               contactIds: ids,
-              contactStatus: q.contactStatus || {},
+              contactStatus: statusObj,
               asked,
               answers,
             };
@@ -1960,6 +1969,9 @@ Respond ONLY in this JSON format:
           delete saveQ.contactNames;
           delete saveQ.contactIds;
           delete saveQ.idx;
+          saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
+            ([cid, s]) => ({ contactId: cid, ...s })
+          );
           saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
         }
         return updatedQ;
@@ -2126,8 +2138,11 @@ Respond ONLY in this JSON format:
       const updated = [...prev];
       const q = updated[idx];
       if (!q.contacts.includes(name)) {
+        const id = contacts.find((c) => c.name === name)?.id || name;
         q.contacts = [...q.contacts, name];
-        q.asked = { ...q.asked, [name]: false };
+        q.contactIds = [...(q.contactIds || []), id];
+        q.asked = { ...q.asked, [id]: false };
+        q.contactStatus = { ...q.contactStatus, [id]: initStatus() };
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -2159,7 +2174,7 @@ Respond ONLY in this JSON format:
           delete q.asked[id];
         }
         if (q.contactStatus && q.contactStatus[id]) {
-          q.contactStatus[id] = initStatus();
+          delete q.contactStatus[id];
         }
       }
       if (uid) {
@@ -2248,6 +2263,9 @@ Respond ONLY in this JSON format:
       const saveQ = { ...q, contacts: q.contactIds };
       delete saveQ.idx;
       delete saveQ.contactIds;
+      saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
+        ([cid, s]) => ({ contactId: cid, ...s })
+      );
       await saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
     }
     return text;
@@ -2277,6 +2295,9 @@ Respond ONLY in this JSON format:
       const saveQ = { ...q, contacts: q.contactIds };
       delete saveQ.idx;
       delete saveQ.contactIds;
+      saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
+        ([cid, s]) => ({ contactId: cid, ...s })
+      );
       await saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
     }
   }
@@ -2678,22 +2699,22 @@ Respond ONLY in this JSON format:
     const askedIds = [];
     const answeredNames = [];
     const answeredIds = [];
-    q.contacts.forEach((name, i) => {
-      const id = q.contactIds?.[i] || name;
-      const ans = q.answers?.[id];
-      const text = typeof ans === "string" ? ans : ans?.text;
-      if (!q.asked?.[id]) {
-        toAskNames.push(name);
-        toAskIds.push(id);
-      } else if (typeof text === "string" && text.trim()) {
+    (q.contactIds || []).forEach((id, i) => {
+      const name = q.contacts?.[i] || id;
+      const status = q.contactStatus?.[id];
+      const cur = (status?.currentStatus || "").toLowerCase();
+      if (cur === "answered") {
         answeredNames.push(name);
         answeredIds.push(id);
-      } else {
+      } else if (cur === "asked") {
         askedNames.push(name);
         askedIds.push(id);
+      } else {
+        toAskNames.push(name);
+        toAskIds.push(id);
       }
     });
-    if (toAskNames.length || q.contacts.length === 0) {
+    if (toAskNames.length || (q.contactIds || []).length === 0) {
       items.push({
         ...q,
         idx,
