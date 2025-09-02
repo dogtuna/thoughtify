@@ -2319,15 +2319,18 @@ Respond ONLY in this JSON format:
 
   async function unmarkAsked(idx, contactId) {
     let updatedQuestions = questions;
+    let removed = { asked: false, answers: false };
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
       if (q) {
-        if (q.asked[contactId] !== undefined) {
+        if (q.asked && q.asked[contactId] !== undefined) {
           delete q.asked[contactId];
+          removed.asked = true;
         }
         if (q.answers && q.answers[contactId]) {
           delete q.answers[contactId];
+          removed.answers = true;
         }
         if (q.contactStatus && q.contactStatus[contactId]) {
           q.contactStatus[contactId] = initStatus();
@@ -2341,6 +2344,12 @@ Respond ONLY in this JSON format:
       const saveQ = { ...q, contacts: getContactIds(q) };
       delete saveQ.idx;
       delete saveQ.contactIds;
+      if (removed.asked) {
+        saveQ.asked = { ...(saveQ.asked || {}), [contactId]: null };
+      }
+      if (removed.answers) {
+        saveQ.answers = { ...(saveQ.answers || {}), [contactId]: null };
+      }
       saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
         ([cid, s]) => ({ contactId: cid, ...s })
       );
