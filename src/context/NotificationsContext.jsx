@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, updateDoc, doc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { computeUnreadCounts } from "./notificationUtils.js";
 
 const NotificationsContext = createContext();
 
@@ -26,14 +27,7 @@ export const NotificationsProvider = ({ children }) => {
         unsubNotif = onSnapshot(q, (snap) => {
           const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
           setNotifications(data);
-          const counts = data.reduce((acc, n) => {
-            const c = n.count || 0;
-            if (c > 0) {
-              acc[n.type] = (acc[n.type] || 0) + c;
-            }
-            return acc;
-          }, {});
-          setUnreadCounts(counts);
+          setUnreadCounts(computeUnreadCounts(data));
         });
       } else {
         setNotifications([]);

@@ -110,7 +110,7 @@ export default function DiscoverySidebar() {
           </li>
           <li>
             <Link to={makeUrl("/inquiry-map")}>
-              Inquiry Map {badge(unreadCounts.inquiry || unreadCounts.inquiryMap || 0)}
+              Inquiry Map {badge(unreadCounts.inquiry || 0)}
             </Link>
           </li>
           <li>
