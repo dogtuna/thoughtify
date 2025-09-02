@@ -17,6 +17,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { getToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
+import { generateQuestionId } from "../utils/questions.js";
 import ai, { generate } from "../ai";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import {
@@ -189,8 +190,8 @@ const DiscoveryHub = () => {
     // authoritative question object before opening the slide-over.
     e.preventDefault();
     e.stopPropagation();
-    const original = questions[q.idx] || q;
-    setAnswerPanel({ idx: q.idx, question: original });
+    const original = questions.find((qq) => qq.id === q.id) || q;
+    setAnswerPanel({ id: q.id, idx: q.idx, question: original });
   };
 
   useEffect(() => {
@@ -466,7 +467,7 @@ const DiscoveryHub = () => {
       subject,
       body,
       recipients: recipientIds,
-      questionIds: questionObjs.map((q) => q.idx),
+      questionIds: questionObjs.map((q) => q.id),
     };
   };
 
@@ -544,7 +545,7 @@ const DiscoveryHub = () => {
         (n) => contacts.find((c) => c.name === n)?.id || n
       );
       const drafts = ids.map((id) =>
-        generateDraft([id], [{ text: q.question, idx: q.idx }])
+        generateDraft([id], [{ text: q.question, id: q.id }])
       );
       startDraftQueue(drafts);
     };
@@ -841,7 +842,7 @@ Respond ONLY in this JSON format:
       subject: "Thank you for the information",
       body,
       recipients: [name],
-      questionIds: [idx],
+      questionIds: [questions[idx]?.id],
     };
     startDraftQueue([draft]);
   };
@@ -1645,9 +1646,9 @@ Respond ONLY in this JSON format:
     const text = (answerDrafts[key] || "").trim();
     if (text.length < 2) return;
     const q = questions[idx];
-    const id = q.contactIds[q.contacts.indexOf(name)] || name;
+    const contactIdVal = q.contactIds[q.contacts.indexOf(name)] || name;
     try {
-      updateAnswer(idx, id, text);
+      updateAnswer(q.id, contactIdVal, text);
       setAnswerDrafts((prev) => {
         const next = { ...prev };
         delete next[key];
@@ -1772,7 +1773,7 @@ Respond ONLY in this JSON format:
             });
             return {
               ...q,
-              id: q.id || idx,
+              id: q.id || generateQuestionId(),
               idx,
               contacts: names,
               contactIds: ids,
@@ -1936,29 +1937,33 @@ Respond ONLY in this JSON format:
     return () => unsub();
   }, [uid, initiativeId]);
 
-  const updateAnswer = (idx, contactId, text, analysis) => {
+  const updateAnswer = (id, contactId, text, analysis) => {
     setQuestions((prev) => {
-      const updated = [...prev];
-      const q = updated[idx];
-      const status = markAnswered(
-        q.contactStatus?.[contactId],
-        {
+      const updated = prev.map((q) => {
+        if (q.id !== id) return q;
+        const status = markAnswered(q.contactStatus?.[contactId], {
           text,
           analysis,
           answeredBy: currentUserName,
+        });
+        const updatedQ = {
+          ...q,
+          contactStatus: { ...q.contactStatus, [contactId]: status },
+          answers: {
+            ...q.answers,
+            [contactId]: status.answers[status.answers.length - 1],
+          },
+          asked: { ...q.asked, [contactId]: true },
+        };
+        if (uid) {
+          const saveQ = { ...updatedQ, contacts: updatedQ.contactIds };
+          delete saveQ.contactNames;
+          delete saveQ.contactIds;
+          delete saveQ.idx;
+          saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
         }
-      );
-      q.contactStatus = { ...q.contactStatus, [contactId]: status };
-      // maintain legacy fields for compatibility
-      q.answers = { ...q.answers, [contactId]: status.answers[status.answers.length - 1] };
-      q.asked = { ...q.asked, [contactId]: true };
-      if (uid) {
-        const saveQ = { ...q, contacts: q.contactIds };
-        delete saveQ.contactNames;
-        delete saveQ.contactIds;
-        delete saveQ.idx;
-        saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
-      }
+        return updatedQ;
+      });
       return updated;
     });
   };
@@ -2561,7 +2566,7 @@ Respond ONLY in this JSON format:
       const targets = s.names.length ? s.names : q.contacts;
       targets.forEach((n) => {
         if (!contactMap[n]) contactMap[n] = [];
-        contactMap[n].push({ text: q.question, idx: s.idx });
+        contactMap[n].push({ text: q.question, id: q.id });
       });
     });
     const allContacts = Object.keys(contactMap);
@@ -3202,6 +3207,7 @@ Respond ONLY in this JSON format:
       createPortal(
         <AnswerSlideOver
           question={answerPanel.question}
+          id={answerPanel.id}
           idx={answerPanel.idx}
           allContacts={contacts}
           currentUserName={currentUserName}
@@ -3684,6 +3690,7 @@ Respond ONLY in this JSON format:
       createPortal(
         <AnswerSlideOver
           question={answerPanel.question}
+          id={answerPanel.id}
           idx={answerPanel.idx}
           allContacts={contacts}
           currentUserName={currentUserName}

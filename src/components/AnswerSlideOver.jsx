@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 
 const AnswerSlideOver = ({
   question,
+  id,
   idx,
   allContacts,
   currentUserName,
@@ -33,7 +34,7 @@ const AnswerSlideOver = ({
     setAnalyzing(false);
     setAnalysis(result.analysis || "");
     setSuggestions(result.suggestions || []);
-    updateAnswer(idx, contact, text, result.analysis);
+      updateAnswer(id, contact, text, result.analysis);
     setStage("results");
   };
 
@@ -60,7 +61,7 @@ const AnswerSlideOver = ({
       assignees: [assignments[i] || currentUserName],
     }));
     if (chosen.length > 0) {
-      const added = await createTasks(idx, contact, chosen);
+        const added = await createTasks(idx, contact, chosen);
       if (added > 0) {
         setToast(`Added ${added} tasks.`);
       }
@@ -190,6 +191,7 @@ const AnswerSlideOver = ({
 
 AnswerSlideOver.propTypes = {
   question: PropTypes.object.isRequired,
+  id: PropTypes.string.isRequired,
   idx: PropTypes.number.isRequired,
   allContacts: PropTypes.array.isRequired,
   currentUserName: PropTypes.string.isRequired,

@@ -324,26 +324,18 @@ export const sendQuestionEmail = onCall(
       throw new HttpsError("invalid-argument", "Missing fields");
     }
 
-    const qIndex = Number(questionId);
-    if (isNaN(qIndex)) {
-      throw new HttpsError("invalid-argument", "QuestionId must be a numeric index.");
-    }
+    const qId = String(questionId);
 
     try {
-      const questionIndex = Number(questionId);
-      if (!Number.isInteger(questionIndex)) {
-        throw new HttpsError("invalid-argument", "Invalid question index");
-      }
-
-      const refToken = `Ref:QID${questionIndex}|UID${uid}`;
+      const refToken = `Ref:QID${qId}|UID${uid}`;
       const subjectWithRef = `${subject} [${refToken}]`;
-      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${questionIndex} UID${uid} -->`;
+      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${qId} UID${uid} -->`;
       const hmac = crypto
         .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
-        .update(`QID${questionIndex}_UID${uid}`)
+        .update(`QID${qId}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
-      const replyTo = `reply+QID${questionIndex}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
+      const replyTo = `reply+QID${qId}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
 
       let messageId = "";
 
@@ -435,7 +427,8 @@ export const sendQuestionEmail = onCall(
         for (const docSnap of initsSnap.docs) {
           const data = docSnap.data() || {};
           const qArr = data.projectQuestions || [];
-          if (qArr[questionIndex] === undefined) continue;
+          const qIdx = qArr.findIndex((q) => String(q.id) === qId);
+          if (qIdx === -1) continue;
 
           const contacts = data.keyContacts || [];
           const emailToContact = new Map(
@@ -451,7 +444,7 @@ export const sendQuestionEmail = onCall(
             .filter(Boolean);
           if (!matched.length) continue;
 
-          const q = qArr[questionIndex] || {};
+          const q = qArr[qIdx] || {};
           const askedEntry = q.asked || {};
           const ansEntry = q.answers || {};
           const statusEntry = q.contactStatus || {};
@@ -484,7 +477,7 @@ export const sendQuestionEmail = onCall(
           q.asked = askedEntry;
           q.answers = ansEntry;
           q.contactStatus = statusEntry;
-          qArr[questionIndex] = q;
+          qArr[qIdx] = q;
           await docSnap.ref.set(
             { projectQuestions: qArr },
             { merge: true }
@@ -611,28 +604,28 @@ export const processInboundEmail = onRequest(
     // Supported formats:
     //   A) QID123_UIDabc123_SIGdeadbeefcafebabe
     //   B) q123.uabc123   (from Reply-To: ref+q<id>.u<uid>@...)
-    let questionIndex = null, uid = null, sig = null;
+    let questionId = null, uid = null, sig = null;
 
-    let m = /^QID(\d+)_UID([A-Za-z0-9\-_]+)_SIG([a-f0-9]{16})$/i.exec(tag || "");
+    let m = /^QID([^_]+)_UID([A-Za-z0-9\-_]+)_SIG([a-f0-9]{16})$/i.exec(tag || "");
     if (m) {
-      questionIndex = parseInt(m[1], 10);
+      questionId = m[1];
       uid = m[2];
       sig = m[3];
     } else {
-      m = /^q(\d+)\.u(.+)$/i.exec(tag || "");
+      m = /^q([^\.]+)\.u(.+)$/i.exec(tag || "");
       if (m) {
-        questionIndex = parseInt(m[1], 10);
+        questionId = m[1];
         uid = m[2];
       }
     }
 
     // 3) Fallback to custom headers
-    if (!Number.isInteger(questionIndex) || !uid) {
+    if (!questionId || !uid) {
       const headerMap = Object.fromEntries(
         Headers.map((h) => [String(h.Name || "").toLowerCase(), h.Value])
       );
-      if (!Number.isInteger(questionIndex) && headerMap["x-question-id"]) {
-        questionIndex = parseInt(String(headerMap["x-question-id"]).trim(), 10);
+      if (!questionId && headerMap["x-question-id"]) {
+        questionId = String(headerMap["x-question-id"]).trim();
       }
       if (!uid && headerMap["x-user-id"]) {
         uid = String(headerMap["x-user-id"]).trim();
@@ -655,15 +648,9 @@ export const processInboundEmail = onRequest(
       StrippedTextReply || TextBody ||
       (HtmlBody ? HtmlBody.replace(/<[^>]+>/g, " ") : "");
 
-    if (
-      !Number.isInteger(questionIndex) ||
-      !uid ||
-      !fromEmail ||
-      !subject ||
-      !rawText
-    ) {
+    if (!questionId || !uid || !fromEmail || !subject || !rawText) {
       console.warn("Missing fields", {
-        questionIndex,
+        questionId,
         uid,
         from: !!fromEmail,
         subject: !!subject,
@@ -679,11 +666,11 @@ export const processInboundEmail = onRequest(
     if (sig) {
       const expected = crypto
         .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
-        .update(`QID${questionIndex}_UID${uid}`)
+        .update(`QID${questionId}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
       if (sig !== expected) {
-        console.warn("Bad signature", { questionIndex, uid });
+        console.warn("Bad signature", { questionId, uid });
         res.status(403).send({ status: "error", message: "Bad signature" });
         return;
       }
@@ -691,7 +678,7 @@ export const processInboundEmail = onRequest(
 
     // 5) Clean footer markers if present
     const cleaned = String(rawText)
-      .replace(/Ref:QID\d+\|UID[^\s]+/gi, "")
+      .replace(/Ref:QID[^\s]+\|UID[^\s]+/gi, "")
       .replace(/<!--\s*THOUGHTIFY_REF.*?-->/gis, "")
       .trim();
 
@@ -733,7 +720,8 @@ export const processInboundEmail = onRequest(
       for (const docSnap of initsSnap.docs) {
         const data = docSnap.data() || {};
         const qArr = data.projectQuestions || [];
-        if (qArr[questionIndex] === undefined) continue;
+        const qIdx = qArr.findIndex((q) => String(q.id) === questionId);
+        if (qIdx === -1) continue;
 
         const contacts = data.keyContacts || [];
         const matchedContact = contacts.find(
@@ -744,7 +732,7 @@ export const processInboundEmail = onRequest(
         const name = matchedContact.name;
         const contactId = matchedContact.id || null;
 
-        const q = qArr[questionIndex];
+        const q = qArr[qIdx];
         const askedEntry = q.asked || {};
         const key = contactId || name;
         let wasAsked = askedEntry[key];
@@ -773,7 +761,7 @@ export const processInboundEmail = onRequest(
         askedEntry[key] = true;
         q.answers = answersEntry;
         q.asked = askedEntry;
-        qArr[questionIndex] = q;
+        qArr[qIdx] = q;
 
         await docSnap.ref.set(
           { projectQuestions: qArr },
@@ -797,7 +785,7 @@ export const processInboundEmail = onRequest(
         subject,
         body: answerText,
         extra: extraText,
-        questionId: String(questionIndex),
+        questionId: String(questionId),
         createdAt: answeredAt,
         from: answeredBy,
         fromEmail: fromEmail,
@@ -885,7 +873,9 @@ export const processInboundEmail = onRequest(
           .join("\n");
 
         const dhQuestion =
-          questionsArr?.[questionIndex]?.question || subject || "Incoming answer";
+          questionsArr.find((q) => String(q.id) === questionId)?.question ||
+          subject ||
+          "Incoming answer";
         const respondent = answeredBy || fromEmail;
 
         const analysisPrompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
@@ -1012,7 +1002,7 @@ Respond ONLY in this JSON format:
                 taskType: s.taskType,
                 status: "pending",
                 createdAt: FieldValue.serverTimestamp(),
-                source: { kind: "email", questionIndex, respondent },
+                source: { kind: "email", questionId, respondent },
               })
             )
           );
@@ -1050,7 +1040,7 @@ Respond ONLY in this JSON format:
             .add({
               type: "answerReceived",
               message: "New answer received - Click to view analysis.",
-              questionId: String(questionIndex),
+              questionId: String(questionId),
               initiativeId,
               href: initiativeId
                 ? `/discovery?initiativeId=${initiativeId}`
