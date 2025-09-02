@@ -242,6 +242,28 @@ const DiscoveryHub = () => {
     [focusQuestionCard],
   );
 
+  const getContactIds = useCallback(
+    (q) =>
+      q.contactIds && q.contactIds.length
+        ? q.contactIds
+        : q.contacts.map(
+            (n) => contacts.find((c) => c.name === n)?.id || n,
+          ),
+    [contacts],
+  );
+
+  const getContactId = useCallback(
+    (q, name) => {
+      const idx = q.contacts.indexOf(name);
+      return (
+        q.contactIds?.[idx] ??
+        contacts.find((c) => c.name === name)?.id ??
+        name
+      );
+    },
+    [contacts],
+  );
+
   useEffect(() => {
     if (uid && initiativeId) {
       loadHypotheses(uid, initiativeId);
@@ -269,7 +291,7 @@ const DiscoveryHub = () => {
       const idx = parseInt(idxStr, 10);
       if (!Number.isNaN(idx) && questions[idx]) {
         const q = questions[idx];
-        const id = q.contactIds[q.contacts.indexOf(name)] || name;
+        const id = getContactId(q, name);
         setAnswerDrafts((prev) => ({
           ...prev,
           [key]: localStorage.getItem(`answerDraft_${key}`) || "",
@@ -435,11 +457,11 @@ const DiscoveryHub = () => {
     let open = 0;
     let answered = 0;
     questions.forEach((q) => {
-      if (q.contacts.length === 0) {
+      const ids = getContactIds(q);
+      if (ids.length === 0) {
         open++;
       } else {
-        q.contacts.forEach((_, i) => {
-          const id = q.contactIds?.[i] || q.contacts[i];
+        ids.forEach((id) => {
           const ans = q.answers?.[id];
           const text = typeof ans === "string" ? ans : ans?.text;
           if (typeof text === "string" && text.trim()) {
@@ -558,7 +580,7 @@ const DiscoveryHub = () => {
       console.warn("auth.currentUser is null when drafting email");
       return;
     }
-    const targets = q.contactIds || [];
+    const targets = getContactIds(q);
     if (!targets.length) return;
     const targetNames = targets.map((id) =>
       contacts.find((c) => c.id === id)?.name || id
@@ -1670,7 +1692,7 @@ Respond ONLY in this JSON format:
     const text = (answerDrafts[key] || "").trim();
     if (text.length < 2) return;
     const q = questions[idx];
-    const contactIdVal = q.contactIds[q.contacts.indexOf(name)] || name;
+    const contactIdVal = getContactId(q, name);
     try {
       updateAnswer(q.id, contactIdVal, text);
       setAnswerDrafts((prev) => {
@@ -2184,10 +2206,10 @@ Respond ONLY in this JSON format:
     setQuestions((prev) => {
       const updated = [...prev];
       const q = updated[idx];
+      const id = getContactId(q, name);
       const i = q.contacts.indexOf(name);
       q.contacts = q.contacts.filter((r) => r !== name);
       if (i !== -1) {
-        const id = q.contactIds?.[i] || name;
         if (q.contactIds) {
           q.contactIds = q.contactIds.filter((_, j) => j !== i);
         }
@@ -2265,7 +2287,7 @@ Respond ONLY in this JSON format:
       const updated = [...prev];
       const q = updated[idx];
       if (q) {
-        const targets = ids.length ? ids : q.contactIds;
+        const targets = ids.length ? ids : getContactIds(q);
         q.contactStatus = q.contactStatus || {};
         q.answers = q.answers || {};
         q.asked = q.asked || {};
@@ -2284,7 +2306,7 @@ Respond ONLY in this JSON format:
     });
     if (uid) {
       const q = updatedQuestions[idx];
-      const saveQ = { ...q, contacts: q.contactIds };
+      const saveQ = { ...q, contacts: getContactIds(q) };
       delete saveQ.idx;
       delete saveQ.contactIds;
       saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
@@ -2316,7 +2338,7 @@ Respond ONLY in this JSON format:
     });
     if (uid) {
       const q = updatedQuestions[idx];
-      const saveQ = { ...q, contacts: q.contactIds };
+      const saveQ = { ...q, contacts: getContactIds(q) };
       delete saveQ.idx;
       delete saveQ.contactIds;
       saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
@@ -2330,7 +2352,7 @@ Respond ONLY in this JSON format:
     try {
       const name = contactsList[0];
       const q = questions[idx];
-      const id = q.contactIds[q.contacts.indexOf(name)] || name;
+      const id = getContactId(q, name);
       markAsked(idx, [id]);
       const key = `${idx}-${name}`;
       const saved = localStorage.getItem(`answerDraft_${key}`);
@@ -2352,9 +2374,9 @@ Respond ONLY in this JSON format:
     const { idx, name: prev } = activeComposer;
     if (newName === prev) return;
     const q = questions[idx];
-    const prevId = q.contactIds[q.contacts.indexOf(prev)] || prev;
+    const prevId = getContactId(q, prev);
     unmarkAsked(idx, prevId);
-    const id = q.contactIds[q.contacts.indexOf(newName)] || newName;
+    const id = getContactId(q, newName);
     markAsked(idx, [id]);
     const key = `${idx}-${newName}`;
     const saved = localStorage.getItem(`answerDraft_${key}`);
@@ -2369,7 +2391,7 @@ Respond ONLY in this JSON format:
 
   const cancelComposer = (idx, name) => {
     const q = questions[idx];
-    const id = q.contactIds[q.contacts.indexOf(name)] || name;
+    const id = getContactId(q, name);
     unmarkAsked(idx, id);
     const key = `${idx}-${name}`;
     setAnswerDrafts((prev) => {
@@ -2723,7 +2745,8 @@ Respond ONLY in this JSON format:
     const askedIds = [];
     const answeredNames = [];
     const answeredIds = [];
-    (q.contactIds || []).forEach((id, i) => {
+    const ids = getContactIds(q);
+    ids.forEach((id, i) => {
       const name = q.contacts?.[i] || id;
       const status = q.contactStatus?.[id];
       const cur = (status?.currentStatus || "").toLowerCase();
@@ -2738,7 +2761,7 @@ Respond ONLY in this JSON format:
         toAskIds.push(id);
       }
     });
-    if (toAskNames.length || (q.contactIds || []).length === 0) {
+    if (toAskNames.length || ids.length === 0) {
       items.push({
         ...q,
         idx,
@@ -2769,7 +2792,7 @@ Respond ONLY in this JSON format:
 
   let filtered = items.filter(
     (q) =>
-      (!contactFilter || (q.contactIds || []).includes(contactFilter)) &&
+      (!contactFilter || q.contactIds.includes(contactFilter)) &&
       (!statusFilter || q.status === statusFilter)
   );
   sortUnassignedFirst(filtered);
@@ -2810,7 +2833,7 @@ Respond ONLY in this JSON format:
         const label = r && r !== "" ? r : "No Role";
         const namesForRole = [];
         const idsForRole = [];
-        (q.contactIds || []).forEach((id, i) => {
+        q.contactIds.forEach((id, i) => {
           const role = contacts.find((c) => c.id === id)?.jobTitle || "No Role";
           if (role === r) {
             namesForRole.push(q.contacts[i]);
@@ -3597,7 +3620,7 @@ Respond ONLY in this JSON format:
                       )}
                       {q.status !== "toask" &&
                         q.contacts.map((name, idxAns) => {
-                          const id = q.contactIds?.[idxAns] || name;
+                          const id = getContactId(q, name);
                           const key = `${q.idx}-${name}`;
                           const draft = answerDrafts[key];
                           const isActive =
@@ -3702,7 +3725,7 @@ Respond ONLY in this JSON format:
           <li
             onClick={async () => {
               const q = questions[menu.idx];
-              const id = q.contactIds[q.contacts.indexOf(menu.name)] || menu.name;
+              const id = getContactId(q, menu.name);
               await markAsked(menu.idx, [id]);
               setMenu(null);
             }}
