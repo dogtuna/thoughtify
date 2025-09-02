@@ -596,7 +596,7 @@ export const processInboundEmail = onRequest(
       uid = m[2];
       sig = m[3];
     } else {
-      m = /^q([^\.]+)\.u(.+)$/i.exec(tag || "");
+      m = /^q([^.]+)\.u(.+)$/i.exec(tag || "");
       if (m) {
         questionId = m[1];
         uid = m[2];
@@ -724,10 +724,14 @@ export const processInboundEmail = onRequest(
         let entry = statusArr.find(
           (cs) => cs.contactId === key || cs.contactId === name,
         );
-        if (!entry) continue; // question not asked for this initiative/contact
+        if (!entry) {
+          entry = { contactId: key, answers: [] };
+          statusArr.push(entry);
+        }
         entry.answers = Array.isArray(entry.answers) ? entry.answers : [];
         entry.answers.push({ text: answerText, answeredAt });
         entry.currentStatus = "answered";
+        q.contactStatus = statusArr;
         qArr[qIdx] = q;
 
         await docSnap.ref.set(
@@ -783,76 +787,80 @@ export const processInboundEmail = onRequest(
       console.error("notif increment failed", e);
     }
 
-    // Run analysis + suggestions + triage similar to Discovery Hub when we can resolve the initiative
-    if (initiativeId && GOOGLE_GENAI_API_KEY.value()) {
-      try {
-        const initSnap = await db
-          .collection("users")
-          .doc(uid)
-          .collection("initiatives")
-          .doc(initiativeId)
-          .get();
-        const init = initSnap.data() || {};
+    // Respond quickly to Postmark
+    res.status(200).send({ status: "ok" });
 
-        // Build project context
-        const contextPieces = [];
-        if (init.projectName) contextPieces.push(`Project Name: ${init.projectName}`);
-        if (init.businessGoal) contextPieces.push(`Business Goal: ${init.businessGoal}`);
-        if (init.audienceProfile)
-          contextPieces.push(`Audience Profile: ${init.audienceProfile}`);
-        if (init.projectConstraints)
-          contextPieces.push(`Project Constraints: ${init.projectConstraints}`);
-        const contacts = init.keyContacts || init.contacts || [];
-        if (contacts.length) {
-          contextPieces.push(
-            `Key Contacts: ${contacts
-              .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
-              .join(", ")}`,
-          );
-        }
-        const questionsArr = init.projectQuestions || [];
-        if (questionsArr.length) {
-          const qa = questionsArr
-            .map((q) => {
-              const answers = Array.isArray(q.contactStatus)
-                ? q.contactStatus
-                    .map((cs) => {
-                      const contact = contacts.find((c) => c.id === cs.contactId);
-                      const name = contact?.name || cs.contactId;
-                      const texts = (cs.answers || [])
-                        .map((a) => a?.text || "")
-                        .filter((s) => String(s).trim())
-                        .join("; ");
-                      return texts ? `${name}: ${texts}` : null;
-                    })
-                    .filter(Boolean)
-                    .join("; ")
-                : "";
-              return answers
-                ? `${q?.question || q}: ${answers}`
-                : `${q?.question || q}`;
-            })
+    // Continue heavy processing asynchronously
+    (async () => {
+      if (initiativeId && GOOGLE_GENAI_API_KEY.value()) {
+        try {
+          const initSnap = await db
+            .collection("users")
+            .doc(uid)
+            .collection("initiatives")
+            .doc(initiativeId)
+            .get();
+          const init = initSnap.data() || {};
+
+          // Build project context
+          const contextPieces = [];
+          if (init.projectName) contextPieces.push(`Project Name: ${init.projectName}`);
+          if (init.businessGoal) contextPieces.push(`Business Goal: ${init.businessGoal}`);
+          if (init.audienceProfile)
+            contextPieces.push(`Audience Profile: ${init.audienceProfile}`);
+          if (init.projectConstraints)
+            contextPieces.push(`Project Constraints: ${init.projectConstraints}`);
+          const contacts = init.keyContacts || init.contacts || [];
+          if (contacts.length) {
+            contextPieces.push(
+              `Key Contacts: ${contacts
+                .map((c) => `${c.name}${c.role ? ` (${c.role})` : ""}`)
+                .join(", ")}`,
+            );
+          }
+          const questionsArr = init.projectQuestions || [];
+          if (questionsArr.length) {
+            const qa = questionsArr
+              .map((q) => {
+                const answers = Array.isArray(q.contactStatus)
+                  ? q.contactStatus
+                      .map((cs) => {
+                        const contact = contacts.find((c) => c.id === cs.contactId);
+                        const name = contact?.name || cs.contactId;
+                        const texts = (cs.answers || [])
+                          .map((a) => a?.text || "")
+                          .filter((s) => String(s).trim())
+                          .join("; ");
+                        return texts ? `${name}: ${texts}` : null;
+                      })
+                      .filter(Boolean)
+                      .join("; ")
+                  : "";
+                return answers
+                  ? `${q?.question || q}: ${answers}`
+                  : `${q?.question || q}`;
+              })
+              .join("\n");
+            contextPieces.push(`Existing Q&A:\n${qa}`);
+          }
+          const documents = init.sourceMaterials || [];
+          if (Array.isArray(documents) && documents.length) {
+            const docs = documents.map((d) => `${d.name}:\n${d.content || ""}`).join("\n");
+            contextPieces.push(`Source Materials:\n${docs}`);
+          }
+          const projectContext = contextPieces.join("\n\n");
+          const hypotheses = (init.inquiryMap && init.inquiryMap.hypotheses) || init.hypotheses || [];
+          const hypothesisList = hypotheses
+            .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
             .join("\n");
-          contextPieces.push(`Existing Q&A:\n${qa}`);
-        }
-        const documents = init.sourceMaterials || [];
-        if (Array.isArray(documents) && documents.length) {
-          const docs = documents.map((d) => `${d.name}:\n${d.content || ""}`).join("\n");
-          contextPieces.push(`Source Materials:\n${docs}`);
-        }
-        const projectContext = contextPieces.join("\n\n");
-        const hypotheses = (init.inquiryMap && init.inquiryMap.hypotheses) || init.hypotheses || [];
-        const hypothesisList = hypotheses
-          .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
-          .join("\n");
 
-        const dhQuestion =
-          questionsArr.find((q) => String(q.id) === questionId)?.question ||
-          subject ||
-          "Incoming answer";
-        const respondent = answeredBy || fromEmail;
+          const dhQuestion =
+            questionsArr.find((q) => String(q.id) === questionId)?.question ||
+            subject ||
+            "Incoming answer";
+          const respondent = answeredBy || fromEmail;
 
-        const analysisPrompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
+          const analysisPrompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 
 Project Context:
 ${projectContext}
@@ -880,56 +888,20 @@ Please provide a JSON object with two fields:
 Respond ONLY in this JSON format:
 {"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "...", "hypothesisId": "A", "taskType": "validate"}, ...]}`;
 
-        const key = GOOGLE_GENAI_API_KEY.value();
-        const ai = genkit({ plugins: [googleAI({ apiKey: key })], model: gemini("gemini-1.5-pro") });
-        const { text: aiText } = await ai.generate(analysisPrompt);
-        let parsed;
-        try {
-          parsed = JSON.parse(aiText);
-        } catch {
-          const m = aiText && aiText.match(/\{[\s\S]*\}/);
-          if (m) parsed = JSON.parse(m[0]);
-        }
-        const allowedCategories = ["question", "meeting", "email", "research", "instructional-design"];
-        const allowedTaskTypes = ["validate", "refute", "explore"];
-        const suggestions = Array.isArray(parsed?.suggestions)
-          ? parsed.suggestions
-              .filter(
-                (s) =>
-                  s &&
-                  typeof s.text === "string" &&
-                  typeof s.category === "string" &&
-                  typeof s.who === "string" &&
-                  allowedCategories.includes(s.category.toLowerCase())
-              )
-              .map((s) => ({
-                text: s.text,
-                category: s.category.toLowerCase(),
-                who: s.who,
-                hypothesisId:
-                  typeof s.hypothesisId === "string" && s.hypothesisId.trim()
-                    ? s.hypothesisId.trim()
-                    : null,
-                taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase())
-                  ? s.taskType.toLowerCase()
-                  : "explore",
-              }))
-          : [];
-
-        // If the email contained additional commentary, analyze it separately for suggestions
-        if (extraText) {
+          const key = GOOGLE_GENAI_API_KEY.value();
+          const ai = genkit({ plugins: [googleAI({ apiKey: key })], model: gemini("gemini-1.5-pro") });
+          const { text: aiText } = await ai.generate(analysisPrompt);
+          let parsed;
           try {
-            const extraPrompt = `You are an expert Instructional Designer and Performance Consultant. Review the following unprompted additional information from ${respondent} for possible follow-up actions.\n\nProject Context:\n${projectContext}\n\nExisting Hypotheses:\n${hypothesisList}\n\nInformation:\n${extraText}\n\nRespond ONLY in the JSON format used previously.`;
-            const { text: extraAiText } = await ai.generate(extraPrompt);
-            let extraParsed;
-            try {
-              extraParsed = JSON.parse(extraAiText);
-            } catch {
-              const m2 = extraAiText && extraAiText.match(/\{[\s\S]*\}/);
-              if (m2) extraParsed = JSON.parse(m2[0]);
-            }
-            if (Array.isArray(extraParsed?.suggestions)) {
-              const extraSuggestions = extraParsed.suggestions
+            parsed = JSON.parse(aiText);
+          } catch {
+            const m = aiText && aiText.match(/\{[\s\S]*\}/);
+            if (m) parsed = JSON.parse(m[0]);
+          }
+          const allowedCategories = ["question", "meeting", "email", "research", "instructional-design"];
+          const allowedTaskTypes = ["validate", "refute", "explore"];
+          const suggestions = Array.isArray(parsed?.suggestions)
+            ? parsed.suggestions
                 .filter(
                   (s) =>
                     s &&
@@ -949,97 +921,133 @@ Respond ONLY in this JSON format:
                   taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase())
                     ? s.taskType.toLowerCase()
                     : "explore",
-                }));
-              suggestions.push(...extraSuggestions);
+                }))
+            : [];
+
+          // If the email contained additional commentary, analyze it separately for suggestions
+          if (extraText) {
+            try {
+              const extraPrompt = `You are an expert Instructional Designer and Performance Consultant. Review the following unprompted additional information from ${respondent} for possible follow-up actions.\n\nProject Context:\n${projectContext}\n\nExisting Hypotheses:\n${hypothesisList}\n\nInformation:\n${extraText}\n\nRespond ONLY in the JSON format used previously.`;
+              const { text: extraAiText } = await ai.generate(extraPrompt);
+              let extraParsed;
+              try {
+                extraParsed = JSON.parse(extraAiText);
+              } catch {
+                const m2 = extraAiText && extraAiText.match(/\{[\s\S]*\}/);
+                if (m2) extraParsed = JSON.parse(m2[0]);
+              }
+              if (Array.isArray(extraParsed?.suggestions)) {
+                const extraSuggestions = extraParsed.suggestions
+                  .filter(
+                    (s) =>
+                      s &&
+                      typeof s.text === "string" &&
+                      typeof s.category === "string" &&
+                      typeof s.who === "string" &&
+                      allowedCategories.includes(s.category.toLowerCase())
+                  )
+                  .map((s) => ({
+                    text: s.text,
+                    category: s.category.toLowerCase(),
+                    who: s.who,
+                    hypothesisId:
+                      typeof s.hypothesisId === "string" && s.hypothesisId.trim()
+                        ? s.hypothesisId.trim()
+                        : null,
+                    taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase())
+                      ? s.taskType.toLowerCase()
+                      : "explore",
+                  }));
+                suggestions.push(...extraSuggestions);
+              }
+            } catch (err) {
+              console.error("extra analysis failed", err);
             }
-          } catch (err) {
-            console.error("extra analysis failed", err);
           }
-        }
 
-        // Persist suggested tasks (non-question)
-        const suggestedTasks = suggestions.filter((s) => s.category !== "question");
-        if (suggestedTasks.length) {
-          const tasksCol = db
-            .collection("users")
-            .doc(uid)
-            .collection("initiatives")
-            .doc(initiativeId)
-            .collection("suggestedTasks");
-          await Promise.all(
-            suggestedTasks.map((s) =>
-              tasksCol.add({
-                message: s.text,
-                subType: s.category,
-                who: s.who,
-                hypothesisId: s.hypothesisId || null,
-                taskType: s.taskType,
-                status: "pending",
+          // Persist suggested tasks (non-question)
+          const suggestedTasks = suggestions.filter((s) => s.category !== "question");
+          if (suggestedTasks.length) {
+            const tasksCol = db
+              .collection("users")
+              .doc(uid)
+              .collection("initiatives")
+              .doc(initiativeId)
+              .collection("suggestedTasks");
+            await Promise.all(
+              suggestedTasks.map((s) =>
+                tasksCol.add({
+                  message: s.text,
+                  subType: s.category,
+                  who: s.who,
+                  hypothesisId: s.hypothesisId || null,
+                  taskType: s.taskType,
+                  status: "pending",
+                  createdAt: FieldValue.serverTimestamp(),
+                  source: { kind: "email", questionId, respondent },
+                })
+              )
+            );
+            await db
+              .collection("users").doc(uid)
+              .collection("notifications").doc("suggestedTasks")
+              .set({ type: "suggestedTasks", count: FieldValue.increment(suggestedTasks.length), createdAt: FieldValue.serverTimestamp() }, { merge: true });
+          }
+
+          // Persist question suggestions into projectQuestions array
+          const questionSuggestions = suggestions.filter((s) => s.category === "question");
+          if (questionSuggestions.length) {
+            const projectQs = (init.projectQuestions || []).slice();
+            for (const s of questionSuggestions) {
+              projectQs.push({
+                id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                phase: "General",
+                question: s.text,
+                contacts: [],
+                contactStatus: [],
+              });
+            }
+            await db
+              .collection("users").doc(uid)
+              .collection("initiatives").doc(initiativeId)
+              .set({ projectQuestions: projectQs }, { merge: true });
+          }
+
+          // Persist analysis and notify user of the new answer
+          try {
+            await msgRef.set({ analysis: parsed?.analysis || "", suggestions }, { merge: true });
+            await db
+              .collection("users").doc(uid)
+              .collection("notifications")
+              .add({
+                type: "answerReceived",
+                message: "New answer received - Click to view analysis.",
+                questionId: String(questionId),
+                initiativeId,
+                href: initiativeId
+                  ? `/discovery?initiativeId=${initiativeId}`
+                  : undefined,
+                messageId: msgRef.id,
                 createdAt: FieldValue.serverTimestamp(),
-                source: { kind: "email", questionId, respondent },
-              })
-            )
-          );
-          await db
-            .collection("users").doc(uid)
-            .collection("notifications").doc("suggestedTasks")
-            .set({ type: "suggestedTasks", count: FieldValue.increment(suggestedTasks.length), createdAt: FieldValue.serverTimestamp() }, { merge: true });
-        }
-
-        // Persist question suggestions into projectQuestions array
-        const questionSuggestions = suggestions.filter((s) => s.category === "question");
-        if (questionSuggestions.length) {
-          const projectQs = (init.projectQuestions || []).slice();
-          for (const s of questionSuggestions) {
-            projectQs.push({
-              id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              phase: "General",
-              question: s.text,
-              contacts: [],
-              contactStatus: [],
-            });
+                count: 1,
+              });
+          } catch (err) {
+            console.error("failed to record analysis notification", err);
           }
-          await db
-            .collection("users").doc(uid)
-            .collection("initiatives").doc(initiativeId)
-            .set({ projectQuestions: projectQs }, { merge: true });
-        }
 
-        // Persist analysis and notify user of the new answer
-        try {
-          await msgRef.set({ analysis: parsed?.analysis || "", suggestions }, { merge: true });
-          await db
-            .collection("users").doc(uid)
-            .collection("notifications")
-            .add({
-              type: "answerReceived",
-              message: "New answer received - Click to view analysis.",
-              questionId: String(questionId),
-              initiativeId,
-              href: initiativeId
-                ? `/discovery?initiativeId=${initiativeId}`
-                : undefined,
-              messageId: msgRef.id,
-              createdAt: FieldValue.serverTimestamp(),
-              count: 1,
-            });
-        } catch (err) {
-          console.error("failed to record analysis notification", err);
-        }
-
-        // Triage evidence to update hypothesis confidences and suggest new hypotheses
-        const triagePrompt = (() => {
-          const hypothesesList = hypotheses
-            .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
-            .join("\n");
-          const contactsList = (contacts || [])
-            .map((c) => `${c.name} (${c.role || "Unknown Role"})`)
-            .join(", ");
-          return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
+          // Triage evidence to update hypothesis confidences and suggest new hypotheses
+          const triagePrompt = (() => {
+            const hypothesesList = hypotheses
+              .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
+              .join("\n");
+            const contactsList = (contacts || [])
+              .map((c) => `${c.name} (${c.role || "Unknown Role"})`)
+              .join(", ");
+            return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
 
 Respond ONLY in the following JSON format:
-{
-  "analysisSummary": "...",
+{ 
+  "analysisSummary": "...", 
   "hypothesisLinks": [
     {"hypothesisId":"A","relationship":"Supports","impact":"High","source":"${respondent}","sourceAuthority":"Medium","evidenceType":"Qualitative","directness":"Direct"}
   ],
@@ -1052,131 +1060,130 @@ New Evidence:\nQuestion: ${dhQuestion}\nAnswer: ${answerText}${extraText ? `\nAd
 Existing Hypotheses:\n${hypothesesList}
 
 Known Project Stakeholders:\n${contactsList}`;
-        })();
-        let triage;
-        try {
-          const { text: triageText } = await ai.generate(triagePrompt);
-          triage = JSON.parse(triageText);
-        } catch {
-          triage = null;
-        }
-        if (triage && Array.isArray(triage.hypothesisLinks)) {
-          const AUTHORITY_WEIGHT = { High: 2.0, Medium: 1.0, Low: 0.5 };
-          const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.5, Qualitative: 0.8 };
-          const DIRECTNESS_WEIGHT = { Direct: 1.5, Indirect: 0.7 };
-          const scoreFromImpact = (impact) => (impact === "High" ? 0.2 : impact === "Medium" ? 0.1 : 0.05);
-          const logisticConfidence = (raw, slope = 1.0) => 1 / (1 + Math.exp(-slope * raw));
-
-          const updated = [...hypotheses];
-          const before = new Map(updated.map((h) => [h.id, h.confidence || 0]));
-          for (const link of triage.hypothesisLinks) {
-            const idx = updated.findIndex((h) => h.id === link.hypothesisId);
-            if (idx === -1) continue;
-            const h = updated[idx];
-            const baseScore = h.confidenceScore || 0;
-            const evidenceCount =
-              (h.evidence?.supporting?.length || h.supportingEvidence?.length || 0) +
-              (h.evidence?.refuting?.length || h.refutingEvidence?.length || 0);
-            const diminishing = 1 / Math.max(1, evidenceCount * 0.5);
-            const aw = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
-            const tw = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
-            const dw = DIRECTNESS_WEIGHT[link.directness] || 1;
-            const weightedImpact = scoreFromImpact(link.impact) * aw * tw * dw;
-            const multiplier = String(link.relationship).toLowerCase() === "refutes" ? -1.5 : 1;
-            const delta = weightedImpact * diminishing * multiplier;
-            const newScore = baseScore + delta;
-            const key = String(link.relationship).toLowerCase() === "refutes" ? "refuting" : "supporting";
-            const entry = {
-              text: `Q: ${dhQuestion}\nA: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`,
-              analysisSummary: triage.analysisSummary || "",
-              impact: link.impact,
-              delta,
-              source: respondent,
-              sourceAuthority: link.sourceAuthority,
-              evidenceType: link.evidenceType,
-              directness: link.directness,
-              relationship: link.relationship,
-              timestamp: Date.now(),
-              user: respondent,
-            };
-            const existingEvidence = h.evidence?.[key] || h[`${key}Evidence`] || [];
-            const updatedHyp = {
-              ...h,
-              evidence: { ...(h.evidence || {}), [key]: [...existingEvidence, entry] },
-              confidenceScore: newScore,
-              confidence: logisticConfidence(newScore),
-              auditLog: [...(h.auditLog || []), { timestamp: Date.now(), user: respondent, evidence: entry.text, weight: delta, message: `${(delta * 100).toFixed(0)} from ${respondent}` }],
-            };
-            updated[idx] = updatedHyp;
+          })();
+          let triage;
+          try {
+            const { text: triageText } = await ai.generate(triagePrompt);
+            triage = JSON.parse(triageText);
+          } catch {
+            triage = null;
           }
+          if (triage && Array.isArray(triage.hypothesisLinks)) {
+            const AUTHORITY_WEIGHT = { High: 2.0, Medium: 1.0, Low: 0.5 };
+            const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.5, Qualitative: 0.8 };
+            const DIRECTNESS_WEIGHT = { Direct: 1.5, Indirect: 0.7 };
+            const scoreFromImpact = (impact) => (impact === "High" ? 0.2 : impact === "Medium" ? 0.1 : 0.05);
+            const logisticConfidence = (raw, slope = 1.0) => 1 / (1 + Math.exp(-slope * raw));
 
-          if (triage.newHypothesis && triage.newHypothesis.statement) {
-            const suggested = (init.suggestedHypotheses || []).slice();
-            suggested.push({
-              id: `sh-${Date.now()}`,
-              statement: triage.newHypothesis.statement,
-              confidence: triage.newHypothesis.confidence ?? 0,
-              suggestedAt: FieldValue.serverTimestamp(),
-              status: "pending",
-            });
+            const updated = [...hypotheses];
+            const before = new Map(updated.map((h) => [h.id, h.confidence || 0]));
+            for (const link of triage.hypothesisLinks) {
+              const idx = updated.findIndex((h) => h.id === link.hypothesisId);
+              if (idx === -1) continue;
+              const h = updated[idx];
+              const baseScore = h.confidenceScore || 0;
+              const evidenceCount =
+                (h.evidence?.supporting?.length || h.supportingEvidence?.length || 0) +
+                (h.evidence?.refuting?.length || h.refutingEvidence?.length || 0);
+              const diminishing = 1 / Math.max(1, evidenceCount * 0.5);
+              const aw = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
+              const tw = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
+              const dw = DIRECTNESS_WEIGHT[link.directness] || 1;
+              const weightedImpact = scoreFromImpact(link.impact) * aw * tw * dw;
+              const multiplier = String(link.relationship).toLowerCase() === "refutes" ? -1.5 : 1;
+              const delta = weightedImpact * diminishing * multiplier;
+              const newScore = baseScore + delta;
+              const key = String(link.relationship).toLowerCase() === "refutes" ? "refuting" : "supporting";
+              const entry = {
+                text: `Q: ${dhQuestion}\nA: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`,
+                analysisSummary: triage.analysisSummary || "",
+                impact: link.impact,
+                delta,
+                source: respondent,
+                sourceAuthority: link.sourceAuthority,
+                evidenceType: link.evidenceType,
+                directness: link.directness,
+                relationship: link.relationship,
+                timestamp: Date.now(),
+                user: respondent,
+              };
+              const existingEvidence = h.evidence?.[key] || h[`${key}Evidence`] || [];
+              const updatedHyp = {
+                ...h,
+                evidence: { ...(h.evidence || {}), [key]: [...existingEvidence, entry] },
+                confidenceScore: newScore,
+                confidence: logisticConfidence(newScore),
+                auditLog: [...(h.auditLog || []), { timestamp: Date.now(), user: respondent, evidence: entry.text, weight: delta, message: `${(delta * 100).toFixed(0)} from ${respondent}` }],
+              };
+              updated[idx] = updatedHyp;
+            }
+
+            if (triage.newHypothesis && triage.newHypothesis.statement) {
+              const suggested = (init.suggestedHypotheses || []).slice();
+              suggested.push({
+                id: `sh-${Date.now()}`,
+                statement: triage.newHypothesis.statement,
+                confidence: triage.newHypothesis.confidence ?? 0,
+                suggestedAt: FieldValue.serverTimestamp(),
+                status: "pending",
+              });
+              await db
+                .collection("users").doc(uid)
+                .collection("initiatives").doc(initiativeId)
+                .set({ suggestedHypotheses: suggested }, { merge: true });
+              await db
+                .collection("users").doc(uid)
+                .collection("notifications").doc("suggestedHypotheses")
+                .set({ type: "suggestedHypotheses", count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
+            }
+
             await db
               .collection("users").doc(uid)
               .collection("initiatives").doc(initiativeId)
-              .set({ suggestedHypotheses: suggested }, { merge: true });
-            await db
-              .collection("users").doc(uid)
-              .collection("notifications").doc("suggestedHypotheses")
-              .set({ type: "suggestedHypotheses", count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
-          }
+              .set({ inquiryMap: { hypotheses: updated }, hypotheses: updated }, { merge: true });
 
-          await db
-            .collection("users").doc(uid)
-            .collection("initiatives").doc(initiativeId)
-            .set({ inquiryMap: { hypotheses: updated }, hypotheses: updated }, { merge: true });
-
-          for (const h of updated) {
-            const was = before.get(h.id) || 0;
-            const now = h.confidence || 0;
-            if (was < 0.8 && now >= 0.8) {
-              await db
-                .collection("users").doc(uid)
-                .collection("notifications").doc(`hyp-${h.id}`)
-                .set({ type: "hypothesisConfidence", message: `${h.statement || h.hypothesis || h.id} confidence now at ${(now * 100).toFixed(0)}%`, count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
+            for (const h of updated) {
+              const was = before.get(h.id) || 0;
+              const now = h.confidence || 0;
+              if (was < 0.8 && now >= 0.8) {
+                await db
+                  .collection("users").doc(uid)
+                  .collection("notifications").doc(`hyp-${h.id}`)
+                  .set({ type: "hypothesisConfidence", message: `${h.statement || h.hypothesis || h.id} confidence now at ${(now * 100).toFixed(0)}%`, count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
+              }
             }
           }
+        } catch (e) {
+          console.error("inbound analysis failed", e);
         }
-      } catch (e) {
-        console.error("inbound analysis failed", e);
       }
-    }
 
-    // 7) Optional: forward the reply to the Thoughtify user (uses secrets, not process.env)
-    try {
-      const userRecord = await auth.getUser(uid);
-      const userEmail = userRecord?.email || null;
+      // 7) Optional: forward the reply to the Thoughtify user (uses secrets, not process.env)
+      try {
+        const userRecord = await auth.getUser(uid);
+        const userEmail = userRecord?.email || null;
 
-      if (userEmail && SMTP_USER.value() && SMTP_PASS.value()) {
-        const forwarder = nodemailer.createTransport({
-          host: "smtp.zoho.com",
-          port: 465,
-          secure: true,
-          auth: {
-            user: SMTP_USER.value(),
-            pass: SMTP_PASS.value(),
-          },
-        });
+        if (userEmail && SMTP_USER.value() && SMTP_PASS.value()) {
+          const forwarder = nodemailer.createTransport({
+            host: "smtp.zoho.com",
+            port: 465,
+            secure: true,
+            auth: {
+              user: SMTP_USER.value(),
+              pass: SMTP_PASS.value(),
+            },
+          });
           await forwarder.sendMail({
             from: SMTP_USER.value(),
             to: userEmail,
             subject,
             text: answerText + (extraText ? `\n\n${extraText}` : ""),
           });
+        }
+      } catch (err) {
+        console.error("Error forwarding reply", err);
+        // don’t fail the webhook on forward errors
       }
-    } catch (err) {
-      console.error("Error forwarding reply", err);
-      // don’t fail the webhook on forward errors
-    }
-
-    res.status(200).send({ status: "ok" });
+    })();
   }
 );
