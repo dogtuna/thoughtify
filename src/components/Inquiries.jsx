@@ -107,15 +107,15 @@ export default function NewInquiries({ user, openReplyModal }) {
             phase: "General",
             question: inquiry.message,
             contacts: [cid],
-            contactStatus: {
-              [cid]: {
-                current: "Ask",
-                history: [
-                  { status: "Ask", timestamp: new Date().toISOString() },
-                ],
+            contactStatus: [
+              {
+                contactId: cid,
+                currentStatus: "Ask",
+                askedAt: new Date().toISOString(),
+                askedBy: user.uid,
                 answers: [],
               },
-            },
+            ],
           });
         await saveInitiative(user.uid, project, { projectQuestions });
         await deleteDoc(doc(db, "inquiries", inquiry.id));

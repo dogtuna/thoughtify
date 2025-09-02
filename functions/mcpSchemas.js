@@ -19,20 +19,23 @@ export const projectQuestionSchema = z.object({
   question: nonEmptyText,
   stakeholders: z.array(z.string()).optional(),
   phase: optionalText.optional(),
-  answer: optionalText.optional(),
-  asked: z.record(z.boolean()).optional(),
   contacts: z.array(z.string()).optional(),
   contactStatus: z
-    .record(
+    .array(
       z.object({
-        current: nonEmptyText,
-        history: z
+        contactId: z.string(),
+        currentStatus: nonEmptyText,
+        askedAt: optionalText.optional(),
+        askedBy: optionalText.optional(),
+        answers: z
           .array(
-            z.object({ status: nonEmptyText, timestamp: nonEmptyText })
+            z.object({
+              text: nonEmptyText,
+              answeredAt: optionalText.optional(),
+            })
           )
           .optional(),
-        answers: z.array(z.any()).optional(),
-      }),
+      })
     )
     .optional(),
 });

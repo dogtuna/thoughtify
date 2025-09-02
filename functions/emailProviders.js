@@ -445,37 +445,21 @@ export const sendQuestionEmail = onCall(
           if (!matched.length) continue;
 
           const q = qArr[qIdx] || {};
-          const askedEntry = q.asked || {};
-          const ansEntry = q.answers || {};
-          const statusEntry = q.contactStatus || {};
+          const statusEntry = Array.isArray(q.contactStatus)
+            ? q.contactStatus
+            : [];
           const now = new Date().toISOString();
           matched.forEach((contact) => {
             if (!contact.id) return;
-            askedEntry[contact.id] = true;
-            const existing = ansEntry[contact.id] || {};
-            ansEntry[contact.id] = {
-              ...existing,
-              askedAt: now,
-              askedBy: asker,
-              currentStatus: "asked",
-              history: Array.isArray(existing.history) ? existing.history : [],
-            };
-            const statusExisting = statusEntry[contact.id] || {};
-            const statusHistory = Array.isArray(statusExisting.history)
-              ? statusExisting.history.slice()
-              : [];
-            statusHistory.push({ status: "Asked", timestamp: now });
-            statusEntry[contact.id] = {
-              ...statusExisting,
-              current: "Asked",
-              history: statusHistory,
-              answers: Array.isArray(statusExisting.answers)
-                ? statusExisting.answers
-                : [],
-            };
+            let entry = statusEntry.find((cs) => cs.contactId === contact.id);
+            if (!entry) {
+              entry = { contactId: contact.id, answers: [] };
+              statusEntry.push(entry);
+            }
+            entry.askedAt = now;
+            entry.askedBy = asker;
+            entry.currentStatus = "asked";
           });
-          q.asked = askedEntry;
-          q.answers = ansEntry;
           q.contactStatus = statusEntry;
           qArr[qIdx] = q;
           await docSnap.ref.set(
@@ -733,34 +717,17 @@ export const processInboundEmail = onRequest(
         const contactId = matchedContact.id || null;
 
         const q = qArr[qIdx];
-        const askedEntry = q.asked || {};
-        const key = contactId || name;
-        let wasAsked = askedEntry[key];
-        if (!wasAsked && contactId && askedEntry[name]) {
-          wasAsked = askedEntry[name];
-          askedEntry[contactId] = askedEntry[name];
-          delete askedEntry[name];
-        }
-        if (!wasAsked) continue; // question not asked for this initiative/contact
-
-        const answersEntry = q.answers || {};
-        const existingForId = answersEntry[key] || {};
-        const history = Array.isArray(existingForId.history)
-          ? existingForId.history.slice()
+        const statusArr = Array.isArray(q.contactStatus)
+          ? q.contactStatus
           : [];
-        history.push({ text: answerText, answeredAt, answeredBy: name });
-        answersEntry[key] = {
-          ...existingForId,
-          text: answerText,
-          answeredAt,
-          answeredBy: name,
-          contactId: key,
-          currentStatus: "answered",
-          history,
-        };
-        askedEntry[key] = true;
-        q.answers = answersEntry;
-        q.asked = askedEntry;
+        const key = contactId || name;
+        let entry = statusArr.find(
+          (cs) => cs.contactId === key || cs.contactId === name,
+        );
+        if (!entry) continue; // question not asked for this initiative/contact
+        entry.answers = Array.isArray(entry.answers) ? entry.answers : [];
+        entry.answers.push({ text: answerText, answeredAt });
+        entry.currentStatus = "answered";
         qArr[qIdx] = q;
 
         await docSnap.ref.set(
@@ -847,16 +814,23 @@ export const processInboundEmail = onRequest(
         if (questionsArr.length) {
           const qa = questionsArr
             .map((q) => {
-              const aMap = q.answers || {};
-              const answers = Object.entries(aMap)
-                .map(([cid, value]) => {
-                  const contact = contacts.find((c) => c.id === cid);
-                  const name = contact?.name || cid;
-                  return `${name}: ${value?.text || ""}`;
-                })
-                .filter((s) => String(s).trim())
-                .join("; ");
-              return answers ? `${q?.question || q}: ${answers}` : `${q?.question || q}`;
+              const answers = Array.isArray(q.contactStatus)
+                ? q.contactStatus
+                    .map((cs) => {
+                      const contact = contacts.find((c) => c.id === cs.contactId);
+                      const name = contact?.name || cs.contactId;
+                      const texts = (cs.answers || [])
+                        .map((a) => a?.text || "")
+                        .filter((s) => String(s).trim())
+                        .join("; ");
+                      return texts ? `${name}: ${texts}` : null;
+                    })
+                    .filter(Boolean)
+                    .join("; ")
+                : "";
+              return answers
+                ? `${q?.question || q}: ${answers}`
+                : `${q?.question || q}`;
             })
             .join("\n");
           contextPieces.push(`Existing Q&A:\n${qa}`);
@@ -1022,7 +996,7 @@ Respond ONLY in this JSON format:
               phase: "General",
               question: s.text,
               contacts: [],
-              answers: [],
+              contactStatus: [],
             });
           }
           await db
