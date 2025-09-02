@@ -34,3 +34,23 @@ export function markAnswered(state, answer) {
   }
   return next;
 }
+
+export function getContactStatus(statusArr = [], contactId) {
+  return statusArr.find((s) => s.contactId === contactId);
+}
+
+export function setContactStatus(statusArr = [], contactId, status) {
+  const next = Array.isArray(statusArr) ? [...statusArr] : [];
+  const idx = next.findIndex((s) => s.contactId === contactId);
+  const entry = { contactId, ...(status || initStatus()) };
+  if (idx >= 0) {
+    next[idx] = entry;
+  } else {
+    next.push(entry);
+  }
+  return next;
+}
+
+export function removeContactStatus(statusArr = [], contactId) {
+  return (statusArr || []).filter((s) => s.contactId !== contactId);
+}

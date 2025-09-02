@@ -30,6 +30,9 @@ import {
   markAnswered,
   markAsked as markAskedStatus,
   initStatus,
+  getContactStatus,
+  setContactStatus,
+  removeContactStatus,
 } from "../utils/questionStatus";
 import ProjectStatus from "./ProjectStatus.jsx";
 import PastUpdateView from "./PastUpdateView.jsx";
@@ -1813,9 +1816,6 @@ Respond ONLY in this JSON format:
               ? q.contacts
               : statusArr.map((cs) => cs.contactId);
             const names = ids.map((cid) => contactMap[cid]?.name || cid);
-            const statusObj = Object.fromEntries(
-              statusArr.map((cs) => [cs.contactId, cs])
-            );
             const asked = {};
             const answers = {};
             statusArr.forEach((cs) => {
@@ -1832,7 +1832,7 @@ Respond ONLY in this JSON format:
               idx,
               contacts: names,
               contactIds: ids,
-              contactStatus: statusObj,
+              contactStatus: statusArr,
               asked,
               answers,
             };
@@ -1996,14 +1996,20 @@ Respond ONLY in this JSON format:
     setQuestions((prev) => {
       const updated = prev.map((q) => {
         if (q.id !== id) return q;
-        const status = markAnswered(q.contactStatus?.[contactId], {
+        const current = getContactStatus(q.contactStatus, contactId);
+        const status = markAnswered(current, {
           text,
           analysis,
           answeredBy: currentUserName,
         });
+        const contactStatus = setContactStatus(
+          q.contactStatus,
+          contactId,
+          status,
+        );
         const updatedQ = {
           ...q,
-          contactStatus: { ...q.contactStatus, [contactId]: status },
+          contactStatus,
           answers: {
             ...q.answers,
             [contactId]: status.answers[status.answers.length - 1],
@@ -2015,9 +2021,7 @@ Respond ONLY in this JSON format:
           delete saveQ.contactNames;
           delete saveQ.contactIds;
           delete saveQ.idx;
-          saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
-            ([cid, s]) => ({ contactId: cid, ...s })
-          );
+          saveQ.contactStatus = contactStatus;
           saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
         }
         return updatedQ;
@@ -2188,7 +2192,7 @@ Respond ONLY in this JSON format:
         q.contacts = [...q.contacts, name];
         q.contactIds = [...(q.contactIds || []), id];
         q.asked = { ...q.asked, [id]: false };
-        q.contactStatus = { ...q.contactStatus, [id]: initStatus() };
+        q.contactStatus = setContactStatus(q.contactStatus, id, initStatus());
       }
       if (uid) {
         saveInitiative(uid, initiativeId, {
@@ -2219,8 +2223,8 @@ Respond ONLY in this JSON format:
         if (q.asked[id] !== undefined) {
           delete q.asked[id];
         }
-        if (q.contactStatus && q.contactStatus[id]) {
-          delete q.contactStatus[id];
+        if (q.contactStatus) {
+          q.contactStatus = removeContactStatus(q.contactStatus, id);
         }
       }
       if (uid) {
@@ -2288,11 +2292,13 @@ Respond ONLY in this JSON format:
       const q = updated[idx];
       if (q) {
         const targets = ids.length ? ids : getContactIds(q);
-        q.contactStatus = q.contactStatus || {};
+        q.contactStatus = q.contactStatus || [];
         q.answers = q.answers || {};
         q.asked = q.asked || {};
         targets.forEach((id) => {
-          q.contactStatus[id] = markAskedStatus(q.contactStatus[id]);
+          const current = getContactStatus(q.contactStatus, id);
+          const nextStatus = markAskedStatus(current);
+          q.contactStatus = setContactStatus(q.contactStatus, id, nextStatus);
           q.asked[id] = true;
           q.answers[id] = {
             ...(q.answers[id] || {}),
@@ -2309,9 +2315,6 @@ Respond ONLY in this JSON format:
       const saveQ = { ...q, contacts: getContactIds(q) };
       delete saveQ.idx;
       delete saveQ.contactIds;
-      saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
-        ([cid, s]) => ({ contactId: cid, ...s })
-      );
       await saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
     }
     return text;
@@ -2332,9 +2335,11 @@ Respond ONLY in this JSON format:
           delete q.answers[contactId];
           removed.answers = true;
         }
-        if (q.contactStatus && q.contactStatus[contactId]) {
-          q.contactStatus[contactId] = initStatus();
-        }
+        q.contactStatus = setContactStatus(
+          q.contactStatus,
+          contactId,
+          initStatus(),
+        );
       }
       updatedQuestions = updated;
       return updated;
@@ -2350,9 +2355,7 @@ Respond ONLY in this JSON format:
       if (removed.answers) {
         saveQ.answers = { ...(saveQ.answers || {}), [contactId]: null };
       }
-      saveQ.contactStatus = Object.entries(saveQ.contactStatus || {}).map(
-        ([cid, s]) => ({ contactId: cid, ...s })
-      );
+      saveQ.contactStatus = q.contactStatus;
       await saveInitiative(uid, initiativeId, { projectQuestions: [saveQ] });
     }
   }
@@ -2757,7 +2760,7 @@ Respond ONLY in this JSON format:
     const ids = getContactIds(q);
     ids.forEach((id, i) => {
       const name = q.contacts?.[i] || id;
-      const status = q.contactStatus?.[id];
+      const status = getContactStatus(q.contactStatus, id);
       const cur = (status?.currentStatus || "").toLowerCase();
       if (cur === "answered") {
         answeredNames.push(name);
