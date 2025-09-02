@@ -35,6 +35,14 @@ export const projectQuestionSchema = z.object({
             })
           )
           .optional(),
+        answersForReview: z
+          .array(
+            z.object({
+              text: nonEmptyText,
+              answeredAt: optionalText.optional(),
+            })
+          )
+          .optional(),
       })
     )
     .optional(),

@@ -729,8 +729,15 @@ export const processInboundEmail = onRequest(
           statusArr.push(entry);
         }
         entry.answers = Array.isArray(entry.answers) ? entry.answers : [];
-        entry.answers.push({ text: answerText, answeredAt });
-        entry.currentStatus = "answered";
+        if (entry.currentStatus === "asked" || entry.askedAt) {
+          entry.answers.push({ text: answerText, answeredAt });
+          entry.currentStatus = "answered";
+        } else {
+          entry.answersForReview = Array.isArray(entry.answersForReview)
+            ? entry.answersForReview
+            : [];
+          entry.answersForReview.push({ text: answerText, answeredAt });
+        }
         q.contactStatus = statusArr;
         qArr[qIdx] = q;
 
