@@ -25,11 +25,16 @@ function normalizeInitiative(docSnap) {
   return { id: docSnap.id, ...DEFAULT_FIELDS, ...docSnap.data() };
 }
 
-function deepMerge(target = {}, source = {}) {
+export function deepMerge(target = {}, source = {}) {
   const output = { ...target };
   for (const key of Object.keys(source)) {
     const srcVal = source[key];
     const tgtVal = target[key];
+    // Treat null/undefined as a directive to delete the key
+    if (srcVal === null || srcVal === undefined) {
+      if (key in output) delete output[key];
+      continue;
+    }
     if (
       srcVal &&
       typeof srcVal === "object" &&
@@ -38,7 +43,13 @@ function deepMerge(target = {}, source = {}) {
       typeof tgtVal === "object" &&
       !Array.isArray(tgtVal)
     ) {
-      output[key] = deepMerge(tgtVal, srcVal);
+      const merged = deepMerge(tgtVal, srcVal);
+      // If the merge produced an empty object, drop the key entirely
+      if (merged && Object.keys(merged).length === 0) {
+        if (key in output) delete output[key];
+      } else {
+        output[key] = merged;
+      }
     } else {
       output[key] = srcVal;
     }
@@ -49,10 +60,20 @@ function deepMerge(target = {}, source = {}) {
 // Merge project questions by id so that updates to a single question
 // do not clobber the rest of the array. Each question's fields are
 // deep merged to preserve asked/answers/contactStatus history.
-function mergeQuestionArrays(existing = [], updates = []) {
+export function mergeQuestionArrays(existing = [], updates = []) {
   const byId = Object.fromEntries(existing.map((q) => [q.id, q]));
   updates.forEach((q) => {
     if (!q || q.id === undefined) return;
+    // Allow callers to replace the entire question object by passing _replace: true
+    if (q._replace) {
+      const { _replace, ...rest } = q;
+      if (rest && Object.keys(rest).length > 0) {
+        byId[q.id] = rest;
+      } else {
+        delete byId[q.id];
+      }
+      return;
+    }
     byId[q.id] = deepMerge(byId[q.id] || {}, q);
   });
   return Object.values(byId);
