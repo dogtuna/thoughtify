@@ -66,7 +66,8 @@ export function mergeQuestionArrays(existing = [], updates = []) {
     if (!q || q.id === undefined) return;
     // Allow callers to replace the entire question object by passing _replace: true
     if (q._replace) {
-      const { _replace, ...rest } = q;
+      const { _replace: _discard, ...rest } = q;
+      void _discard;
       if (rest && Object.keys(rest).length > 0) {
         byId[q.id] = rest;
       } else {
