@@ -213,7 +213,10 @@ const ProjectSetup = () => {
   };
 
   const removeKeyContact = (index) => {
-    setKeyContacts((prev) => prev.filter((_, i) => i !== index));
+    setKeyContacts((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      return updated.length > 0 ? updated : [emptyContact()];
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -221,25 +224,32 @@ const ProjectSetup = () => {
     setLoading(true);
     setError("");
     try {
+      const filteredContacts = keyContacts.filter(
+        (c) => c.name && c.jobTitle
+      );
       const { data } = await generateProjectQuestions(
         omitEmptyStrings({
           businessGoal,
           audienceProfile,
           sourceMaterial: getCombinedSource(),
           projectConstraints,
-          keyContacts: keyContacts.map(({ id, name, jobTitle, profile, info }) => ({
-            id,
-            name,
-            jobTitle,
-            profile,
-            info,
-          })),
+          keyContacts: filteredContacts.map(
+            ({ id, name, jobTitle, profile, info }) => ({
+              id,
+              name,
+              jobTitle,
+              profile,
+              info,
+            })
+          ),
         })
       );
       const qsRaw = (data.projectQuestions || []).slice(0, 9);
       const qs = qsRaw.map((q) => {
         const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
-          const match = keyContacts.find((c) => c.name === name || c.id === name);
+          const match = keyContacts.find(
+            (c) => c.name === name || c.id === name
+          );
           return match ? match.id : name;
         });
         const statusArr = contactIds.map((cid) => ({
@@ -258,35 +268,35 @@ const ProjectSetup = () => {
         };
       });
       const uid = auth.currentUser?.uid;
-        if (uid) {
-          await saveInitiative(uid, initiativeId, {
-            projectName,
-            businessGoal,
-            audienceProfile,
-            sourceMaterials,
-            projectConstraints,
-            keyContacts,
-            projectQuestions: qs,
-          });
+      if (uid) {
+        await saveInitiative(uid, initiativeId, {
+          projectName,
+          businessGoal,
+          audienceProfile,
+          sourceMaterials,
+          projectConstraints,
+          keyContacts: filteredContacts,
+          projectQuestions: qs,
+        });
 
-          const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
-          try {
-            const mapResp = await generateInitialInquiryMap(
-              omitEmptyStrings({
-                uid,
-                initiativeId,
-                brief,
-                documents: getCombinedSource(),
-                answers: "",
-              })
-            );
-            const hypotheses = mapResp?.data?.hypotheses || [];
-            setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
-            await new Promise((res) => setTimeout(res, 1000));
-          } catch (mapErr) {
-            console.error("Error generating inquiry map:", mapErr);
-          }
+        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
+        try {
+          const mapResp = await generateInitialInquiryMap(
+            omitEmptyStrings({
+              uid,
+              initiativeId,
+              brief,
+              documents: getCombinedSource(),
+              answers: "",
+            })
+          );
+          const hypotheses = mapResp?.data?.hypotheses || [];
+          setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
+          await new Promise((res) => setTimeout(res, 1000));
+        } catch (mapErr) {
+          console.error("Error generating inquiry map:", mapErr);
         }
+      }
       navigate(`/discovery?initiativeId=${initiativeId}`);
     } catch (err) {
       console.error("Error generating project questions:", err);
