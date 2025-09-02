@@ -799,8 +799,10 @@ export const processInboundEmail = onRequest(
     // Respond quickly to Postmark
     res.status(200).send({ status: "ok" });
 
-    // Continue heavy processing asynchronously
-    (async () => {
+    // Continue heavy processing asynchronously and ensure completion.
+    // If this work risks exceeding the function timeout, move it to a
+    // background trigger or queue.
+    await (async () => {
       if (initiativeId && GOOGLE_GENAI_API_KEY.value()) {
         try {
           const initSnap = await db
