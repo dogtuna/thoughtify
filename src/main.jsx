@@ -38,6 +38,7 @@ import ProjectStatus from "./components/ProjectStatus.jsx";
 import ProjectStatusHistory from "./components/ProjectStatusHistory.jsx";
 import ZapierConfig from "./pages/ZapierConfig.jsx";
 import Messages from "./components/Messages.jsx";
+import Notifications from "./components/Notifications.jsx";
 
 window.PropTypes = PropTypes;
 
@@ -122,6 +123,10 @@ function Root() {
           <Route
             path="/messages"
             element={user ? <Messages /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/notifications"
+            element={user ? <Notifications /> : <Navigate to="/login" />}
           />
           <Route
             path="/action-dashboard"

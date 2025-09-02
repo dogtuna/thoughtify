@@ -1025,7 +1025,7 @@ Respond ONLY in this JSON format:
                 questionId: String(questionId),
                 initiativeId,
                 href: initiativeId
-                  ? `/discovery?initiativeId=${initiativeId}`
+                  ? `/discovery?initiativeId=${initiativeId}&questionId=${questionId}&messageId=${msgRef.id}&qa=1`
                   : undefined,
                 messageId: msgRef.id,
                 createdAt: FieldValue.serverTimestamp(),

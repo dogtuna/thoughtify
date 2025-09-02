@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useNotifications } from "../context/NotificationsContext.jsx";
 import "./DiscoverySidebar.css";
 
 export default function DiscoverySidebar() {
@@ -18,6 +19,14 @@ export default function DiscoverySidebar() {
   };
 
   const section = params.get("section");
+  const { unreadCounts } = useNotifications();
+  const totalUnread = Object.values(unreadCounts).reduce(
+    (sum, c) => sum + c,
+    0,
+  );
+
+  const badge = (count) =>
+    count > 0 && <span className="count-badge">{count}</span>;
   const tasksOpen =
     (pathname === "/discovery" && section === "tasks") ||
     pathname.startsWith("/action-dashboard");
@@ -31,10 +40,17 @@ export default function DiscoverySidebar() {
       <nav>
         <ul>
           <li>
+            <Link to={makeUrl("/notifications")}>
+              Notifications {badge(totalUnread)}
+            </Link>
+          </li>
+          <li>
             <Link to={makeUrl("/discovery")}>Overview</Link>
           </li>
           <li>
-            <Link to={makeUrl("/discovery", { section: "tasks" })}>Tasks</Link>
+            <Link to={makeUrl("/discovery", { section: "tasks" })}>
+              Tasks {badge(unreadCounts.tasks || 0)}
+            </Link>
             {tasksOpen && (
               <ul>
                 <li>
@@ -45,12 +61,12 @@ export default function DiscoverySidebar() {
           </li>
           <li>
             <Link to={makeUrl("/discovery", { section: "documents" })}>
-              Documents
+              Documents {badge(unreadCounts.documents || 0)}
             </Link>
           </li>
           <li>
             <Link to={makeUrl("/discovery", { section: "questions" })}>
-              Questions
+              Questions {badge(unreadCounts.questions || 0)}
             </Link>
             {questionsOpen && (
               <ul>
@@ -88,7 +104,14 @@ export default function DiscoverySidebar() {
             )}
           </li>
           <li>
-            <Link to={makeUrl("/messages")}>Messages</Link>
+            <Link to={makeUrl("/messages")}>
+              Messages {badge(unreadCounts.messages || 0)}
+            </Link>
+          </li>
+          <li>
+            <Link to={makeUrl("/inquiry-map")}>
+              Inquiry Map {badge(unreadCounts.inquiry || unreadCounts.inquiryMap || 0)}
+            </Link>
           </li>
           <li>
             <Link to={makeUrl("/project-status")}>Project Status</Link>
@@ -121,9 +144,6 @@ export default function DiscoverySidebar() {
                 </li>
               </ul>
             )}
-          </li>
-          <li>
-            <Link to={makeUrl("/inquiry-map")}>Inquiry Map</Link>
           </li>
         </ul>
       </nav>
