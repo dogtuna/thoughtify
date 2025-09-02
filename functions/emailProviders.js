@@ -596,7 +596,7 @@ export const processInboundEmail = onRequest(
       uid = m[2];
       sig = m[3];
     } else {
-      m = /^q([^\.]+)\.u(.+)$/i.exec(tag || "");
+      m = /^q([^.]+)\.u(.+)$/i.exec(tag || "");
       if (m) {
         questionId = m[1];
         uid = m[2];
