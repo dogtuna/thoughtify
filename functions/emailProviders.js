@@ -719,7 +719,9 @@ export const processInboundEmail = onRequest(
         const q = qArr[qIdx];
         const statusArr = Array.isArray(q.contactStatus)
           ? q.contactStatus
-          : [];
+          : Object.entries(q.contactStatus || {}).map(
+              ([contactId, status]) => ({ contactId, ...status })
+            );
         const key = contactId || name;
         let entry = statusArr.find(
           (cs) => cs.contactId === key || cs.contactId === name,
