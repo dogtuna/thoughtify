@@ -300,9 +300,13 @@ const InitiativesNew = () => {
   const getCombinedSource = () =>
     sourceMaterials.map((f) => f.content).join("\n");
   const [projectConstraints, setProjectConstraints] = useState("");
-  const [keyContacts, setKeyContacts] = useState([
-    { id: crypto.randomUUID(), name: "", role: "", email: "" },
-  ]);
+  const emptyContact = () => ({
+    id: crypto.randomUUID(),
+    name: "",
+    role: "",
+    email: "",
+  });
+  const [keyContacts, setKeyContacts] = useState([emptyContact()]);
 
   const [projectBrief, setProjectBrief] = useState("");
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
@@ -552,9 +556,10 @@ const InitiativesNew = () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     try {
+      const contacts = keyContacts.filter((c) => c.name && c.role);
       const projectQuestions = clarifyingQuestions.map((q, idx) => {
         const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
-          const match = keyContacts.find((c) => c.name === name || c.id === name);
+          const match = contacts.find((c) => c.name === name || c.id === name);
           return match ? match.id : name;
         });
         const statusArr = contactIds.map((cid) => ({
@@ -580,7 +585,7 @@ const InitiativesNew = () => {
         projectConstraints,
         projectBrief,
         projectQuestions,
-        keyContacts,
+        keyContacts: contacts,
         strategy,
         selectedModality,
         blendModalities,
@@ -659,7 +664,7 @@ const InitiativesNew = () => {
           setKeyContacts(
             (data.keyContacts && data.keyContacts.length
               ? data.keyContacts
-              : [{ name: "", role: "", email: "" }]
+              : [emptyContact()]
             ).map((c) => ({ id: c.id || crypto.randomUUID(), ...c }))
           );
         }
@@ -880,14 +885,14 @@ const InitiativesNew = () => {
   };
 
   const addKeyContact = () => {
-    setKeyContacts((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), name: "", role: "", email: "" },
-    ]);
+    setKeyContacts((prev) => [...prev, emptyContact()]);
   };
 
   const removeKeyContact = (index) => {
-    setKeyContacts((prev) => prev.filter((_, i) => i !== index));
+    setKeyContacts((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      return updated.length > 0 ? updated : [emptyContact()];
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -904,13 +909,14 @@ const InitiativesNew = () => {
         setPersonaCount(0);
 
     try {
+      const contacts = keyContacts.filter((c) => c.name && c.role);
       const { data } = await generateClarifyingQuestions(
         omitEmptyStrings({
           businessGoal,
           audienceProfile,
           sourceMaterial: getCombinedSource(),
           projectConstraints,
-          keyContacts,
+          keyContacts: contacts,
         })
       );
 
@@ -932,7 +938,7 @@ const InitiativesNew = () => {
           audienceProfile,
           sourceMaterials,
           projectConstraints,
-          keyContacts,
+          keyContacts: contacts,
           clarifyingQuestions: qs,
           clarifyingAnswers: qs.map(() => ""),
         });
@@ -951,13 +957,14 @@ const InitiativesNew = () => {
     setError("");
 
     try {
+      const contacts = keyContacts.filter((c) => c.name && c.role);
       const { data } = await generateProjectBrief(
         omitEmptyStrings({
           businessGoal,
           audienceProfile,
           sourceMaterial: getCombinedSource(),
           projectConstraints,
-          keyContacts,
+          keyContacts: contacts,
           clarifyingQuestions,
           clarifyingAnswers,
         })
@@ -977,7 +984,7 @@ const InitiativesNew = () => {
           audienceProfile,
           sourceMaterials,
           projectConstraints,
-          keyContacts,
+          keyContacts: contacts,
           projectBrief: data.projectBrief,
           clarifyingQuestions,
           clarifyingAnswers,
@@ -1019,13 +1026,14 @@ const InitiativesNew = () => {
     setNextError("");
 
     try {
+      const contacts = keyContacts.filter((c) => c.name && c.role);
       const { data } = await generateLearningStrategy(
         omitEmptyStrings({
           projectBrief,
           businessGoal,
           audienceProfile,
           projectConstraints,
-          keyContacts,
+          keyContacts: contacts,
           clarifyingQuestions,
           clarifyingAnswers,
           personaCount: personas.length,
@@ -1048,7 +1056,7 @@ const InitiativesNew = () => {
       if (uid) {
         await saveInitiative(uid, initiativeId, {
           projectName,
-          keyContacts,
+          keyContacts: contacts,
           strategy: data,
           selectedModality: data.modalityRecommendation,
           blendModalities: data.blendedModalities || [],
@@ -1071,10 +1079,11 @@ const InitiativesNew = () => {
       const next = lower.includes("blended") ? prev : [];
       const uid = auth.currentUser?.uid;
       if (uid) {
+        const contacts = keyContacts.filter((c) => c.name && c.role);
         saveInitiative(uid, initiativeId, {
           selectedModality: value,
           blendModalities: next,
-          keyContacts,
+          keyContacts: contacts,
         });
       }
       return next;
@@ -1098,6 +1107,7 @@ const InitiativesNew = () => {
       let existingTypes = [...usedTypes, ...personas.map((p) => p.type)];
       let usedAdjLocal = [...usedAdjectives];
       let usedNounLocal = [...usedNouns];
+      const contacts = keyContacts.filter((c) => c.name && c.role);
       for (let i = 0; i < toGenerate; i++) {
         const personaRes = await generateLearnerPersona(
           omitEmptyStrings({
@@ -1105,7 +1115,7 @@ const InitiativesNew = () => {
             businessGoal,
             audienceProfile,
             projectConstraints,
-            keyContacts,
+            keyContacts: contacts,
             sourceMaterial: getCombinedSource(),
             existingMotivationKeywords: usedMotivationKeywords,
             existingChallengeKeywords: usedChallengeKeywords,
@@ -1226,13 +1236,14 @@ const InitiativesNew = () => {
         ...usedTypes,
         ...existingTypesCurrent,
       ];
+      const contacts = keyContacts.filter((c) => c.name && c.role);
       const personaRes = await generateLearnerPersona(
         omitEmptyStrings({
           projectBrief,
           businessGoal,
           audienceProfile,
           projectConstraints,
-          keyContacts,
+          keyContacts: contacts,
           sourceMaterial: getCombinedSource(),
           existingMotivationKeywords: usedMotivationKeywords,
           existingChallengeKeywords: usedChallengeKeywords,
