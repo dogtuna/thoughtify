@@ -534,6 +534,19 @@ export const processInboundEmail = onRequest(
       return;
     }
 
+    // Safely read secrets so missing values don't crash the function
+    const safeSecret = (secret) => {
+      try {
+        return secret.value();
+      } catch {
+        return "";
+      }
+    };
+    const tokenKey = safeSecret(TOKEN_ENCRYPTION_KEY);
+    const smtpUser = safeSecret(SMTP_USER);
+    const smtpPass = safeSecret(SMTP_PASS);
+    const genAiKey = safeSecret(GOOGLE_GENAI_API_KEY);
+
     const body = req.body || {};
     // Helpful logs in case of shape surprises
     console.log("Inbound keys:", Object.keys(body));
@@ -652,9 +665,9 @@ export const processInboundEmail = onRequest(
     }
 
     // 4) Enforce HMAC only if SIG was present in tag
-    if (sig) {
+    if (sig && tokenKey) {
       const expected = crypto
-        .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
+        .createHmac("sha256", tokenKey)
         .update(`QID${questionId}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
@@ -674,11 +687,10 @@ export const processInboundEmail = onRequest(
     // Step 1: Extract the direct answer and any extra commentary via AI
     let answerText = cleaned;
     let extraText = "";
-    if (GOOGLE_GENAI_API_KEY.value()) {
+    if (genAiKey) {
       try {
-        const key = GOOGLE_GENAI_API_KEY.value();
         const extractor = genkit({
-          plugins: [googleAI({ apiKey: key })],
+          plugins: [googleAI({ apiKey: genAiKey })],
           model: gemini("gemini-1.5-pro"),
         });
         const extractPrompt = `You are reading an email reply and must separate the direct answer to the question from any additional commentary. Respond only in JSON with keys "answer" and "extra".\n\nEmail Reply:\n${cleaned}`;
@@ -808,7 +820,7 @@ export const processInboundEmail = onRequest(
     // If this work risks exceeding the function timeout, move it to a
     // background trigger or queue.
     await (async () => {
-      if (initiativeId && GOOGLE_GENAI_API_KEY.value()) {
+      if (initiativeId && genAiKey) {
         try {
           const initSnap = await db
             .collection("users")
@@ -904,8 +916,7 @@ Please provide a JSON object with two fields:
 Respond ONLY in this JSON format:
 {"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "...", "hypothesisId": "A", "taskType": "validate"}, ...]}`;
 
-          const key = GOOGLE_GENAI_API_KEY.value();
-          const ai = genkit({ plugins: [googleAI({ apiKey: key })], model: gemini("gemini-1.5-pro") });
+          const ai = genkit({ plugins: [googleAI({ apiKey: genAiKey })], model: gemini("gemini-1.5-pro") });
           const { text: aiText } = await ai.generate(analysisPrompt);
           let parsed;
           try {
@@ -1010,23 +1021,33 @@ Respond ONLY in this JSON format:
               .set({ type: "suggestedTasks", count: FieldValue.increment(suggestedTasks.length), createdAt: FieldValue.serverTimestamp() }, { merge: true });
           }
 
-          // Persist question suggestions into projectQuestions array
+          // Persist question suggestions separately so the user can approve them
           const questionSuggestions = suggestions.filter((s) => s.category === "question");
           if (questionSuggestions.length) {
-            const projectQs = (init.projectQuestions || []).slice();
-            for (const s of questionSuggestions) {
-              projectQs.push({
-                id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                phase: "General",
-                question: s.text,
-                contacts: [],
-                contactStatus: [],
-              });
-            }
+            const qCol = db
+              .collection("users")
+              .doc(uid)
+              .collection("initiatives")
+              .doc(initiativeId)
+              .collection("suggestedQuestions");
+            await Promise.all(
+              questionSuggestions.map((s) =>
+                qCol.add({
+                  question: s.text,
+                  hypothesisId: s.hypothesisId || null,
+                  createdAt: FieldValue.serverTimestamp(),
+                  source: { kind: "email", questionId, respondent },
+                })
+              )
+            );
             await db
               .collection("users").doc(uid)
-              .collection("initiatives").doc(initiativeId)
-              .set({ projectQuestions: projectQs }, { merge: true });
+              .collection("notifications").doc("suggestedQuestions")
+              .set({
+                type: "suggestedQuestions",
+                count: FieldValue.increment(questionSuggestions.length),
+                createdAt: FieldValue.serverTimestamp(),
+              }, { merge: true });
           }
 
           // Persist analysis and notify user of the new answer
@@ -1080,7 +1101,20 @@ Known Project Stakeholders:\n${contactsList}`;
           let triage;
           try {
             const { text: triageText } = await ai.generate(triagePrompt);
-            triage = JSON.parse(triageText);
+            try {
+              triage = JSON.parse(triageText);
+            } catch {
+              const m = triageText && triageText.match(/\{[\s\S]*\}/);
+              if (m) {
+                try {
+                  triage = JSON.parse(m[0]);
+                } catch {
+                  triage = null;
+                }
+              } else {
+                triage = null;
+              }
+            }
           } catch {
             triage = null;
           }
@@ -1179,18 +1213,18 @@ Known Project Stakeholders:\n${contactsList}`;
         const userRecord = await auth.getUser(uid);
         const userEmail = userRecord?.email || null;
 
-        if (userEmail && SMTP_USER.value() && SMTP_PASS.value()) {
+        if (userEmail && smtpUser && smtpPass) {
           const forwarder = nodemailer.createTransport({
             host: "smtp.zoho.com",
             port: 465,
             secure: true,
             auth: {
-              user: SMTP_USER.value(),
-              pass: SMTP_PASS.value(),
+              user: smtpUser,
+              pass: smtpPass,
             },
           });
           await forwarder.sendMail({
-            from: SMTP_USER.value(),
+            from: smtpUser,
             to: userEmail,
             subject,
             text: answerText + (extraText ? `\n\n${extraText}` : ""),
