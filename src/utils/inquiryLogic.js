@@ -128,10 +128,15 @@ export const calculateNewConfidence = (
   const beforeSources = new Set(existingSup.map(e => e.source));
   const beforeCorroboration = beforeHasQuant && beforeHasQual && beforeSources.size > 1;
 
-  const afterSup = link.relationship === "Supports" ? updatedEvidence : existingSup;
-  const afterHasQuant = afterSup.some(e => e.evidenceType === "Quantitative");
-  const afterHasQual = afterSup.some(e => e.evidenceType === "Qualitative");
-  const afterSources = new Set(afterSup.map(e => e.source));
+  const afterSup =
+    link.relationship === "Supports" ? updatedEvidenceArr : existingSup;
+  const afterHasQuant = afterSup.some(
+    (e) => e.evidenceType === "Quantitative"
+  );
+  const afterHasQual = afterSup.some(
+    (e) => e.evidenceType === "Qualitative"
+  );
+  const afterSources = new Set(afterSup.map((e) => e.source));
   const afterCorroboration = afterHasQuant && afterHasQual && afterSources.size > 1;
 
   let newScore = baseScore + delta;
@@ -180,5 +185,5 @@ export const calculateNewConfidence = (
     auditLog: [...(hypothesis.auditLog || []), auditEntry],
   };
 
-  return { updatedHypothesis, extraRecommendations: [] };
+  return { updatedHypothesis, extraRecommendations };
 };
