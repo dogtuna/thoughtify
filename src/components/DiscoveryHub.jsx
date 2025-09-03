@@ -668,6 +668,10 @@ const DiscoveryHub = () => {
         message: emailDraft.body,
         questionId: emailDraft.questionIds[0],
       });
+      const qIdx = questions.findIndex(
+        (q) => q.id === emailDraft.questionIds[0],
+      );
+      if (qIdx >= 0) await markAsked(qIdx, emailDraft.recipients);
       alert("Email sent");
       nextDraft();
     } catch (err) {
