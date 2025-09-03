@@ -1010,23 +1010,33 @@ Respond ONLY in this JSON format:
               .set({ type: "suggestedTasks", count: FieldValue.increment(suggestedTasks.length), createdAt: FieldValue.serverTimestamp() }, { merge: true });
           }
 
-          // Persist question suggestions into projectQuestions array
+          // Persist question suggestions separately so the user can approve them
           const questionSuggestions = suggestions.filter((s) => s.category === "question");
           if (questionSuggestions.length) {
-            const projectQs = (init.projectQuestions || []).slice();
-            for (const s of questionSuggestions) {
-              projectQs.push({
-                id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                phase: "General",
-                question: s.text,
-                contacts: [],
-                contactStatus: [],
-              });
-            }
+            const qCol = db
+              .collection("users")
+              .doc(uid)
+              .collection("initiatives")
+              .doc(initiativeId)
+              .collection("suggestedQuestions");
+            await Promise.all(
+              questionSuggestions.map((s) =>
+                qCol.add({
+                  question: s.text,
+                  hypothesisId: s.hypothesisId || null,
+                  createdAt: FieldValue.serverTimestamp(),
+                  source: { kind: "email", questionId, respondent },
+                })
+              )
+            );
             await db
               .collection("users").doc(uid)
-              .collection("initiatives").doc(initiativeId)
-              .set({ projectQuestions: projectQs }, { merge: true });
+              .collection("notifications").doc("suggestedQuestions")
+              .set({
+                type: "suggestedQuestions",
+                count: FieldValue.increment(questionSuggestions.length),
+                createdAt: FieldValue.serverTimestamp(),
+              }, { merge: true });
           }
 
           // Persist analysis and notify user of the new answer
@@ -1080,7 +1090,20 @@ Known Project Stakeholders:\n${contactsList}`;
           let triage;
           try {
             const { text: triageText } = await ai.generate(triagePrompt);
-            triage = JSON.parse(triageText);
+            try {
+              triage = JSON.parse(triageText);
+            } catch {
+              const m = triageText && triageText.match(/\{[\s\S]*\}/);
+              if (m) {
+                try {
+                  triage = JSON.parse(m[0]);
+                } catch {
+                  triage = null;
+                }
+              } else {
+                triage = null;
+              }
+            }
           } catch {
             triage = null;
           }

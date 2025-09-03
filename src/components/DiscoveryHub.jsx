@@ -118,6 +118,7 @@ const DiscoveryHub = () => {
   const [documents, setDocuments] = useState([]);
   const [projectTasks, setProjectTasks] = useState([]);
   const [suggestedTasks, setSuggestedTasks] = useState([]);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const projectTasksRef = useRef([]);
   const prevHypothesisConfidence = useRef({});
   const [contactFilter, setContactFilter] = useState("");
@@ -1894,6 +1895,24 @@ Respond ONLY in this JSON format:
     return () => unsub();
   }, [uid, initiativeId]);
 
+  // Listen for suggested questions (pending acceptance)
+  useEffect(() => {
+    if (!uid || !initiativeId) return;
+    const qref = collection(
+      db,
+      "users",
+      uid,
+      "initiatives",
+      initiativeId,
+      "suggestedQuestions",
+    );
+    const unsub = onSnapshot(qref, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setSuggestedQuestions(list);
+    });
+    return () => unsub();
+  }, [uid, initiativeId]);
+
   const acceptSuggestedTask = async (t) => {
     if (!uid || !initiativeId) return;
     try {
@@ -1931,6 +1950,32 @@ Respond ONLY in this JSON format:
       await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedTasks", t.id));
     } catch (err) {
       console.error("rejectSuggestedTask error", err);
+    }
+  };
+
+  const acceptSuggestedQuestion = async (q) => {
+    if (!uid || !initiativeId) return;
+    try {
+      const newQ = {
+        id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        phase: "General",
+        question: q.question,
+        contacts: [],
+        contactStatus: [],
+      };
+      await saveInitiative(uid, initiativeId, { projectQuestions: [newQ] });
+      await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedQuestions", q.id));
+    } catch (err) {
+      console.error("acceptSuggestedQuestion error", err);
+    }
+  };
+
+  const rejectSuggestedQuestion = async (q) => {
+    if (!uid || !initiativeId) return;
+    try {
+      await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedQuestions", q.id));
+    } catch (err) {
+      console.error("rejectSuggestedQuestion error", err);
     }
   };
 
@@ -3192,6 +3237,21 @@ Respond ONLY in this JSON format:
         {displayedTasks.length === 0 && (
           <p className="text-gray-400">Looks like you are all caught up!</p>
         )}
+      </div>
+    )}
+
+    {suggestedQuestions.length > 0 && (
+      <div className="initiative-card">
+        <h3>Suggested Questions</h3>
+        {suggestedQuestions.map((q) => (
+          <div key={q.id} className="flex items-center justify-between border-b border-gray-700 py-2">
+            <div className="font-medium">{q.question}</div>
+            <div className="flex gap-2">
+              <button className="generator-button" onClick={() => acceptSuggestedQuestion(q)}>Accept</button>
+              <button className="generator-button" onClick={() => rejectSuggestedQuestion(q)}>Reject</button>
+            </div>
+          </div>
+        ))}
       </div>
     )}
 
