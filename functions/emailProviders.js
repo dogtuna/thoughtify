@@ -447,7 +447,9 @@ export const sendQuestionEmail = onCall(
           const q = qArr[qIdx] || {};
           const statusEntry = Array.isArray(q.contactStatus)
             ? q.contactStatus
-            : [];
+            : Object.entries(q.contactStatus || {}).map(
+                ([contactId, status]) => ({ contactId, ...status })
+              );
           const now = new Date().toISOString();
           matched.forEach((contact) => {
             if (!contact.id) return;
@@ -458,7 +460,10 @@ export const sendQuestionEmail = onCall(
             }
             entry.askedAt = now;
             entry.askedBy = asker;
-            entry.currentStatus = "asked";
+            entry.currentStatus = "Asked";
+            entry.history = Array.isArray(entry.history)
+              ? [...entry.history, { status: "Asked", timestamp: now }]
+              : [{ status: "Asked", timestamp: now }];
           });
           q.contactStatus = statusEntry;
           qArr[qIdx] = q;
