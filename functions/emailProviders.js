@@ -10,7 +10,7 @@ import { google } from "googleapis";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import nodemailer from "nodemailer";
-import { generateTriagePrompt, calculateNewConfidence } from "../src/utils/inquiryLogic.js";
+import { generateTriagePrompt, calculateNewConfidence } from "./shared/inquiryLogic.js";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -791,28 +791,7 @@ export const processInboundEmail = onRequest(
         initiativeId,
       });
 
-    // Increment notifications: questions answered
-    try {
-      const nref = db
-        .collection("users")
-        .doc(uid)
-        .collection("notifications")
-        .doc("questionsAnswered");
-      await nref.set(
-        {
-          type: "questionsAnswered",
-          message: "A stakeholder answered a question.",
-          href: initiativeId
-            ? `/discovery?initiativeId=${initiativeId}`
-            : undefined,
-          count: FieldValue.increment(1),
-          createdAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    } catch (e) {
-      console.error("notif increment failed", e);
-    }
+    // Removed legacy "questions answered" notification; we rely on analysis notification
 
     // Respond quickly to Postmark
     res.status(200).send({ status: "ok" });
