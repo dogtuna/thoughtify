@@ -10,6 +10,7 @@ import { google } from "googleapis";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import nodemailer from "nodemailer";
+import { generateTriagePrompt, calculateNewConfidence } from "../src/utils/inquiryLogic.js";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -1062,135 +1063,125 @@ Respond ONLY in this JSON format:
           }
 
           // Triage evidence to update hypothesis confidences and suggest new hypotheses
-          const triagePrompt = (() => {
-            const hypothesesList = hypotheses
-              .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
-              .join("\n");
-            const contactsList = (contacts || [])
-              .map((c) => `${c.name} (${c.role || "Unknown Role"})`)
-              .join(", ");
-            return `Your role is an expert Performance Consultant. Analyze the New Evidence in the context of the Existing Hypotheses.
-
-Respond ONLY in the following JSON format:
-{ 
-  "analysisSummary": "...", 
-  "hypothesisLinks": [
-    {"hypothesisId":"A","relationship":"Supports","impact":"High","source":"${respondent}","sourceAuthority":"Medium","evidenceType":"Qualitative","directness":"Direct"}
-  ],
-  "newHypothesis": {"statement":"text","confidence":0.4}
-}
-
----
-New Evidence:\nQuestion: ${dhQuestion}\nAnswer: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}
-
-Existing Hypotheses:\n${hypothesesList}
-
-Known Project Stakeholders:\n${contactsList}`;
-          })();
-          let triage;
           try {
+            const evidenceText = `Question: ${dhQuestion}\nAnswer: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`;
+            const triagePrompt = generateTriagePrompt(evidenceText, hypotheses, contacts);
             const { text: triageText } = await ai.generate(triagePrompt);
+            let triage;
             try {
               triage = JSON.parse(triageText);
             } catch {
               const m = triageText && triageText.match(/\{[\s\S]*\}/);
-              if (m) {
-                try {
-                  triage = JSON.parse(m[0]);
-                } catch {
-                  triage = null;
-                }
-              } else {
-                triage = null;
-              }
+              if (m) triage = JSON.parse(m[0]);
             }
-          } catch {
-            triage = null;
-          }
-          if (triage && Array.isArray(triage.hypothesisLinks)) {
-            const AUTHORITY_WEIGHT = { High: 2.0, Medium: 1.0, Low: 0.5 };
-            const EVIDENCE_TYPE_WEIGHT = { Quantitative: 1.5, Qualitative: 0.8 };
-            const DIRECTNESS_WEIGHT = { Direct: 1.5, Indirect: 0.7 };
-            const scoreFromImpact = (impact) => (impact === "High" ? 0.2 : impact === "Medium" ? 0.1 : 0.05);
-            const logisticConfidence = (raw, slope = 1.0) => 1 / (1 + Math.exp(-slope * raw));
-
-            const updated = [...hypotheses];
-            const before = new Map(updated.map((h) => [h.id, h.confidence || 0]));
-            for (const link of triage.hypothesisLinks) {
-              const idx = updated.findIndex((h) => h.id === link.hypothesisId);
-              if (idx === -1) continue;
-              const h = updated[idx];
-              const baseScore = h.confidenceScore || 0;
-              const evidenceCount =
-                (h.evidence?.supporting?.length || h.supportingEvidence?.length || 0) +
-                (h.evidence?.refuting?.length || h.refutingEvidence?.length || 0);
-              const diminishing = 1 / Math.max(1, evidenceCount * 0.5);
-              const aw = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
-              const tw = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
-              const dw = DIRECTNESS_WEIGHT[link.directness] || 1;
-              const weightedImpact = scoreFromImpact(link.impact) * aw * tw * dw;
-              const multiplier = String(link.relationship).toLowerCase() === "refutes" ? -1.5 : 1;
-              const delta = weightedImpact * diminishing * multiplier;
-              const newScore = baseScore + delta;
-              const key = String(link.relationship).toLowerCase() === "refutes" ? "refuting" : "supporting";
-              const entry = {
-                text: `Q: ${dhQuestion}\nA: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`,
-                analysisSummary: triage.analysisSummary || "",
-                impact: link.impact,
-                delta,
-                source: respondent,
-                sourceAuthority: link.sourceAuthority,
-                evidenceType: link.evidenceType,
-                directness: link.directness,
-                relationship: link.relationship,
-                timestamp: Date.now(),
-                user: respondent,
-              };
-              const existingEvidence = h.evidence?.[key] || h[`${key}Evidence`] || [];
-              const updatedHyp = {
-                ...h,
-                evidence: { ...(h.evidence || {}), [key]: [...existingEvidence, entry] },
-                confidenceScore: newScore,
-                confidence: logisticConfidence(newScore),
-                auditLog: [...(h.auditLog || []), { timestamp: Date.now(), user: respondent, evidence: entry.text, weight: delta, message: `${(delta * 100).toFixed(0)} from ${respondent}` }],
-              };
-              updated[idx] = updatedHyp;
-            }
-
-            if (triage.newHypothesis && triage.newHypothesis.statement) {
-              const suggested = (init.suggestedHypotheses || []).slice();
-              suggested.push({
-                id: `sh-${Date.now()}`,
-                statement: triage.newHypothesis.statement,
-                confidence: triage.newHypothesis.confidence ?? 0,
-                suggestedAt: FieldValue.serverTimestamp(),
-                status: "pending",
+            if (triage?.hypothesisLinks?.length) {
+              let updatedHypotheses = [...hypotheses];
+              let allNewRecommendations = [
+                ...(triage.strategicRecommendations || []),
+              ];
+              let newProjectQuestions = [
+                ...(triage.projectQuestions || []),
+              ];
+              const before = new Map(
+                updatedHypotheses.map((h) => [h.id, h.confidence || 0])
+              );
+              triage.hypothesisLinks.forEach((link) => {
+                const idx = updatedHypotheses.findIndex(
+                  (h) => h.id === link.hypothesisId
+                );
+                if (idx === -1) return;
+                const { updatedHypothesis, extraRecommendations } =
+                  calculateNewConfidence(
+                    updatedHypotheses[idx],
+                    link,
+                    evidenceText,
+                    triage.analysisSummary || "",
+                    respondent
+                  );
+                updatedHypotheses[idx] = updatedHypothesis;
+                allNewRecommendations.push(...extraRecommendations);
               });
-              await db
-                .collection("users").doc(uid)
-                .collection("initiatives").doc(initiativeId)
-                .set({ suggestedHypotheses: suggested }, { merge: true });
-              await db
-                .collection("users").doc(uid)
-                .collection("notifications").doc("suggestedHypotheses")
-                .set({ type: "suggestedHypotheses", count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
-            }
 
-            await db
-              .collection("users").doc(uid)
-              .collection("initiatives").doc(initiativeId)
-              .set({ inquiryMap: { hypotheses: updated }, hypotheses: updated }, { merge: true });
-
-            for (const h of updated) {
-              const was = before.get(h.id) || 0;
-              const now = h.confidence || 0;
-              if (was < 0.8 && now >= 0.8) {
+              if (triage.newHypothesis?.statement) {
+                const suggested = (init.suggestedHypotheses || []).slice();
+                suggested.push({
+                  id: `sh-${Date.now()}`,
+                  statement: triage.newHypothesis.statement,
+                  confidence: triage.newHypothesis.confidence ?? 0,
+                  suggestedAt: FieldValue.serverTimestamp(),
+                  status: "pending",
+                });
                 await db
-                  .collection("users").doc(uid)
-                  .collection("notifications").doc(`hyp-${h.id}`)
-                  .set({ type: "hypothesisConfidence", message: `${h.statement || h.hypothesis || h.id} confidence now at ${(now * 100).toFixed(0)}%`, count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() }, { merge: true });
+                  .collection("users")
+                  .doc(uid)
+                  .collection("initiatives")
+                  .doc(initiativeId)
+                  .set({ suggestedHypotheses: suggested }, { merge: true });
+                await db
+                  .collection("users")
+                  .doc(uid)
+                  .collection("notifications")
+                  .doc("suggestedHypotheses")
+                  .set(
+                    {
+                      type: "suggestedHypotheses",
+                      count: FieldValue.increment(1),
+                      createdAt: FieldValue.serverTimestamp(),
+                    },
+                    { merge: true }
+                  );
+              }
+
+              const updatedRecommendations = [
+                ...(init.inquiryMap?.recommendations || init.recommendations || []),
+                ...allNewRecommendations,
+              ];
+              const updatedProjectQuestions = [
+                ...(init.projectQuestions || []),
+                ...newProjectQuestions,
+              ];
+
+              await db
+                .collection("users")
+                .doc(uid)
+                .collection("initiatives")
+                .doc(initiativeId)
+                .set(
+                  {
+                    "inquiryMap.hypotheses": updatedHypotheses,
+                    hypotheses: updatedHypotheses,
+                    "inquiryMap.recommendations": updatedRecommendations,
+                    recommendations: updatedRecommendations,
+                    projectQuestions: updatedProjectQuestions,
+                  },
+                  { merge: true }
+                );
+
+              for (const h of updatedHypotheses) {
+                const was = before.get(h.id) || 0;
+                const now = h.confidence || 0;
+                if (was < 0.8 && now >= 0.8) {
+                  await db
+                    .collection("users")
+                    .doc(uid)
+                    .collection("notifications")
+                    .doc(`hyp-${h.id}`)
+                    .set(
+                      {
+                        type: "hypothesisConfidence",
+                        message: `${
+                          h.statement || h.hypothesis || h.id
+                        } confidence now at ${(now * 100).toFixed(0)}%`,
+                        count: FieldValue.increment(1),
+                        createdAt: FieldValue.serverTimestamp(),
+                      },
+                      { merge: true }
+                    );
+                }
               }
             }
+          } catch (err) {
+            console.error("inbound triage failed", err);
           }
         } catch (e) {
           console.error("inbound analysis failed", e);
