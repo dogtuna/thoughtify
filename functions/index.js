@@ -14,6 +14,7 @@ import { Buffer } from "buffer";
 import express from "express";
 import cors from "cors";
 import { callZap } from "./integrations/zapier.js";
+import { processAnswer } from "./shared/answerPipeline.js";
 
 const FIREBASE_CONFIG = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
 const PROJECT_ID =
@@ -1665,7 +1666,7 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
   });
 
 export const generateInitialInquiryMap = onCall(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", invoker: "public", secrets: ["GOOGLE_GENAI_API_KEY"], cors: ["https://thoughtify.training"] },
   async (request) => {
     const {
       brief,
@@ -1769,6 +1770,45 @@ Project Data:\n${projectData.join("\n\n")}`;
 
     return { hypotheses, count: hypotheses.length };
   },
+);
+
+// Unified server analysis/triage for Discovery Hub answers
+export const analyzeDiscoveryAnswer = onCall(
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  async (request) => {
+    const {
+      uid,
+      initiativeId,
+      questionId,
+      questionText,
+      answerText,
+      extraText = "",
+      respondent = "",
+    } = request.data || {};
+
+    if (!uid || !initiativeId || !answerText) {
+      throw new HttpsError("invalid-argument", "uid, initiativeId, and answerText are required");
+    }
+    const key = process.env.GOOGLE_GENAI_API_KEY;
+    if (!key) throw new HttpsError("internal", "No API key available.");
+
+    const result = await processAnswer(
+      db,
+      admin.firestore.FieldValue,
+      {
+        uid,
+        initiativeId,
+        questionId,
+        questionText,
+        answerText,
+        extraText,
+        respondent,
+        subject: "Discovery Hub answer",
+        genAiKey: key,
+      }
+    );
+    return result;
+  }
 );
 
 

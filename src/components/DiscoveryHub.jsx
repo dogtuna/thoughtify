@@ -692,193 +692,25 @@ const DiscoveryHub = () => {
 
   const analyzeAnswer = async (question, text, respondent) => {
     try {
-      const contextPieces = [];
-      if (projectName) contextPieces.push(`Project Name: ${projectName}`);
-      if (businessGoal) contextPieces.push(`Business Goal: ${businessGoal}`);
-      if (audienceProfile)
-        contextPieces.push(`Audience Profile: ${audienceProfile}`);
-      if (projectConstraints)
-        contextPieces.push(`Project Constraints: ${projectConstraints}`);
-      if (contacts.length) {
-        contextPieces.push(
-          `Key Contacts: ${contacts
-            .map((c) => `${c.name}${c.jobTitle ? ` (${c.jobTitle})` : ""}`)
-            .join(", ")}`
-        );
-      }
-      if (questions.length) {
-          const qa = questions
-            .map((q) => {
-              const answers = Object.entries(q.answers || {})
-                .map(([name, value]) => `${name}: ${value?.text || ""}`)
-                .filter((s) => s.trim())
-                .join("; ");
-              return answers ? `${q.question} | ${answers}` : `${q.question}`;
-            })
-            .join("\n");
-        contextPieces.push(`Existing Q&A:\n${qa}`);
-      }
-      if (documents.length) {
-        const docs = documents
-          .map((d) => `${d.name}:\n${d.content}`)
-          .join("\n");
-        contextPieces.push(`Source Materials:\n${docs}`);
-      }
-
-      const existingTasks = projectTasks.map((t) => t.message).join("\n");
-      if (existingTasks) contextPieces.push(`Existing Tasks:\n${existingTasks}`);
-      const existingQuestions = questions.map((q) => q.question).join("\n");
-      if (existingQuestions)
-        contextPieces.push(`Existing Questions:\n${existingQuestions}`);
-
-      const projectContext = contextPieces.join("\n\n");
-      const taskSet = new Set(projectTasks.map((t) => t.message.toLowerCase()));
-      const questionSet = new Set(questions.map((q) => q.question.toLowerCase()));
-
-      const hypothesisList = hypotheses
-        .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.text || h.label || h.id}`)
-        .join("\n");
-
-      const prompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
-
-Project Context:
-${projectContext}
-
-Existing Hypotheses:
-${hypothesisList}
-
-Discovery Question:
-${question}
-
-Answer from ${respondent}:
-${text}
-
-Avoid suggesting tasks or questions that already exist in the provided lists.
-
-Please provide a JSON object with two fields:
-- "analysis": a concise summary of what this answer reveals about the question in the context of the project.
-- "suggestions": An array of objects for follow-up actions. Each object must have these fields:
-    1. "text": The follow-up action. Do not include any names in this text.
-    2. "category": One of "question", "meeting", "email", "research", or "instructional-design". Use "instructional-design" for tasks involving designing or creating instructional materials.
-    3. "who": The person or group to work with. This must be either a project contact, someone explicitly mentioned in the provided materials, or the current user.
-    4. "hypothesisId": The ID of the related hypothesis, or null if exploring a new idea.
-    5. "taskType": One of "validate", "refute", or "explore".
-
-Respond ONLY in this JSON format:
-{"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "...", "hypothesisId": "A", "taskType": "validate"}, ...]}`;
-
-      const { text: res } = await ai.generate(prompt);
-
-      const parseResponse = (str) => {
-        const parsed = JSON.parse(str);
-        const analysis =
-          typeof parsed.analysis === "string"
-            ? parsed.analysis
-            : JSON.stringify(parsed.analysis);
-
-        const allowedCategories = [
-          "question",
-          "meeting",
-          "email",
-          "research",
-          "instructional-design",
-        ];
-        const allowedTaskTypes = ["validate", "refute", "explore"];
-        const suggestions = Array.isArray(parsed.suggestions)
-          ? parsed.suggestions
-              .filter(
-                (s) =>
-                  s &&
-                  typeof s.text === "string" &&
-                  typeof s.category === "string" &&
-                  typeof s.who === "string" &&
-                  allowedCategories.includes(s.category.toLowerCase()) &&
-                  !taskSet.has(s.text.toLowerCase()) &&
-                  !questionSet.has(s.text.toLowerCase())
-              )
-              .map((s) => ({
-                text: s.text,
-                category: s.category.toLowerCase(),
-                who: s.who,
-                hypothesisId:
-                  typeof s.hypothesisId === "string" && s.hypothesisId.trim()
-                    ? s.hypothesisId.trim()
-                    : null,
-                taskType: allowedTaskTypes.includes(
-                  (s.taskType || "").toLowerCase(),
-                )
-                  ? s.taskType.toLowerCase()
-                  : "explore",
-              }))
-          : [];
-
-        return { analysis, suggestions };
+      if (appCheck) await getToken(appCheck);
+      if (auth.currentUser) await auth.currentUser.getIdToken(true);
+      const callable = httpsCallable(functions, "analyzeDiscoveryAnswer");
+      const resp = await callable({
+        uid,
+        initiativeId,
+        questionId: null,
+        questionText: question,
+        answerText: text,
+        respondent,
+      });
+      const data = resp?.data || {};
+      return {
+        analysis: typeof data.analysis === "string" ? data.analysis : JSON.stringify(data.analysis || ""),
+        suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
       };
-
-      let result;
-      if (typeof res === "string") {
-        try {
-          result = parseResponse(res);
-        } catch {
-          const match = res.match(/\{[\s\S]*\}/);
-          if (match) {
-            try {
-              result = parseResponse(match[0]);
-            } catch {
-              // fall through
-            }
-          }
-          if (!result) {
-            result = { analysis: res.trim(), suggestions: [] };
-          }
-        }
-      } else {
-        result = { analysis: "Unexpected response format.", suggestions: [] };
-      }
-
-      let triageRes = null;
-      if (uid && initiativeId) {
-        try {
-          triageRes = await triageEvidence(
-            `Question: ${question}\nAnswer: ${text}`
-          );
-        } catch (err) {
-          console.error("triageEvidence error", err);
-        }
-      }
-
-      if (triageRes?.hypothesisLinks?.length) {
-        const firstSupport = triageRes.hypothesisLinks.find(
-          (l) => l.relationship?.toLowerCase() === "supports",
-        );
-        const firstRefute = triageRes.hypothesisLinks.find(
-          (l) => l.relationship?.toLowerCase() === "refutes",
-        );
-        const firstRelevant = triageRes.hypothesisLinks.find(
-          (l) => l.relationship?.toLowerCase() !== "unrelated",
-        );
-        result.suggestions = result.suggestions.map((s) => {
-          if (s.hypothesisId) return s;
-          if (s.taskType === "validate" && firstSupport) {
-            return { ...s, hypothesisId: firstSupport.hypothesisId };
-          }
-          if (s.taskType === "refute" && firstRefute) {
-            return { ...s, hypothesisId: firstRefute.hypothesisId };
-          }
-          if (s.taskType === "explore" && firstRelevant) {
-            return { ...s, hypothesisId: firstRelevant.hypothesisId };
-          }
-          return s;
-        });
-      }
-
-      return result;
     } catch (err) {
       console.error("analyzeAnswer error", err);
-      return {
-        analysis: "Analysis could not be generated.",
-        suggestions: [],
-      };
+      return { analysis: "Analysis could not be generated.", suggestions: [] };
     }
   };
 

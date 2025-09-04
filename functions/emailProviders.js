@@ -11,6 +11,7 @@ import { gemini, googleAI } from "@genkit-ai/googleai";
 import { genkit } from "genkit";
 import nodemailer from "nodemailer";
 import { generateTriagePrompt, calculateNewConfidence } from "./shared/inquiryLogic.js";
+import { processAnswer } from "./shared/answerPipeline.js";
 
 // --- Firebase Functions v2 (https) ---
 import {
@@ -801,6 +802,26 @@ export const processInboundEmail = onRequest(
     // background trigger or queue.
     await (async () => {
       if (initiativeId && genAiKey) {
+        try {
+          await processAnswer(db, FieldValue, {
+            uid,
+            initiativeId,
+            questionId,
+            questionText: null,
+            answerText,
+            extraText,
+            respondent: answeredBy || fromEmail,
+            subject,
+            genAiKey,
+            messageRef: msgRef,
+          });
+          return; // skip legacy inline logic below
+        } catch (e) {
+          console.error("inbound processing failed", e);
+          return;
+        }
+      }
+      // legacy inline path continues (should be skipped by return above)
         try {
           const initSnap = await db
             .collection("users")
