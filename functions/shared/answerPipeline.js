@@ -320,6 +320,12 @@ export async function processAnswer(db, FieldValue, params) {
           confidence: triage.newHypothesis.confidence ?? 0,
           suggestedAt: Date.now(),
           status: "pending",
+          provenance: {
+            evidenceText,
+            analysisSummary: triage.analysisSummary || "",
+            respondent,
+            source: respondent,
+          },
         });
         await db
           .collection("users").doc(uid)

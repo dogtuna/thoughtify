@@ -380,12 +380,32 @@ export const InquiryMapProvider = ({ children }) => {
         if (idx === -1) return;
         const sh = [...(current.suggestedHypotheses || [])];
         const picked = sh.splice(idx, 1)[0];
+        const now = Date.now();
+        const prov = picked?.provenance || {};
+        const evidenceEntry = prov?.evidenceText
+          ? {
+              text: prov.evidenceText,
+              analysisSummary: prov.analysisSummary || "",
+              impact: "High",
+              delta: 0,
+              source: prov.source || prov.respondent || currentUser,
+              sourceAuthority: "Medium",
+              evidenceType: "Qualitative",
+              directness: "Direct",
+              relationship: "Supports",
+              timestamp: now,
+              user: prov.respondent || currentUser,
+            }
+          : null;
         const newHyp = {
           id: `hyp-${Date.now()}`,
           statement: picked.statement || picked.hypothesis,
           hypothesis: picked.hypothesis || picked.statement,
           confidence: picked.confidence ?? 0,
-          evidence: { supporting: [], refuting: [] },
+          evidence: {
+            supporting: evidenceEntry ? [evidenceEntry] : [],
+            refuting: [],
+          },
           sourceContributions: [],
         };
         const hyps = [...(current.hypotheses || []), newHyp];
