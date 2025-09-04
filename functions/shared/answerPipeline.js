@@ -249,7 +249,12 @@ export async function processAnswer(db, FieldValue, params) {
       let updatedHypotheses = [...hypotheses];
       let allNewRecommendations = [ ...(triage.strategicRecommendations || []) ];
       let newProjectQuestions = [ ...(triage.projectQuestions || []) ];
-      const before = new Map(updatedHypotheses.map((h) => [String(h.id), h.confidence || 0]));
+      const before = new Map(
+        updatedHypotheses.map((h) => [
+          String(h.id),
+          h.confidence ?? (typeof h.confidenceScore === "number" ? logistic(h.confidenceScore) : 0),
+        ])
+      );
 
       const normalize = (s) => String(s || "").trim();
       const simplify = (s) => normalize(s).toLowerCase();
@@ -272,6 +277,9 @@ export async function processAnswer(db, FieldValue, params) {
         return i;
       };
 
+      // helper for logistic
+      function logistic(x) { return 1 / (1 + Math.exp(-x)); }
+
       triage.hypothesisLinks.forEach((link) => {
         const idx = resolveIndex(updatedHypotheses, link.hypothesisId);
         if (idx === -1) {
@@ -288,7 +296,7 @@ export async function processAnswer(db, FieldValue, params) {
           respondent
         );
         updatedHypotheses[idx] = updatedHypothesis;
-        const afterConf = updatedHypothesis.confidence || 0;
+        const afterConf = updatedHypothesis.confidence ?? beforeConf;
         const deltaPct = Math.round((afterConf - beforeConf) * 100);
         console.log("processAnswer: link applied", {
           hypothesisId: hId,
@@ -310,7 +318,7 @@ export async function processAnswer(db, FieldValue, params) {
           id: `sh-${Date.now()}`,
           statement: triage.newHypothesis.statement,
           confidence: triage.newHypothesis.confidence ?? 0,
-          suggestedAt: FieldValue.serverTimestamp(),
+          suggestedAt: Date.now(),
           status: "pending",
         });
         await db

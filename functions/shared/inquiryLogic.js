@@ -98,6 +98,7 @@ export const calculateNewConfidence = (
   const rel = String(link.relationship || "").toLowerCase();
   const isSupport = rel === "supports";
   const isRefute = rel === "refutes";
+  const isUnrelated = !isSupport && !isRefute;
   const multiplier = isRefute ? -1.5 : isSupport ? 1 : 0; // unrelated => 0 impact
   const delta = weightedImpact * diminishingFactor * multiplier;
 
@@ -158,6 +159,24 @@ export const calculateNewConfidence = (
         `CRITICAL: Schedule a root cause alignment meeting with ${highAuthorityConflict.source} and ${link.source} to resolve the conflicting perspectives on hypothesis ${hypothesis.id}.`
       );
     }
+  }
+
+  // If unrelated, do not change score/confidence or add audit; only return evidence untouched
+  if (isUnrelated) {
+    const rest = { ...hypothesis };
+    delete rest.supportingEvidence;
+    delete rest.refutingEvidence;
+    return {
+      updatedHypothesis: {
+        ...rest,
+        evidence: updatedEvidence,
+        contested,
+        confidenceScore: hypothesis.confidenceScore ?? 0,
+        confidence: hypothesis.confidence ?? undefined,
+        auditLog: [...(hypothesis.auditLog || [])],
+      },
+      extraRecommendations,
+    };
   }
 
   const oldConfidence = hypothesis.confidence ?? logisticConfidence(baseScore);

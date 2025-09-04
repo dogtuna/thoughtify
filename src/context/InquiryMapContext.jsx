@@ -19,8 +19,30 @@ const InquiryMapContext = createContext();
 const toArray = (val) =>
   Array.isArray(val) ? val : val && typeof val === "object" ? Object.values(val) : [];
 
+const pickBetterHypotheses = (a1, a2) => {
+  const arr1 = toArray(a1);
+  const arr2 = toArray(a2);
+  if (arr1.length && arr2.length) {
+    const score = (arr) => {
+      let c = 0;
+      for (const h of arr) {
+        if (typeof h?.confidence === "number") { c += 2; }
+        const sup = h?.evidence?.supporting || h?.supportingEvidence || [];
+        const ref = h?.evidence?.refuting || h?.refutingEvidence || [];
+        if ((sup && sup.length) || (ref && ref.length)) { c += 1; }
+      }
+      return c;
+    };
+    return score(arr2) > score(arr1) ? arr2 : arr1;
+  }
+  return arr1.length ? arr1 : arr2;
+};
+
 const getInquiryData = (data) => ({
-  hypotheses: toArray(data?.inquiryMap?.hypotheses ?? data?.hypotheses),
+  hypotheses: pickBetterHypotheses(
+    data?.inquiryMap?.hypotheses,
+    data?.hypotheses
+  ),
   recommendations: toArray(
     data?.inquiryMap?.recommendations ?? data?.recommendations
   ),
