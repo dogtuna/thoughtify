@@ -3,6 +3,7 @@ export const TYPE_CATEGORY_MAP = {
   questionsAnswered: "questions",
   answerReceived: "messages",
   suggestedTasks: "tasks",
+  suggestedQuestions: "questions",
   suggestedHypotheses: "inquiry",
   hypothesisConfidence: "inquiry",
 };
@@ -17,4 +18,3 @@ export const computeUnreadCounts = (notifs = []) =>
     }
     return acc;
   }, {});
-
