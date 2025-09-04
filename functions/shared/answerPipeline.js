@@ -249,12 +249,37 @@ export async function processAnswer(db, FieldValue, params) {
       let updatedHypotheses = [...hypotheses];
       let allNewRecommendations = [ ...(triage.strategicRecommendations || []) ];
       let newProjectQuestions = [ ...(triage.projectQuestions || []) ];
-      const before = new Map(updatedHypotheses.map((h) => [h.id, h.confidence || 0]));
+      const before = new Map(updatedHypotheses.map((h) => [String(h.id), h.confidence || 0]));
+
+      const normalize = (s) => String(s || "").trim();
+      const simplify = (s) => normalize(s).toLowerCase();
+      const resolveIndex = (arr, rawId) => {
+        const raw = normalize(rawId);
+        if (!raw) return -1;
+        // 1) Exact match
+        let i = arr.findIndex((h) => normalize(h.id) === raw);
+        if (i !== -1) return i;
+        // 2) Strip trailing label like "A: ..."
+        const token = normalize(raw.split(":")[0]);
+        i = arr.findIndex((h) => normalize(h.id) === token);
+        if (i !== -1) return i;
+        // 3) Case-insensitive comparison
+        const rawL = simplify(raw);
+        i = arr.findIndex((h) => simplify(h.id) === rawL);
+        if (i !== -1) return i;
+        const tokenL = simplify(token);
+        i = arr.findIndex((h) => simplify(h.id) === tokenL);
+        return i;
+      };
 
       triage.hypothesisLinks.forEach((link) => {
-        const targetId = String(link.hypothesisId || "").trim();
-        const idx = updatedHypotheses.findIndex((h) => String(h.id) === targetId);
-        if (idx === -1) return;
+        const idx = resolveIndex(updatedHypotheses, link.hypothesisId);
+        if (idx === -1) {
+          console.warn("processAnswer: could not resolve hypothesisId from triage", link.hypothesisId);
+          return;
+        }
+        const hId = String(updatedHypotheses[idx].id);
+        const beforeConf = before.get(hId) || 0;
         const { updatedHypothesis, extraRecommendations } = calculateNewConfidence(
           updatedHypotheses[idx],
           link,
@@ -263,6 +288,19 @@ export async function processAnswer(db, FieldValue, params) {
           respondent
         );
         updatedHypotheses[idx] = updatedHypothesis;
+        const afterConf = updatedHypothesis.confidence || 0;
+        const deltaPct = Math.round((afterConf - beforeConf) * 100);
+        console.log("processAnswer: link applied", {
+          hypothesisId: hId,
+          relationship: link.relationship,
+          impact: link.impact,
+          sourceAuthority: link.sourceAuthority,
+          evidenceType: link.evidenceType,
+          directness: link.directness,
+          before: beforeConf,
+          after: afterConf,
+          deltaPct,
+        });
         allNewRecommendations.push(...extraRecommendations);
       });
 
@@ -288,15 +326,22 @@ export async function processAnswer(db, FieldValue, params) {
       const updatedRecommendations = [ ...(init.inquiryMap?.recommendations || init.recommendations || []), ...allNewRecommendations ];
       const updatedProjectQuestions = [ ...(init.projectQuestions || []), ...newProjectQuestions ];
 
+      // Ensure the nested inquiryMap map is updated atomically, not only via dotted paths
+      const newInquiryMap = {
+        ...(init.inquiryMap || {}),
+        hypotheses: updatedHypotheses,
+        hypothesisCount: updatedHypotheses.length,
+        recommendations: updatedRecommendations,
+      };
+
       await db
         .collection("users").doc(uid)
         .collection("initiatives").doc(initiativeId)
         .set(
           {
-            "inquiryMap.hypotheses": updatedHypotheses,
-            hypotheses: updatedHypotheses,
-            "inquiryMap.recommendations": updatedRecommendations,
-            recommendations: updatedRecommendations,
+            inquiryMap: newInquiryMap,
+            hypotheses: updatedHypotheses, // legacy top-level mirror
+            recommendations: updatedRecommendations, // legacy top-level mirror
             projectQuestions: updatedProjectQuestions,
           },
           { merge: true }

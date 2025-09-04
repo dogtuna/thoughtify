@@ -8,9 +8,11 @@ const DIRECTNESS_WEIGHT = { Direct: 1.5, Indirect: 0.7 };
 const CORROBORATION_MULTIPLIER = 2.0;
 
 const scoreFromImpact = (impact) => {
-  switch (impact) {
-    case "High": return 0.2;
-    case "Medium": return 0.1;
+  const v = String(impact || "").toLowerCase();
+  switch (v) {
+    case "high": return 0.2;
+    case "medium": return 0.1;
+    case "low": return 0.05;
     default: return 0.05;
   }
 };
@@ -35,14 +37,14 @@ export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
 3.  **Classify the Source:** Identify the source and classify its authority, type, and directness.
 4.  **Suggest New Hypothesis:** If this evidence implies a new hypothesis that could have a higher confidence than the current lowest confidence hypothesis, include it.
 
-Use the EXACT hypothesis IDs shown before the colon (for example, use "hyp-123" if that is the ID). Do not invent new IDs or renumber them.
+Use the EXACT hypothesis IDs shown before the colon. Do not invent new IDs or renumber them.
 
 Respond ONLY in the following JSON format (IDs must match exactly):
 {
   "analysisSummary": "A brief summary of the evidence's strategic meaning.",
   "hypothesisLinks": [
     {
-      "hypothesisId": "hyp-123",
+      "hypothesisId": "A",
       "relationship": "Refutes",
       "impact": "High",
       "source": "Chloe Zhao",
@@ -83,14 +85,20 @@ export const calculateNewConfidence = (
     (hypothesis.evidence?.refuting?.length || hypothesis.refutingEvidence?.length || 0);
   const diminishingFactor = 1 / Math.max(1, evidenceCount * 0.5);
 
-  const authorityWeight = AUTHORITY_WEIGHT[link.sourceAuthority] || 1;
-  const typeWeight = EVIDENCE_TYPE_WEIGHT[link.evidenceType] || 1;
-  const directWeight = DIRECTNESS_WEIGHT[link.directness] || 1;
+  const cap = (s) => {
+    const t = String(s || "").toLowerCase();
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
+  };
+  const authorityWeight = AUTHORITY_WEIGHT[cap(link.sourceAuthority)] || 1;
+  const typeWeight = EVIDENCE_TYPE_WEIGHT[cap(link.evidenceType)] || 1;
+  const directWeight = DIRECTNESS_WEIGHT[cap(link.directness)] || 1;
 
   const weightedImpact = scoreFromImpact(link.impact) * authorityWeight * typeWeight * directWeight;
 
   const rel = String(link.relationship || "").toLowerCase();
-  const multiplier = rel === "refutes" ? -1.5 : 1;
+  const isSupport = rel === "supports";
+  const isRefute = rel === "refutes";
+  const multiplier = isRefute ? -1.5 : isSupport ? 1 : 0; // unrelated => 0 impact
   const delta = weightedImpact * diminishingFactor * multiplier;
 
   const timestamp = Date.now();
@@ -108,11 +116,13 @@ export const calculateNewConfidence = (
     user,
   };
 
-  const key = rel === "supports" ? "supporting" : "refuting";
-  const existingEvidenceArr =
-    hypothesis.evidence?.[key] || hypothesis[`${key}Evidence`] || [];
-  const updatedEvidenceArr = [...existingEvidenceArr, newEvidenceEntry];
-  const updatedEvidence = { ...(hypothesis.evidence || {}), [key]: updatedEvidenceArr };
+  let updatedEvidence = hypothesis.evidence || {};
+  if (isSupport || isRefute) {
+    const key = isSupport ? "supporting" : "refuting";
+    const existingEvidenceArr = hypothesis.evidence?.[key] || hypothesis[`${key}Evidence`] || [];
+    const updatedEvidenceArr = [...existingEvidenceArr, newEvidenceEntry];
+    updatedEvidence = { ...(hypothesis.evidence || {}), [key]: updatedEvidenceArr };
+  }
 
   const existingSup = hypothesis.evidence?.supporting || hypothesis.supportingEvidence || [];
   const beforeHasQuant = existingSup.some(e => e.evidenceType === "Quantitative");
@@ -120,7 +130,7 @@ export const calculateNewConfidence = (
   const beforeSources = new Set(existingSup.map(e => e.source));
   const beforeCorroboration = beforeHasQuant && beforeHasQual && beforeSources.size > 1;
 
-  const afterSup = rel === "supports" ? updatedEvidenceArr : existingSup;
+  const afterSup = isSupport ? (updatedEvidence.supporting || []) : existingSup;
   const afterHasQuant = afterSup.some(
     (e) => e.evidenceType === "Quantitative"
   );
@@ -131,7 +141,7 @@ export const calculateNewConfidence = (
   const afterCorroboration = afterHasQuant && afterHasQual && afterSources.size > 1;
 
   let newScore = baseScore + delta;
-  if (rel === "supports" && afterCorroboration && !beforeCorroboration) {
+  if (isSupport && afterCorroboration && !beforeCorroboration) {
     newScore *= CORROBORATION_MULTIPLIER;
   }
 

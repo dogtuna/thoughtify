@@ -329,16 +329,19 @@ export const sendQuestionEmail = onCall(
 
     const qId = String(questionId);
 
-    try {
-      const refToken = `Ref:QID${qId}|UID${uid}`;
-      const subjectWithRef = `${subject} [${refToken}]`;
-      const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${qId} UID${uid} -->`;
+  try {
+    console.log("sendQuestionEmail: payload", { provider, to: recipientEmail, questionId: qId });
+    const refToken = `Ref:QID${qId}|UID${uid}`;
+    const subjectWithRef = `${subject} [${refToken}]`;
+    const bodyWithFooter = `${message}\n\n${refToken}\n<!-- THOUGHTIFY_REF QID${qId} UID${uid} -->`;
       const hmac = crypto
         .createHmac("sha256", TOKEN_ENCRYPTION_KEY.value())
         .update(`QID${qId}_UID${uid}`)
         .digest("hex")
         .slice(0, 16);
-      const replyTo = `reply+QID${qId}_UID${uid}_SIG${hmac}@${REPLIES_DOMAIN.value() || "replies.thoughtify.training"}`;
+    const replyDomain = REPLIES_DOMAIN.value() || "replies.thoughtify.training";
+    const replyTo = `reply+QID${qId}_UID${uid}_SIG${hmac}@${replyDomain}`;
+    console.log("sendQuestionEmail: headers", { replyTo, subjectWithRef });
 
       let messageId = "";
 
@@ -370,6 +373,7 @@ export const sendQuestionEmail = onCall(
           requestBody: { raw },
         });
         messageId = resp.data.id || "";
+        console.log("sendQuestionEmail: gmail sent", { messageId });
       } else if (["imap", "pop3", "outlook"].includes(provider)) {
         const snap = await db
           .collection("users")
@@ -406,6 +410,7 @@ export const sendQuestionEmail = onCall(
         });
         await transporter.close();
         messageId = info.messageId || "";
+        console.log("sendQuestionEmail: smtp sent", { messageId });
       } else {
         throw new HttpsError("invalid-argument", "Unknown provider");
       }
@@ -480,7 +485,8 @@ export const sendQuestionEmail = onCall(
         console.error("Failed to mark question as asked from sendQuestionEmail", e);
       }
 
-      return { messageId };
+      console.log("sendQuestionEmail: success", { messageId });
+      return { messageId, replyTo, subject: subjectWithRef };
     } catch (err) {
       console.error(
         "sendQuestionEmail error",
@@ -625,16 +631,32 @@ export const processInboundEmail = onRequest(
       }
     }
 
-    // 3) Fallback to custom headers
+    // 3) Fallbacks
     if (!questionId || !uid) {
-      const headerMap = Object.fromEntries(
-        Headers.map((h) => [String(h.Name || "").toLowerCase(), h.Value])
-      );
-      if (!questionId && headerMap["x-question-id"]) {
-        questionId = String(headerMap["x-question-id"]).trim();
-      }
-      if (!uid && headerMap["x-user-id"]) {
-        uid = String(headerMap["x-user-id"]).trim();
+      // 3a) Custom headers
+      try {
+        const headerMap = Object.fromEntries(
+          (Headers || []).map((h) => [String(h.Name || "").toLowerCase(), h.Value])
+        );
+        if (!questionId && headerMap["x-question-id"]) {
+          questionId = String(headerMap["x-question-id"]).trim();
+        }
+        if (!uid && headerMap["x-user-id"]) {
+          uid = String(headerMap["x-user-id"]).trim();
+        }
+      } catch {}
+    }
+    if (!questionId || !uid) {
+      // 3b) Subject/body reference token: Ref:QID<id>|UID<uid>
+      const parseRef = (txt) => {
+        if (!txt) return null;
+        const m = String(txt).match(/Ref:QID([^|\]\s]+)\|UID([^\]\s]+)/i);
+        return m ? { q: m[1], u: m[2] } : null;
+      };
+      const ref = parseRef(Subject) || parseRef(TextBody) || parseRef(HtmlBody);
+      if (ref) {
+        if (!questionId) questionId = ref.q;
+        if (!uid) uid = ref.u;
       }
     }
 
@@ -796,13 +818,12 @@ export const processInboundEmail = onRequest(
 
     // Removed legacy "questions answered" notification; we rely on analysis notification
 
-    // Respond quickly to Postmark
+    // Respond immediately to Postmark to avoid retries/timeouts
     res.status(200).send({ status: "ok" });
 
-    // Continue heavy processing asynchronously and ensure completion.
-    // If this work risks exceeding the function timeout, move it to a
-    // background trigger or queue.
-    await (async () => {
+    // Kick off analysis/triage in the background (do not block the webhook)
+    // Note: For strict reliability, consider queueing to Firestore/PubSub.
+    setTimeout(async () => {
       if (!(initiativeId && genAiKey)) return;
       try {
         await processAnswer(db, FieldValue, {
@@ -820,6 +841,6 @@ export const processInboundEmail = onRequest(
       } catch (e) {
         console.error("inbound processing failed", e);
       }
-    })();
+    }, 0);
   }
 );
