@@ -53,7 +53,8 @@ export async function processAnswer(db, FieldValue, params) {
     messageRef = null, // optional DocumentReference to attach analysis
   } = params;
 
-  if (!uid || !initiativeId || !answerText || !genAiKey) {
+  if (!uid || !initiativeId || !answerText) {
+    console.error("processAnswer: missing required inputs", { hasUid: !!uid, hasInitiativeId: !!initiativeId, hasAnswer: !!answerText });
     return { analysis: "", suggestions: [] };
   }
 
@@ -111,9 +112,12 @@ export async function processAnswer(db, FieldValue, params) {
 
   const dhQuestion = questionText || (questionsArr.find((q) => String(q.id) === String(questionId))?.question) || subject;
 
-  // 1) Analysis and suggestions
-  const ai = genkit({ plugins: [googleAI({ apiKey: genAiKey })], model: gemini("gemini-1.5-pro") });
-  const analysisPrompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
+  // 1) Analysis and suggestions (skip if missing key)
+  let analysis = "";
+  let suggestions = [];
+  if (genAiKey) {
+    const ai = genkit({ plugins: [googleAI({ apiKey: genAiKey })], model: gemini("gemini-1.5-pro") });
+    const analysisPrompt = `You are an expert Instructional Designer and Performance Consultant. You are analyzing ${respondent}'s answer to a specific discovery question. Your goal is to understand what this answer means for the training project and to determine follow-up actions.
 \nProject Context:\n${projectContext}
 \nExisting Hypotheses:\n${hypothesisList}
 \nDiscovery Question:\n${dhQuestion}
@@ -130,17 +134,20 @@ export async function processAnswer(db, FieldValue, params) {
 \nRespond ONLY in this JSON format:
 {"analysis": "...", "suggestions": [{"text": "...", "category": "...", "who": "...", "hypothesisId": "A", "taskType": "validate"}, ...]}`;
 
-  const { text: aiText } = await ai.generate(analysisPrompt);
-  const parsed = safeParseJson(aiText, {});
+    const { text: aiText } = await ai.generate(analysisPrompt);
+    const parsed = safeParseJson(aiText, {});
 
-  const taskSet = new Set((init.tasks || []).map((t) => (t.message || "").toLowerCase()));
-  const questionSet = new Set((questionsArr || []).map((q) => (q.question || String(q)).toLowerCase()));
+    const taskSet = new Set((init.tasks || []).map((t) => (t.message || "").toLowerCase()));
+    const questionSet = new Set((questionsArr || []).map((q) => (q.question || String(q)).toLowerCase()));
 
-  const suggestions = normalizeSuggestions(parsed?.suggestions, {
-    existingTasks: taskSet,
-    existingQuestions: questionSet,
-  });
-  const analysis = typeof parsed?.analysis === "string" ? parsed.analysis : JSON.stringify(parsed?.analysis || "");
+    suggestions = normalizeSuggestions(parsed?.suggestions, {
+      existingTasks: taskSet,
+      existingQuestions: questionSet,
+    });
+    analysis = typeof parsed?.analysis === "string" ? parsed.analysis : JSON.stringify(parsed?.analysis || "");
+  } else {
+    console.warn("processAnswer: Missing genAiKey; skipping analysis/suggestions generation");
+  }
 
   // Persist suggested tasks (non-question)
   const suggestedTasks = suggestions.filter((s) => s.category !== "question");
@@ -230,18 +237,23 @@ export async function processAnswer(db, FieldValue, params) {
 
   // 2) Triage evidence to update hypothesis confidences and suggest new hypotheses
   try {
+    if (!genAiKey) throw new Error("No genAiKey for triage");
+    const ai = genkit({ plugins: [googleAI({ apiKey: genAiKey })], model: gemini("gemini-1.5-pro") });
     const evidenceText = `Question: ${dhQuestion}\nAnswer: ${answerText}${extraText ? `\nAdditional: ${extraText}` : ""}`;
     const triagePrompt = generateTriagePrompt(evidenceText, hypotheses, contacts);
     const { text: triageText } = await ai.generate(triagePrompt);
     const triage = safeParseJson(triageText, {});
-    if (triage?.hypothesisLinks?.length) {
+    const linkCount = Array.isArray(triage?.hypothesisLinks) ? triage.hypothesisLinks.length : 0;
+    console.log("processAnswer: triage link count:", linkCount);
+    if (linkCount) {
       let updatedHypotheses = [...hypotheses];
       let allNewRecommendations = [ ...(triage.strategicRecommendations || []) ];
       let newProjectQuestions = [ ...(triage.projectQuestions || []) ];
       const before = new Map(updatedHypotheses.map((h) => [h.id, h.confidence || 0]));
 
       triage.hypothesisLinks.forEach((link) => {
-        const idx = updatedHypotheses.findIndex((h) => h.id === link.hypothesisId);
+        const targetId = String(link.hypothesisId || "").trim();
+        const idx = updatedHypotheses.findIndex((h) => String(h.id) === targetId);
         if (idx === -1) return;
         const { updatedHypothesis, extraRecommendations } = calculateNewConfidence(
           updatedHypotheses[idx],
@@ -289,6 +301,7 @@ export async function processAnswer(db, FieldValue, params) {
           },
           { merge: true }
         );
+      console.log("processAnswer: updated hypotheses count:", updatedHypotheses.length);
 
       for (const h of updatedHypotheses) {
         const was = before.get(h.id) || 0;
@@ -307,9 +320,8 @@ export async function processAnswer(db, FieldValue, params) {
       }
     }
   } catch (err) {
-    console.error("triage failed", err);
+    console.warn("processAnswer: triage skipped or failed", err?.message || err);
   }
 
   return { analysis, suggestions };
 }
-

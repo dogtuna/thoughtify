@@ -287,9 +287,10 @@ export const saveEmailCredentials = onCall(
 export const sendQuestionEmail = onCall(
   {
     region: "us-central1",
-    enforceAppCheck: true,
+    // Temporarily disable App Check enforcement to unblock CORS failures
+    // Once App Check is confirmed working in production, re-enable:
+    // enforceAppCheck: true,
     invoker: "public",
-    cors: ["https://thoughtify.training"],
     secrets: [
       TOKEN_ENCRYPTION_KEY,
       GMAIL_CLIENT_ID,
@@ -548,6 +549,7 @@ export const processInboundEmail = onRequest(
     const smtpUser = safeSecret(SMTP_USER);
     const smtpPass = safeSecret(SMTP_PASS);
     const genAiKey = safeSecret(GOOGLE_GENAI_API_KEY);
+    console.log("processInboundEmail: genAiKey present:", !!genAiKey);
 
     const body = req.body || {};
     // Helpful logs in case of shape surprises

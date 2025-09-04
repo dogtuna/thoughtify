@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
-import { functions, auth } from "../firebase";
+import { functions, auth, appCheck } from "../firebase";
+import { getToken } from "firebase/app-check";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import { generateQuestionId } from "../utils/questions.js";
@@ -281,6 +282,9 @@ const ProjectSetup = () => {
 
         const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
         try {
+          // Ensure App Check token is attached if enabled
+          try { if (appCheck) { await getToken(appCheck); } } catch {}
+          try { if (auth.currentUser) { await auth.currentUser.getIdToken(true); } } catch {}
           const mapResp = await generateInitialInquiryMap(
             omitEmptyStrings({
               uid,
@@ -460,4 +464,3 @@ const ProjectSetup = () => {
 };
 
 export default ProjectSetup;
-

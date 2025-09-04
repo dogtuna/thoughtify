@@ -502,7 +502,6 @@ export const generateProjectQuestions = onCall(
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY"],
     invoker: "public",
-    cors: ["https://thoughtify.training"],
   },
   async (request) => {
     const {
@@ -913,7 +912,6 @@ export const generateContentAssets = onCall(
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 300,
-    cors: ["https://thoughtify.training"],
   },
   async (req) => {
     const { ldd, component, components, jobId } = req.data || {};
@@ -1666,7 +1664,7 @@ export const sendEmailReply = functions.https.onCall(async (callData) => {
   });
 
 export const generateInitialInquiryMap = onCall(
-  { region: "us-central1", invoker: "public", secrets: ["GOOGLE_GENAI_API_KEY"], cors: ["https://thoughtify.training"] },
+  { region: "us-central1", invoker: "public", secrets: ["GOOGLE_GENAI_API_KEY"] },
   async (request) => {
     const {
       brief,

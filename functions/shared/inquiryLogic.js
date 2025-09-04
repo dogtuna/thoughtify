@@ -35,12 +35,14 @@ export const generateTriagePrompt = (evidenceText, hypotheses, contacts) => {
 3.  **Classify the Source:** Identify the source and classify its authority, type, and directness.
 4.  **Suggest New Hypothesis:** If this evidence implies a new hypothesis that could have a higher confidence than the current lowest confidence hypothesis, include it.
 
-Respond ONLY in the following JSON format:
+Use the EXACT hypothesis IDs shown before the colon (for example, use "hyp-123" if that is the ID). Do not invent new IDs or renumber them.
+
+Respond ONLY in the following JSON format (IDs must match exactly):
 {
   "analysisSummary": "A brief summary of the evidence's strategic meaning.",
   "hypothesisLinks": [
     {
-      "hypothesisId": "A",
+      "hypothesisId": "hyp-123",
       "relationship": "Refutes",
       "impact": "High",
       "source": "Chloe Zhao",
@@ -53,7 +55,7 @@ Respond ONLY in the following JSON format:
     "statement": "Possible new hypothesis",
     "confidence": 0.4
   }
-}
+} 
 
 ---
 ### Project Data
@@ -87,7 +89,8 @@ export const calculateNewConfidence = (
 
   const weightedImpact = scoreFromImpact(link.impact) * authorityWeight * typeWeight * directWeight;
 
-  const multiplier = link.relationship === "Refutes" ? -1.5 : 1;
+  const rel = String(link.relationship || "").toLowerCase();
+  const multiplier = rel === "refutes" ? -1.5 : 1;
   const delta = weightedImpact * diminishingFactor * multiplier;
 
   const timestamp = Date.now();
@@ -105,7 +108,7 @@ export const calculateNewConfidence = (
     user,
   };
 
-  const key = link.relationship === "Supports" ? "supporting" : "refuting";
+  const key = rel === "supports" ? "supporting" : "refuting";
   const existingEvidenceArr =
     hypothesis.evidence?.[key] || hypothesis[`${key}Evidence`] || [];
   const updatedEvidenceArr = [...existingEvidenceArr, newEvidenceEntry];
@@ -117,8 +120,7 @@ export const calculateNewConfidence = (
   const beforeSources = new Set(existingSup.map(e => e.source));
   const beforeCorroboration = beforeHasQuant && beforeHasQual && beforeSources.size > 1;
 
-  const afterSup =
-    link.relationship === "Supports" ? updatedEvidenceArr : existingSup;
+  const afterSup = rel === "supports" ? updatedEvidenceArr : existingSup;
   const afterHasQuant = afterSup.some(
     (e) => e.evidenceType === "Quantitative"
   );
@@ -129,7 +131,7 @@ export const calculateNewConfidence = (
   const afterCorroboration = afterHasQuant && afterHasQual && afterSources.size > 1;
 
   let newScore = baseScore + delta;
-  if (link.relationship === "Supports" && afterCorroboration && !beforeCorroboration) {
+  if (rel === "supports" && afterCorroboration && !beforeCorroboration) {
     newScore *= CORROBORATION_MULTIPLIER;
   }
 
@@ -175,4 +177,3 @@ export const calculateNewConfidence = (
 
   return { updatedHypothesis, extraRecommendations };
 };
-
