@@ -1,4 +1,4 @@
-import { logisticConfidence } from "./confidence";
+import { logisticConfidence } from "./confidence.js";
 
 // --- Constants for Weighting ---
 // These are now more aggressive to prioritize objective proof.
