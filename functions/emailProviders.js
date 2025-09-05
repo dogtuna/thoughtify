@@ -717,6 +717,7 @@ export const processInboundEmail = onRequest(
       .trim();
 
     // Step 1: Extract the direct answer and any extra commentary via AI
+    // Keep the full cleaned body for storage and analysis; extraction is for convenience only.
     let answerText = cleaned;
     let extraText = "";
     if (genAiKey) {
@@ -812,7 +813,9 @@ export const processInboundEmail = onRequest(
       .collection("messages")
       .add({
         subject,
-        body: answerText,
+        // Store full cleaned body to avoid losing context
+        body: cleaned,
+        direct: answerText,
         extra: extraText,
         questionId: String(questionId),
         createdAt: answeredAt,
@@ -837,8 +840,9 @@ export const processInboundEmail = onRequest(
           initiativeId,
           questionId,
           questionText: null,
-          answerText,
-          extraText,
+          // Use the full cleaned reply for analysis to avoid truncation
+          answerText: cleaned,
+          extraText: "",
           respondent: answeredBy || fromEmail,
           subject,
           genAiKey,

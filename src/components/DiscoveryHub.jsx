@@ -3570,6 +3570,25 @@ const DiscoveryHub = () => {
                               className="answer-block"
                             >
                               <strong>{name}:</strong>
+                              {(() => {
+                                const status = (q.contactStatus || []).find((cs) => cs.contactId === id) || null;
+                                const answersArr = Array.isArray(status?.answers) ? status.answers : [];
+                                if (!answersArr.length) return null;
+                                const last = answersArr[answersArr.length - 1];
+                                const preview = (last.text || "").split(/(?<=\.)\s+/).slice(0, 1).join(" ").slice(0, 200);
+                                return (
+                                  <div className="text-xs text-gray-300 mb-1">
+                                    <span className="inline-block px-2 py-0.5 mr-2 rounded bg-gray-700">
+                                      {last.channel ? last.channel : "manual"}
+                                    </span>
+                                    {last.answeredBy && <span className="mr-2">by {last.answeredBy}</span>}
+                                    {last.answeredAt && (
+                                      <span className="mr-2">{new Date(last.answeredAt).toLocaleString()}</span>
+                                    )}
+                                    {preview && <span className="block opacity-80">{preview}</span>}
+                                  </div>
+                                );
+                              })()}
                               {activeComposer &&
                                 activeComposer.idx === q.idx &&
                                 activeComposer.contacts.length > 1 && (
