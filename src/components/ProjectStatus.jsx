@@ -90,6 +90,8 @@ const ProjectStatus = ({
 
     const lastUpdateForAudience = history.find(h => h.audience === audience);
     const previous = lastUpdateForAudience ? lastUpdateForAudience.summary : "None";
+    const previousSnapshot = lastUpdateForAudience?.snapshot || null;
+    const previousDate = lastUpdateForAudience?.date || null;
     // eslint-disable-next-line no-unused-vars
     const today = new Date().toDateString();
 
@@ -97,6 +99,42 @@ const ProjectStatus = ({
     const audiencePrompt = audience === "client"
       ? "Use a client-facing tone that is professional and strategically focused."
       : "Use an internal tone that candidly highlights risks, data conflicts, and detailed blockers.";
+
+    // Build current snapshot for delta analysis
+    const normalizeConfidence = (h) => {
+      if (typeof h?.confidence === 'number') return h.confidence;
+      const score = typeof h?.confidenceScore === 'number' ? h.confidenceScore : 0;
+      return 1 / (1 + Math.exp(-score));
+    };
+    const currentSnapshot = {
+      hypotheses: (hypotheses || []).map(h => ({
+        id: h.id,
+        hypothesis: h.statement || h.hypothesis || h.text || '',
+        confidence: normalizeConfidence(h),
+        evidenceCounts: {
+          supporting: (h.evidence?.supporting || h.supportingEvidence || []).length,
+          refuting: (h.evidence?.refuting || h.refutingEvidence || []).length,
+        },
+      })),
+    };
+
+    // Compute evidence/new items since last update
+    const since = previousDate ? new Date(previousDate).getTime() : 0;
+    const newEvidenceLines = [];
+    (hypotheses || []).forEach(h => {
+      const sup = h.evidence?.supporting || h.supportingEvidence || [];
+      const ref = h.evidence?.refuting || h.refutingEvidence || [];
+      const fresh = [...sup, ...ref].filter(e => typeof e?.timestamp === 'number' ? e.timestamp > since : false);
+      fresh.forEach(e => {
+        const rel = e.relationship || (sup.includes(e) ? 'Supports' : 'Refutes');
+        newEvidenceLines.push(`H${h.id}: ${rel} • ${e.analysisSummary || e.text || ''}`);
+      });
+    });
+
+    const previousSnapshotText = previousSnapshot
+      ? JSON.stringify(previousSnapshot.hypotheses || [])
+      : 'None';
+    const currentSnapshotText = JSON.stringify(currentSnapshot.hypotheses || []);
 
     const prompt = `Your role is an expert Performance Consultant. Draft a project status update based on the current state of the Inquiry Map.
 
@@ -117,8 +155,14 @@ This is a **follow-up brief**. Analyze the **change in hypothesis confidence sco
 **Previous Update:**
 ${previous}
 
-**Current Inquiry Map State (Hypotheses, Confidence Scores, and linked evidence summaries):**
-${JSON.stringify(hypotheses)}
+**Previous Snapshot (Hypotheses & Confidence at last report):**
+${previousSnapshotText}
+
+**Current Snapshot (Hypotheses & Confidence now):**
+${currentSnapshotText}
+
+**Evidence Since Last Update (if any):**
+${newEvidenceLines.join('\n')}
 
 **Project Baseline:**
 Goal: ${businessGoal}
@@ -136,7 +180,7 @@ ${JSON.stringify({recommendations, tasks})}
 
       if (user && initiativeId) {
         const now = new Date().toISOString();
-        const entry = { date: now, summary: clean, sent: false, audience };
+        const entry = { date: now, summary: clean, sent: false, audience, snapshot: currentSnapshot };
 
         const colRef = collection(db, "users", user.uid, "initiatives", initiativeId, "statusUpdates");
         const docRef = await addDoc(colRef, entry);
