@@ -14,6 +14,10 @@ import { Buffer } from "buffer";
 import express from "express";
 import cors from "cors";
 import { callZap } from "./integrations/zapier.js";
+// Disable Genkit Inspector globally for Cloud Functions containers
+if (!process.env.GENKIT_INSPECTOR_ENABLED) {
+  process.env.GENKIT_INSPECTOR_ENABLED = "false";
+}
 import { processAnswer } from "./shared/answerPipeline.js";
 
 const FIREBASE_CONFIG = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
@@ -1772,7 +1776,7 @@ Project Data:\n${projectData.join("\n\n")}`;
 
 // Unified server analysis/triage for Discovery Hub answers
 export const analyzeDiscoveryAnswer = onCall(
-  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"] },
+  { region: "us-central1", secrets: ["GOOGLE_GENAI_API_KEY"], memory: "512MiB" },
   async (request) => {
     const {
       uid,

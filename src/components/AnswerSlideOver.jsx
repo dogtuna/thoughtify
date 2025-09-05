@@ -120,7 +120,14 @@ const AnswerSlideOver = ({
                   {question.contactStatus
                     .find((cs) => cs.contactId === contact)
                     .answers.map((a, i) => (
-                      <li key={i}>{a.text}</li>
+                      <li key={i}>
+                        <div>{a.text}</div>
+                        <div className="text-xs text-gray-400">
+                          {a.answeredBy ? `by ${a.answeredBy}` : ""}
+                          {a.channel ? ` • via ${a.channel}` : ""}
+                          {a.answeredAt ? ` • ${new Date(a.answeredAt).toLocaleString()}` : ""}
+                        </div>
+                      </li>
                     ))}
                 </ul>
               </details>

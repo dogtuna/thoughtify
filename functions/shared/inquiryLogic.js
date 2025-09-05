@@ -161,6 +161,9 @@ export const calculateNewConfidence = (
     }
   }
 
+  // Compute old confidence based on existing score if needed
+  const oldConfidence = hypothesis.confidence ?? logisticConfidence(baseScore);
+
   // If unrelated, do not change score/confidence or add audit; only return evidence untouched
   if (isUnrelated) {
     const rest = { ...hypothesis };
@@ -171,15 +174,14 @@ export const calculateNewConfidence = (
         ...rest,
         evidence: updatedEvidence,
         contested,
-        confidenceScore: hypothesis.confidenceScore ?? 0,
-        confidence: hypothesis.confidence ?? undefined,
+        confidenceScore: baseScore,
+        confidence: oldConfidence,
         auditLog: [...(hypothesis.auditLog || [])],
       },
       extraRecommendations,
     };
   }
 
-  const oldConfidence = hypothesis.confidence ?? logisticConfidence(baseScore);
   const newConfidence = logisticConfidence(newScore);
   const deltaPct = newConfidence - oldConfidence;
 

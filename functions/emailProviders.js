@@ -21,6 +21,11 @@ import {
 } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
+// Disable Genkit Inspector in serverless runtime to avoid port listeners and memory bloat
+if (!process.env.GENKIT_INSPECTOR_ENABLED) {
+  process.env.GENKIT_INSPECTOR_ENABLED = "false";
+}
+
 // ==============================
 // Admin initialization (singleton)
 // ==============================
@@ -535,6 +540,7 @@ export const processInboundEmail = onRequest(
     cors: true,
     secrets: [TOKEN_ENCRYPTION_KEY, SMTP_USER, SMTP_PASS, GOOGLE_GENAI_API_KEY],
     timeoutSeconds: 30,
+    memory: "512MiB",
   },
   async (req, res) => {
     // Allow Postmark’s GET “test” pings
@@ -775,13 +781,13 @@ export const processInboundEmail = onRequest(
         }
         entry.answers = Array.isArray(entry.answers) ? entry.answers : [];
         if (entry.currentStatus === "asked" || entry.askedAt) {
-          entry.answers.push({ text: answerText, answeredAt });
+          entry.answers.push({ text: answerText, answeredAt, answeredBy: name, channel: "email" });
           entry.currentStatus = "answered";
         } else {
           entry.answersForReview = Array.isArray(entry.answersForReview)
             ? entry.answersForReview
             : [];
-          entry.answersForReview.push({ text: answerText, answeredAt });
+          entry.answersForReview.push({ text: answerText, answeredAt, answeredBy: name, channel: "email" });
         }
         q.contactStatus = statusArr;
         qArr[qIdx] = q;

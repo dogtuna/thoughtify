@@ -2,6 +2,11 @@ import { genkit } from "genkit";
 import { gemini, googleAI } from "@genkit-ai/googleai";
 import { generateTriagePrompt, calculateNewConfidence } from "./inquiryLogic.js";
 
+// Ensure Genkit Inspector is disabled in Cloud Functions
+if (!process.env.GENKIT_INSPECTOR_ENABLED) {
+  process.env.GENKIT_INSPECTOR_ENABLED = "false";
+}
+
 // Utility: parse JSON with fallback to first JSON object substring
 function safeParseJson(text, fallback = {}) {
   try {
@@ -218,19 +223,20 @@ export async function processAnswer(db, FieldValue, params) {
       messageId = ref.id;
       await ref.set({ analysis, suggestions }, { merge: true });
     }
+    const notif = {
+      type: "answerReceived",
+      message: "New answer received - Click to view analysis.",
+      initiativeId,
+      messageId,
+      createdAt: FieldValue.serverTimestamp(),
+      count: 1,
+    };
+    if (questionId) notif.questionId = String(questionId);
+    if (initiativeId && messageId) notif.href = `/discovery?initiativeId=${initiativeId}${questionId ? `&questionId=${questionId}` : ""}&messageId=${messageId}&qa=1`;
     await db
       .collection("users").doc(uid)
       .collection("notifications")
-      .add({
-        type: "answerReceived",
-        message: "New answer received - Click to view analysis.",
-        questionId: questionId ? String(questionId) : undefined,
-        initiativeId,
-        href: initiativeId && messageId ? `/discovery?initiativeId=${initiativeId}&questionId=${questionId}&messageId=${messageId}&qa=1` : undefined,
-        messageId,
-        createdAt: FieldValue.serverTimestamp(),
-        count: 1,
-      });
+      .add(notif);
   } catch (err) {
     console.error("failed to record analysis notification", err);
   }
@@ -382,5 +388,5 @@ export async function processAnswer(db, FieldValue, params) {
     console.warn("processAnswer: triage skipped or failed", err?.message || err);
   }
 
-  return { analysis, suggestions };
+  return { analysis, suggestions, messageId };
 }

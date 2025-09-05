@@ -707,6 +707,7 @@ const DiscoveryHub = () => {
       return {
         analysis: typeof data.analysis === "string" ? data.analysis : JSON.stringify(data.analysis || ""),
         suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+        messageId: data.messageId || null,
       };
     } catch (err) {
       console.error("analyzeAnswer error", err);
@@ -1727,6 +1728,32 @@ const DiscoveryHub = () => {
     return () => unsub();
   }, [uid, initiativeId]);
 
+  // Auto-correct any misfiled suggested questions that were stored in suggestedTasks
+  useEffect(() => {
+    if (!uid || !initiativeId) return;
+    const fix = async () => {
+      const misfiled = (suggestedTasks || []).filter(
+        (t) => (String(t.subType || t.tag || "").toLowerCase() === "question")
+      );
+      if (!misfiled.length) return;
+      const qcol = collection(db, "users", uid, "initiatives", initiativeId, "suggestedQuestions");
+      for (const t of misfiled) {
+        try {
+          await addDoc(qcol, {
+            question: t.message || t.text || "",
+            hypothesisId: t.hypothesisId || null,
+            createdAt: serverTimestamp(),
+            source: t.source || null,
+          });
+          await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedTasks", t.id));
+        } catch (err) {
+          console.error("failed to move misfiled suggested question", err);
+        }
+      }
+    };
+    fix();
+  }, [uid, initiativeId, suggestedTasks]);
+
   // Listen for suggested questions (pending acceptance)
   useEffect(() => {
     if (!uid || !initiativeId) return;
@@ -1882,6 +1909,7 @@ const DiscoveryHub = () => {
           text,
           analysis,
           answeredBy: currentUserName,
+          channel: "hub",
         });
         const contactStatus = setContactStatus(
           q.contactStatus,
@@ -3753,6 +3781,15 @@ const DiscoveryHub = () => {
                     </>
                   )}
                 <div className="modal-actions">
+                  {analysisModal.messageId && (
+                    <a
+                      className="generator-button"
+                      href={`/discovery?initiativeId=${initiativeId}${analysisModal.idx != null && questions[analysisModal.idx]?.id ? `&questionId=${questions[analysisModal.idx].id}` : ""}&messageId=${analysisModal.messageId}&qa=1`}
+                      onClick={() => setAnalysisModal(null)}
+                    >
+                      View Analysis
+                    </a>
+                  )}
                   <button
                     className="generator-button"
                     onClick={() => {
