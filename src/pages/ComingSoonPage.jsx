@@ -206,47 +206,28 @@ const onEmailSubmit = async (data) => {
         />
       </section>
 
-      <section id="workflow-video" className="workflow-section">
-        <h2 className="workflow-headline">
-          Go from Idea to Assessment in Minutes, Not Weeks.
-        </h2>
-        <video
-          className="workflow-video"
-          controls
-          aria-label="Workflow demonstration video"
-        >
-          <source
-            src="https://www.w3schools.com/html/mov_bbb.mp4"
-            type="video/mp4"
-          />
-          <track
-            src="/workflow-demo-captions.vtt"
-            kind="captions"
-            srcLang="en"
-            label="English captions"
-            default
-          />
-        </video>
-        <div className="workflow-steps">
-          <div className="workflow-step">
-            <div className="step-number">1</div>
-            <h3 className="step-title">Define Your Outline</h3>
-            <p className="step-description">
-              Generate a structured outline for any topic in seconds.
+      <section id="foundation" className="foundation-section">
+        <h2 className="foundation-headline">Stop Patching Cracks. Reinforce the Foundation.</h2>
+        <div className="foundation-grid">
+          <div className="foundation-card">
+            <div className="foundation-icon" aria-hidden>🛠️</div>
+            <h3 className="foundation-question">Is it a skill gap or a broken process?</h3>
+            <p className="foundation-desc">
+              Your leaders ask for training, but you suspect a deeper, systemic issue. Wasting resources on the wrong solution is not an option.
             </p>
           </div>
-          <div className="workflow-step">
-            <div className="step-number">2</div>
-            <h3 className="step-title">Generate Your Content</h3>
-            <p className="step-description">
-              Turn outlines into lessons, study aids, and storyboards with one click.
+          <div className="foundation-card">
+            <div className="foundation-icon" aria-hidden>🤝</div>
+            <h3 className="foundation-question">Are conflicting opinions derailing your project?</h3>
+            <p className="foundation-desc">
+              Your stakeholders have different versions of the truth. You need to find the objective evidence to build alignment and move forward.
             </p>
           </div>
-          <div className="workflow-step">
-            <div className="step-number">3</div>
-            <h3 className="step-title">Create Your Assessments</h3>
-            <p className="step-description">
-              Generate objective-based questions automatically.
+          <div className="foundation-card">
+            <div className="foundation-icon" aria-hidden>📊</div>
+            <h3 className="foundation-question">Drowning in data but starving for insight?</h3>
+            <p className="foundation-desc">
+              You have emails, documents, and interview notes, but finding the true signal in the noise is taking weeks of manual work.
             </p>
           </div>
         </div>
