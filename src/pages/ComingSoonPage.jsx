@@ -233,13 +233,50 @@ const onEmailSubmit = async (data) => {
         </div>
       </section>
 
-      <div id="pricing" className="core-benefits-cta">
-        <h2>Full platform coming soon.</h2>
-        <p>Be the first to know when we launch.</p>
-        <Button className="join-mailing-button" onClick={handleJoinClick}>
-          Join the Waitlist
-        </Button>
-      </div>
+      {/* Section 3: Your Strategic Co-Pilot */}
+      <section id="copilot" className="copilot-section">
+        <h2 className="copilot-headline">Your Strategic Co-Pilot</h2>
+        <p className="copilot-sub">The AI-Powered Workflow to Find and Fix the Real Problem</p>
+
+        {/* Sub-section 3A: Inquiry Map (text left, visual right) */}
+        <div className="feature">
+          <div className="feature-text">
+            <h3 className="feature-title">1. Diagnose the Root Cause with the Inquiry Map</h3>
+            <p className="feature-desc">
+              Thoughtify's AI doesn't just summarize your data; it builds an Inquiry Map—a visual, interactive
+              evidence board for your investigation. It automatically generates competing hypotheses for your
+              business problem and assigns a real-time confidence score as you add evidence. You'll instantly see
+              which lines of inquiry are promising and which are dead ends. No more guesswork; just a clear,
+              data-driven path to the real "why."
+            </p>
+          </div>
+          <div className="feature-visual">
+            <img
+              src="https://placehold.co/640x360?text=Inquiry+Map+Preview"
+              alt="Preview of the Inquiry Map with hypotheses and confidence scores"
+            />
+          </div>
+        </div>
+
+        {/* Sub-section 3B: Action Dashboard (visual left, text right) */}
+        <div className="feature reverse">
+          <div className="feature-visual">
+            <img
+              src="https://placehold.co/640x360?text=Action+Dashboard+Preview"
+              alt="Preview of the Action Dashboard with prioritized columns and task cards"
+            />
+          </div>
+          <div className="feature-text">
+            <h3 className="feature-title">2. Create a Prioritized Action Plan, Instantly</h3>
+            <p className="feature-desc">
+              Once the Inquiry Map has identified the root cause, the Action Dashboard answers the critical
+              question, "Now what?" Instead of a disorganized to-do list, the AI intelligently prioritizes every
+              task based on its strategic impact. You'll always know the one or two 'Critical' tasks you need to do
+              right now to solve the problem and drive the project forward.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="benefits-section">
         <h2 className="benefits-headline">Reclaim Your Time. Amplify Your Genius.</h2>
