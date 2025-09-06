@@ -623,6 +623,49 @@ body.pulsing::before {
   text-decoration: underline;
 }
 
+/* Demo CTA (replaces social proof) */
+.demo-cta-section {
+  margin: 60px auto;
+  width: 90%;
+  max-width: 60rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 40px 20px;
+  border-radius: 8px;
+}
+
+.demo-cta-headline {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #f5eef6;
+  margin-bottom: 8px;
+}
+
+.demo-cta-sub {
+  color: #EDE0DE;
+  margin-bottom: 20px;
+}
+
+.demo-cta-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.demo-cta-button {
+  display: inline-block;
+  background-color: #8C259E; /* brand accent */
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.demo-cta-button:hover {
+  background-color: #FB852A;
+}
+
 /* Header */
 .glass-header {
   width: 100%;

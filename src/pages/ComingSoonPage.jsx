@@ -311,7 +311,16 @@ const onEmailSubmit = async (data) => {
         </div>
       </section>
 
-      <Testimonials />
+      {/* Demo CTA replacing social proof */}
+      <section className="demo-cta-section" id="demo-cta">
+        <h2 className="demo-cta-headline">Ready to Close the Gap Between Strategy and Reality?</h2>
+        <p className="demo-cta-sub">
+          See how Thoughtify OS can help you uncover the root causes of your most complex business challenges.
+        </p>
+        <div className="demo-cta-actions">
+          <a href="#contact" className="demo-cta-button">Request a Demo</a>
+        </div>
+      </section>
 
       <section id="tools" className="info-slider">
         <div
