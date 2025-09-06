@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { auth } from "../firebase";
 import { loadInitiatives } from "../utils/initiatives";
 import UserSettingsSlideOver from "./UserSettingsSlideOver";
@@ -70,6 +70,16 @@ export default function NavBar() {
               <path d="M8.5 11l-3-3" />
               <path d="M15.5 11l3-3" />
             </svg>
+            {!loggedIn && (
+              <Link to="/" className="logo-text" aria-label="Thoughtify Home">
+                THOUGHTIFY
+              </Link>
+            )}
+            {loggedIn && (
+              <Link to="/dashboard" className="logo-text" aria-label="Dashboard">
+                THOUGHTIFY
+              </Link>
+            )}
           </div>
           {loggedIn && (
             <>
