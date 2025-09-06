@@ -279,39 +279,34 @@ const onEmailSubmit = async (data) => {
       </section>
 
       <section className="benefits-section">
-        <h2 className="benefits-headline">Reclaim Your Time. Amplify Your Genius.</h2>
+        <h2 className="benefits-headline">Move Faster. Act with Confidence. Drive Real Results.</h2>
         <div className="benefits-grid">
           <div className="benefit-item">
-            <span className="benefit-icon" role="img" aria-label="clock">⏰</span>
-            <h3 className="benefit-title">Slash Development Time</h3>
-            <ul className="benefit-description">
-              <li>Automate writing and structure.</li>
-              <li>Ship projects faster.</li>
-            </ul>
+            <span className="benefit-icon" role="img" aria-label="timer">⏱️</span>
+            <h3 className="benefit-title">From Weeks to Days</h3>
+            <p className="benefit-description">
+              Thoughtify&apos;s AI automates the most time-consuming parts of performance consulting—
+              synthesizing interviews, analyzing documents, and identifying patterns. What takes a human
+              consultant weeks of manual work, you can now accomplish in a fraction of the time.
+            </p>
           </div>
           <div className="benefit-item">
-            <span className="benefit-icon" role="img" aria-label="lightbulb">💡</span>
-            <h3 className="benefit-title">Eliminate Writer&apos;s Block</h3>
-            <ul className="benefit-description">
-              <li>Generate ideas, examples, and scenarios.</li>
-              <li>Start with a strong draft, not a blank page.</li>
-            </ul>
+            <span className="benefit-icon" role="img" aria-label="scales">⚖️</span>
+            <h3 className="benefit-title">Replace Politics with Proof</h3>
+            <p className="benefit-description">
+              Stop debating opinions and start analyzing evidence. The Inquiry Map provides a single source of truth,
+              visually tracking your investigation and building a data-driven case for your recommendations. Present
+              your findings with unshakeable, evidence-backed confidence.
+            </p>
           </div>
           <div className="benefit-item">
             <span className="benefit-icon" role="img" aria-label="target">🎯</span>
-            <h3 className="benefit-title">Ensure Instructional Soundness</h3>
-            <ul className="benefit-description">
-              <li>Use outlines grounded in learning principles.</li>
-              <li>Keep content consistent and high quality.</li>
-            </ul>
-          </div>
-          <div className="benefit-item">
-            <span className="benefit-icon" role="img" aria-label="upward arrow">⬆️</span>
-            <h3 className="benefit-title">Focus on High-Value Work</h3>
-            <ul className="benefit-description">
-              <li>Automate tedious tasks.</li>
-              <li>Spend time on strategy and design.</li>
-            </ul>
+            <h3 className="benefit-title">Solve the Right Problem, Every Time</h3>
+            <p className="benefit-description">
+              The biggest cost is solving the wrong problem. Thoughtify ensures your efforts are focused on the true
+              root cause, preventing wasted budget on ineffective solutions and directly linking your work to the
+              business metrics that matter, like revenue and retention.
+            </p>
           </div>
         </div>
       </section>
