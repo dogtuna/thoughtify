@@ -185,18 +185,18 @@ const onEmailSubmit = async (data) => {
       <section id="home" className="hero">
         <div className="hero-content">
           <h1 className="hero-title">
-            Stop Drowning in Content. Start Designing with Impact.
+            Your Strategy, <span className="gradient-text">supercharged</span> by AI.
           </h1>
           <p className="hero-subtitle">
-            Create course outlines, lessons, and assessments in minutes. No instructional design experience required.
+            Thoughtify OS transforms your complex project data into clear, prioritized action plans. End analysis paralysis and drive decisive execution.
           </p>
           <div className="hero-actions">
-            <Link to="/ai-tools" className="cta-primary">
+            {/* <Link to="/ai-tools" className="cta-primary">
               Get Started for Free
             </Link>
             <a href="#workflow-video" className="cta-secondary">
               Watch Demo
-            </a>
+            </a> */}
           </div>
         </div>
         <img
