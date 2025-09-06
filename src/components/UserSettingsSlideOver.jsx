@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { onAuthStateChanged, updateProfile } from "firebase/auth";
+import { onAuthStateChanged, updateProfile, signOut } from "firebase/auth";
 import { auth, db, app, functions, appCheck } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -160,6 +160,16 @@ export default function UserSettingsSlideOver({ onClose }) {
     setPopPass("");
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error("Error signing out:", e);
+    } finally {
+      if (onClose) onClose();
+    }
+  };
+
   return createPortal(
     <div className="slide-over-overlay" onClick={onClose}>
       <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
@@ -292,6 +302,10 @@ export default function UserSettingsSlideOver({ onClose }) {
             </div>
           )}
         </section>
+        <section className="settings-section">
+          <h3>Account</h3>
+          <button onClick={handleSignOut}>Sign Out</button>
+        </section>
         <div>
           <button onClick={onClose}>Close</button>
         </div>
@@ -300,4 +314,3 @@ export default function UserSettingsSlideOver({ onClose }) {
     document.body
   );
 }
-
