@@ -663,7 +663,7 @@ const ProjectSetup = () => {
             )}
           </div>
 
-          <div
+          {/* <div
             className="upload-card"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
@@ -713,7 +713,7 @@ const ProjectSetup = () => {
               {loading ? "Analyzing..." : "Next"}
             </button>
           </div>
-          {error && <p className="generator-error">{error}</p>}
+          {error && <p className="generator-error">{error}</p>} */}
         </form>
       </div>
       {/* global datalist for contact suggestions */}
