@@ -17,7 +17,6 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [gmailConnected, setGmailConnected] = useState(false);
   const [imapConnected, setImapConnected] = useState(false);
-  const [popConnected, setPopConnected] = useState(false);
   const [imapHost, setImapHost] = useState("");
   const [imapPort, setImapPort] = useState("");
   const [imapSmtpHost, setImapSmtpHost] = useState("");
@@ -27,12 +26,9 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [resetMsg, setResetMsg] = useState("");
   const [resetErr, setResetErr] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
-  const [popHost, setPopHost] = useState("");
-  const [popPort, setPopPort] = useState("");
-  const [popSmtpHost, setPopSmtpHost] = useState("");
-  const [popSmtpPort, setPopSmtpPort] = useState("");
-  const [popUser, setPopUser] = useState("");
-  const [popPass, setPopPass] = useState("");
+  const [emailOpen, setEmailOpen] = useState(true);
+  const [showConnectOptions, setShowConnectOptions] = useState(false);
+  const [editingImap, setEditingImap] = useState(false);
   const fileInput = useRef(null);
   const [avatarError, setAvatarError] = useState("");
 
@@ -54,18 +50,6 @@ export default function UserSettingsSlideOver({ onClose }) {
           setImapSmtpHost(data.smtpHost || "");
           setImapSmtpPort(String(data.smtpPort || ""));
           setImapUser(data.user || "");
-        }
-        const popSnap = await getDoc(
-          doc(db, "users", user.uid, "emailTokens", "pop3"),
-        );
-        if (popSnap.exists()) {
-          const data = popSnap.data();
-          setPopConnected(true);
-          setPopHost(data.host || "");
-          setPopPort(String(data.port || ""));
-          setPopSmtpHost(data.smtpHost || "");
-          setPopSmtpPort(String(data.smtpPort || ""));
-          setPopUser(data.user || "");
         }
       }
     });
@@ -178,31 +162,7 @@ export default function UserSettingsSlideOver({ onClose }) {
     setImapPass("");
   };
 
-  const savePop = async () => {
-    if (!uid) return;
-    await saveCredentials({
-      provider: "pop3",
-      host: popHost.trim(),
-      port: popPort,
-      smtpHost: popSmtpHost.trim(),
-      smtpPort: popSmtpPort,
-      user: popUser.trim(),
-      pass: popPass,
-    });
-    setPopConnected(true);
-  };
-
-  const disconnectPop = async () => {
-    if (!uid) return;
-    await deleteDoc(doc(db, "users", uid, "emailTokens", "pop3"));
-    setPopConnected(false);
-    setPopHost("");
-    setPopPort("");
-    setPopSmtpHost("");
-    setPopSmtpPort("");
-    setPopUser("");
-    setPopPass("");
-  };
+  // POP3 support removed per design
 
   const handleSignOut = async () => {
     try {
@@ -218,11 +178,14 @@ export default function UserSettingsSlideOver({ onClose }) {
     <div className="slide-over-overlay" onClick={onClose}>
       <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
         <h2>User Settings</h2>
-        <section className="settings-section">
+        <section className="settings-section" style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <img src={computedAvatar} alt="User Avatar" className="settings-avatar" />
-          <button type="button" onClick={() => fileInput.current?.click()}>
-            Edit Avatar
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button type="button" onClick={() => fileInput.current?.click()}>
+              Edit Avatar
+            </button>
+            <button onClick={handleSignOut}>Sign Out</button>
+          </div>
           <input
             ref={fileInput}
             type="file"
@@ -234,128 +197,160 @@ export default function UserSettingsSlideOver({ onClose }) {
             <p style={{ color: "#E64A78", marginTop: 8 }}>{avatarError}</p>
           )}
         </section>
+
         <section className="settings-section">
-          <h3>Email Accounts</h3>
-          {gmailConnected ? (
+          <h3 style={{ cursor: "pointer" }} onClick={() => setEmailOpen((v) => !v)}>
+            Email Settings {emailOpen ? "▾" : "▸"}
+          </h3>
+          {emailOpen && (
             <div>
-              <p>Gmail account connected.</p>
-              <button onClick={disconnectGmail}>Disconnect Gmail</button>
-            </div>
-          ) : (
-            <button onClick={connectGmail}>Connect Gmail</button>
-          )}
-          {imapConnected ? (
-            <div>
-              <p>IMAP account connected.</p>
-              <button onClick={disconnectImap}>Disconnect IMAP</button>
-            </div>
-          ) : (
-            <div className="settings-section">
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="IMAP Host"
-                value={imapHost}
-                onChange={(e) => setImapHost(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="IMAP Port"
-                value={imapPort}
-                onChange={(e) => setImapPort(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="SMTP Host"
-                value={imapSmtpHost}
-                onChange={(e) => setImapSmtpHost(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="SMTP Port"
-                value={imapSmtpPort}
-                onChange={(e) => setImapSmtpPort(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="IMAP Username"
-                value={imapUser}
-                onChange={(e) => setImapUser(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="password"
-                placeholder="IMAP Password"
-                value={imapPass}
-                onChange={(e) => setImapPass(e.target.value)}
-              />
-              <button onClick={saveImap}>Save IMAP</button>
-            </div>
-          )}
-          {popConnected ? (
-            <div>
-              <p>POP3 account connected.</p>
-              <button onClick={disconnectPop}>Disconnect POP3</button>
-            </div>
-          ) : (
-            <div className="settings-section">
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="POP3 Host"
-                value={popHost}
-                onChange={(e) => setPopHost(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="POP3 Port"
-                value={popPort}
-                onChange={(e) => setPopPort(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="SMTP Host"
-                value={popSmtpHost}
-                onChange={(e) => setPopSmtpHost(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="SMTP Port"
-                value={popSmtpPort}
-                onChange={(e) => setPopSmtpPort(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="text"
-                placeholder="POP3 Username"
-                value={popUser}
-                onChange={(e) => setPopUser(e.target.value)}
-              />
-              <input
-                className="generator-input"
-                type="password"
-                placeholder="POP3 Password"
-                value={popPass}
-                onChange={(e) => setPopPass(e.target.value)}
-              />
-              <button onClick={savePop}>Save POP3</button>
+              {gmailConnected ? (
+                <div>
+                  <p>Gmail account connected.</p>
+                  <button onClick={disconnectGmail}>Disconnect Gmail</button>
+                </div>
+              ) : imapConnected ? (
+                <div>
+                  <p>IMAP account connected.</p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button onClick={() => setEditingImap((v) => !v)}>
+                      {editingImap ? "Close IMAP Settings" : "Edit IMAP Settings"}
+                    </button>
+                    <button onClick={disconnectImap}>Disconnect IMAP</button>
+                  </div>
+                  {editingImap && (
+                    <div style={{ marginTop: 12 }}>
+                      <label className="generator-input" style={{ display: "block" }}>
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="IMAP Username"
+                          value={imapUser}
+                          onChange={(e) => setImapUser(e.target.value)}
+                        />
+                      </label>
+                      <label className="generator-input" style={{ display: "block" }}>
+                        <input
+                          className="generator-input"
+                          type="password"
+                          placeholder="IMAP Password"
+                          value={imapPass}
+                          onChange={(e) => setImapPass(e.target.value)}
+                        />
+                      </label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="IMAP Host"
+                          value={imapHost}
+                          onChange={(e) => setImapHost(e.target.value)}
+                        />
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="IMAP Port"
+                          value={imapPort}
+                          onChange={(e) => setImapPort(e.target.value)}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="SMTP Host"
+                          value={imapSmtpHost}
+                          onChange={(e) => setImapSmtpHost(e.target.value)}
+                        />
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="SMTP Port"
+                          value={imapSmtpPort}
+                          onChange={(e) => setImapSmtpPort(e.target.value)}
+                        />
+                      </div>
+                      <button onClick={saveImap} style={{ marginTop: 8 }}>Save Settings</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {!showConnectOptions ? (
+                    <button onClick={() => setShowConnectOptions(true)}>Connect Email</button>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button onClick={connectGmail}>Continue with Google</button>
+                      <button onClick={() => { setEditingImap(true); }}>Use IMAP</button>
+                    </div>
+                  )}
+                  {editingImap && (
+                    <div style={{ marginTop: 12 }}>
+                      <label className="generator-input" style={{ display: "block" }}>
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="IMAP Username"
+                          value={imapUser}
+                          onChange={(e) => setImapUser(e.target.value)}
+                        />
+                      </label>
+                      <label className="generator-input" style={{ display: "block" }}>
+                        <input
+                          className="generator-input"
+                          type="password"
+                          placeholder="IMAP Password"
+                          value={imapPass}
+                          onChange={(e) => setImapPass(e.target.value)}
+                        />
+                      </label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="IMAP Host"
+                          value={imapHost}
+                          onChange={(e) => setImapHost(e.target.value)}
+                        />
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="IMAP Port"
+                          value={imapPort}
+                          onChange={(e) => setImapPort(e.target.value)}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="SMTP Host"
+                          value={imapSmtpHost}
+                          onChange={(e) => setImapSmtpHost(e.target.value)}
+                        />
+                        <input
+                          className="generator-input"
+                          type="text"
+                          placeholder="SMTP Port"
+                          value={imapSmtpPort}
+                          onChange={(e) => setImapSmtpPort(e.target.value)}
+                        />
+                      </div>
+                      <button onClick={async () => { await saveImap(); setShowConnectOptions(false); setEditingImap(false); }} style={{ marginTop: 8 }}>Save Settings</button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>
+
         <section className="settings-section">
           <h3>Account</h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={handleSendReset} disabled={resetBusy}>
               {resetBusy ? "Sending…" : "Email Password Reset"}
             </button>
-            <button onClick={handleSignOut}>Sign Out</button>
           </div>
           {resetMsg && <p style={{ marginTop: 8 }}>{resetMsg}</p>}
           {resetErr && <p style={{ marginTop: 8, color: "#c0392b" }}>{resetErr}</p>}
