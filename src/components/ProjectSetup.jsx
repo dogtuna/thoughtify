@@ -26,7 +26,7 @@ const ProjectSetup = () => {
 
   const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
-  const [audienceProfile, setAudienceProfile] = useState("");
+  // Audience is no longer collected at setup
   const [projectScope, setProjectScope] = useState("internal"); // internal | external
   const [companyName, setCompanyName] = useState("");
   const [companiesList, setCompaniesList] = useState([]);
@@ -64,7 +64,7 @@ const ProjectSetup = () => {
         if (init) {
           setProjectName(init.projectName || "");
           setBusinessGoal(init.businessGoal || "");
-          setAudienceProfile(init.audienceProfile || "");
+          // audienceProfile no longer used at setup
           setProjectScope(init.projectScope || "internal");
           setCompanyName(init.company || "");
           setProjectConstraints(init.projectConstraints || "");
@@ -265,7 +265,7 @@ const ProjectSetup = () => {
       const { data } = await generateProjectQuestions(
         omitEmptyStrings({
           businessGoal,
-          audienceProfile,
+          // audienceProfile removed
           sourceMaterial: getCombinedSource(),
           projectConstraints,
           keyContacts: filteredContacts.map(
@@ -309,7 +309,7 @@ const ProjectSetup = () => {
         await saveInitiative(uid, initiativeId, {
           projectName,
           businessGoal,
-          audienceProfile,
+          // audienceProfile removed
           projectScope,
           company: companyName,
           companies: Array.from(new Set([companyName, ...selectedCompanies].filter(Boolean))),
@@ -329,7 +329,7 @@ const ProjectSetup = () => {
           console.warn("Failed to upsert companies/contacts index", persistErr);
         }
 
-        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
+        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nConstraints:${projectConstraints}`;
         try {
           // Ensure App Check token is attached if enabled
           try { if (appCheck) { await getToken(appCheck); } } catch {}
@@ -440,16 +440,7 @@ const ProjectSetup = () => {
               </label>
             </div>
           )}
-          <label>
-            Who is the target audience?
-            <textarea
-              value={audienceProfile}
-              placeholder="e.g., 'New sales hires, age 22-28, with no prior industry experience'"
-              onChange={(e) => setAudienceProfile(e.target.value)}
-              className="generator-input"
-              rows={3}
-            />
-          </label>
+          {/* Audience removed from project setup */}
           <div className="contacts-section">
             <p>Key Contacts</p>
             {keyContacts.map((c, idx) => (
