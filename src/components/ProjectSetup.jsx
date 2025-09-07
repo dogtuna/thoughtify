@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
 import { functions, auth, appCheck } from "../firebase";
 import { getToken } from "firebase/app-check";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
+import { loadCompanies, loadAllContacts, upsertCompaniesAndContacts } from "../utils/companies";
 import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import { generateQuestionId } from "../utils/questions.js";
 import "./AIToolsGenerators.css";
@@ -26,6 +27,12 @@ const ProjectSetup = () => {
   const [projectName, setProjectName] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
   const [audienceProfile, setAudienceProfile] = useState("");
+  const [projectScope, setProjectScope] = useState("internal"); // internal | external
+  const [companyName, setCompanyName] = useState("");
+  const [companiesList, setCompaniesList] = useState([]);
+  const [contactsIndex, setContactsIndex] = useState({}); // key: "Name — Company" => details
+  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [companyInput, setCompanyInput] = useState("");
   const [projectConstraints, setProjectConstraints] = useState("");
   const genId = () => crypto.randomUUID();
   const emptyContact = () => ({
@@ -33,6 +40,8 @@ const ProjectSetup = () => {
     name: "",
     jobTitle: "",
     profile: "",
+    scope: "internal",
+    company: "",
     info: { email: "", slack: "", teams: "" },
   });
   const [keyContacts, setKeyContacts] = useState([emptyContact()]);
@@ -56,6 +65,8 @@ const ProjectSetup = () => {
           setProjectName(init.projectName || "");
           setBusinessGoal(init.businessGoal || "");
           setAudienceProfile(init.audienceProfile || "");
+          setProjectScope(init.projectScope || "internal");
+          setCompanyName(init.company || "");
           setProjectConstraints(init.projectConstraints || "");
           setKeyContacts(
             (init.keyContacts || [emptyContact()]).map((c) => ({
@@ -63,6 +74,8 @@ const ProjectSetup = () => {
               name: c.name || "",
               jobTitle: c.jobTitle || c.role || "",
               profile: c.profile || "",
+              scope: c.scope || "internal",
+              company: c.company || "",
               info: {
                 email: c.info?.email || c.email || "",
                 slack: c.info?.slack || "",
@@ -71,7 +84,26 @@ const ProjectSetup = () => {
             }))
           );
           setSourceMaterials(init.sourceMaterials || []);
+          // Initialize companies array for this project
+          const initCompanies = Array.isArray(init.companies)
+            ? init.companies
+            : (init.company ? [init.company] : []);
+          setSelectedCompanies(initCompanies);
         }
+        // Load reusable companies and contacts for suggestions
+        try {
+          const companies = await loadCompanies(user.uid);
+          setCompaniesList(companies);
+        } catch {}
+        try {
+          const contacts = await loadAllContacts(user.uid);
+          const idx = {};
+          contacts.forEach((c) => {
+            const key = `${c.name} — ${c.company}`;
+            idx[key] = { name: c.name, company: c.company, email: c.email || "", jobTitle: c.jobTitle || "" };
+          });
+          setContactsIndex(idx);
+        } catch {}
       }
     });
     return () => unsub();
@@ -170,6 +202,8 @@ const ProjectSetup = () => {
     if (files) handleFiles(files);
   };
 
+  const filePickerRef = useRef(null);
+
   const handleDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
@@ -235,11 +269,13 @@ const ProjectSetup = () => {
           sourceMaterial: getCombinedSource(),
           projectConstraints,
           keyContacts: filteredContacts.map(
-            ({ id, name, jobTitle, profile, info }) => ({
+            ({ id, name, jobTitle, profile, scope, company, info }) => ({
               id,
               name,
               jobTitle,
               profile,
+              scope,
+              company,
               info,
             })
           ),
@@ -274,11 +310,24 @@ const ProjectSetup = () => {
           projectName,
           businessGoal,
           audienceProfile,
+          projectScope,
+          company: companyName,
+          companies: Array.from(new Set([companyName, ...selectedCompanies].filter(Boolean))),
           sourceMaterials,
           projectConstraints,
           keyContacts: filteredContacts,
           projectQuestions: qs,
         });
+
+        // Persist companies and contacts to profile for future suggestions
+        try {
+          const companiesToSave = projectScope === "external"
+            ? Array.from(new Set([companyName, ...selectedCompanies].filter(Boolean)))
+            : [];
+          await upsertCompaniesAndContacts(uid, companiesToSave, filteredContacts);
+        } catch (persistErr) {
+          console.warn("Failed to upsert companies/contacts index", persistErr);
+        }
 
         const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nAudience: ${audienceProfile}\nConstraints:${projectConstraints}`;
         try {
@@ -316,135 +365,212 @@ const ProjectSetup = () => {
         <form onSubmit={handleSubmit} className="generator-form">
           <h3>Project Intake</h3>
           <p>Tell us about your project. The more detail, the better.</p>
-          <div className="intake-grid">
-            <div className="intake-left">
+          {/* Single-column layout */}
+          <label>
+            Project Name
+            <input
+              type="text"
+              value={projectName}
+              placeholder="e.g., 'Q3 Sales Onboarding'"
+              onChange={(e) => setProjectName(e.target.value)}
+              className="generator-input"
+            />
+          </label>
+          <label>
+            Primary Business Goal
+            <input
+              type="text"
+              value={businessGoal}
+              placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
+              onChange={(e) => setBusinessGoal(e.target.value)}
+              className="generator-input"
+            />
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span>Project Type:</span>
+            <label><input type="radio" name="scope" value="internal" checked={projectScope === "internal"} onChange={() => setProjectScope("internal")} /> Internal</label>
+            <label><input type="radio" name="scope" value="external" checked={projectScope === "external"} onChange={() => setProjectScope("external")} /> External</label>
+          </div>
+          {projectScope === "external" && (
+            <div>
               <label>
-                Project Name
+                Primary Company (External)
                 <input
                   type="text"
-                  value={projectName}
-                  placeholder="e.g., 'Q3 Sales Onboarding'"
-                  onChange={(e) => setProjectName(e.target.value)}
+                  value={companyName}
+                  placeholder="e.g., Acme Corp"
+                  list="company-suggestions"
+                  onChange={(e) => setCompanyName(e.target.value)}
                   className="generator-input"
                 />
               </label>
               <label>
-                What is the primary business goal?
-                <input
-                  type="text"
-                  value={businessGoal}
-                  placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
-                  onChange={(e) => setBusinessGoal(e.target.value)}
-                  className="generator-input"
-                />
-              </label>
-              <label>
-                Who is the target audience?
-                <textarea
-                  value={audienceProfile}
-                  placeholder="e.g., 'New sales hires, age 22-28, with no prior industry experience'"
-                  onChange={(e) => setAudienceProfile(e.target.value)}
-                  className="generator-input"
-                  rows={3}
-                />
-              </label>
-              <div className="contacts-section">
-                <p>Key Contacts</p>
-                {keyContacts.map((c, idx) => (
-                  <div key={idx} className="contact-row">
-                    <input
-                      type="text"
-                      value={c.name}
-                      placeholder="Name"
-                      onChange={(e) => handleContactChange(idx, "name", e.target.value)}
-                      className="generator-input"
-                    />
-                    <input
-                      type="text"
-                      value={c.jobTitle}
-                      placeholder="Job Title"
-                      onChange={(e) =>
-                        handleContactChange(idx, "jobTitle", e.target.value)
-                      }
-                      className="generator-input"
-                    />
-                    <input
-                      type="email"
-                      value={c.info.email}
-                      placeholder="Email"
-                      onChange={(e) =>
-                        handleContactChange(idx, "info.email", e.target.value)
-                      }
-                      className="generator-input"
-                    />
-                    {keyContacts.length > 1 && (
-                      <button
-                        type="button"
-                        className="remove-file"
-                        onClick={() => removeKeyContact(idx)}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="generator-button add-contact-button"
-                  onClick={addKeyContact}
-                >
-                  +
-                </button>
-              </div>
-              <label>
-                Project Constraints or Limitations
-                <textarea
-                  value={projectConstraints}
-                  onChange={(e) => setProjectConstraints(e.target.value)}
-                  className="generator-input"
-                  rows={3}
-                />
-              </label>
-            </div>
-            <div
-              className="upload-card"
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                onChange={handleFileInput}
-                className="file-input"
-                accept=".pdf,.docx,.txt"
-                multiple
-              />
-              <div className="upload-title">Upload Source Material (Optional)</div>
-              <div className="upload-subtitle">Click to upload or drag and drop</div>
-              <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
-              <button
-                type="button"
-                className="generator-button paste-text"
-                onClick={handlePasteText}
-              >
-                Paste Text
-              </button>
-              {sourceMaterials.length > 0 && (
-                <ul className="file-list">
-                  {sourceMaterials.map((f, idx) => (
-                    <li key={idx}>
-                      {f.name}
-                      <button
-                        type="button"
-                        className="remove-file"
-                        onClick={() => removeFile(idx)}
-                      >
-                        Remove
-                      </button>
-                    </li>
+                Other Companies (Optional)
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {selectedCompanies.map((c) => (
+                    <span key={c} className="glass-card" style={{ padding: "4px 8px", borderRadius: 9999 }}>
+                      {c}
+                      <button type="button" className="remove-file" onClick={() => setSelectedCompanies((prev) => prev.filter((x) => x !== c))} style={{ marginLeft: 6 }}>×</button>
+                    </span>
                   ))}
-                </ul>
-              )}
+                </div>
+                <input
+                  type="text"
+                  value={companyInput}
+                  list="company-suggestions"
+                  placeholder="Type to add company and press Enter"
+                  onChange={(e) => setCompanyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const val = companyInput.trim();
+                      if (val && !selectedCompanies.includes(val)) {
+                        setSelectedCompanies((prev) => [...prev, val]);
+                      }
+                      setCompanyInput("");
+                    }
+                  }}
+                  className="generator-input"
+                />
+                <datalist id="company-suggestions">
+                  {companiesList.map((c) => (
+                    <option key={c.id} value={c.name} />
+                  ))}
+                </datalist>
+              </label>
             </div>
+          )}
+          <label>
+            Who is the target audience?
+            <textarea
+              value={audienceProfile}
+              placeholder="e.g., 'New sales hires, age 22-28, with no prior industry experience'"
+              onChange={(e) => setAudienceProfile(e.target.value)}
+              className="generator-input"
+              rows={3}
+            />
+          </label>
+          <div className="contacts-section">
+            <p>Key Contacts</p>
+            {keyContacts.map((c, idx) => (
+              <div key={idx} className="contact-row" style={{ flexWrap: "wrap" }}>
+                <input
+                  type="text"
+                  value={c.name}
+                  placeholder="Name"
+                  list="contact-suggestions"
+                  onChange={(e) => handleContactChange(idx, "name", e.target.value)}
+                  onBlur={(e) => {
+                    const val = e.target.value;
+                    const key = val.includes(" — ") ? val : null;
+                    if (key && contactsIndex[key]) {
+                      const s = contactsIndex[key];
+                      handleContactChange(idx, "name", s.name);
+                      handleContactChange(idx, "jobTitle", s.jobTitle || "");
+                      handleContactChange(idx, "info.email", s.email || "");
+                      handleContactChange(idx, "company", s.company || "");
+                      handleContactChange(idx, "scope", "external");
+                    }
+                  }}
+                  className="generator-input"
+                />
+                <input
+                  type="text"
+                  value={c.jobTitle}
+                  placeholder="Job Title"
+                  onChange={(e) => handleContactChange(idx, "jobTitle", e.target.value)}
+                  className="generator-input"
+                />
+                <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
+                  <label><input type="radio" name={`contact-scope-${c.id}`} value="internal" checked={c.scope === "internal"} onChange={() => handleContactChange(idx, "scope", "internal")} /> Internal</label>
+                  <label><input type="radio" name={`contact-scope-${c.id}`} value="external" checked={c.scope === "external"} onChange={() => handleContactChange(idx, "scope", "external")} /> External</label>
+                  {c.scope === "external" && (
+                    <input
+                      type="text"
+                      value={c.company}
+                      placeholder="Company"
+                      onChange={(e) => handleContactChange(idx, "company", e.target.value)}
+                      className="generator-input"
+                      style={{ maxWidth: 300 }}
+                    />
+                  )}
+                </div>
+                <input
+                  type="email"
+                  value={c.info.email}
+                  placeholder="Email"
+                  onChange={(e) => handleContactChange(idx, "info.email", e.target.value)}
+                  className="generator-input"
+                />
+                {keyContacts.length > 1 && (
+                  <button
+                    type="button"
+                    className="remove-file"
+                    onClick={() => removeKeyContact(idx)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="generator-button add-contact-button"
+              onClick={addKeyContact}
+            >
+              +
+            </button>
+          </div>
+          <label>
+            Project Constraints or Limitations
+            <textarea
+              value={projectConstraints}
+              onChange={(e) => setProjectConstraints(e.target.value)}
+              className="generator-input"
+              rows={3}
+            />
+          </label>
+
+          <div
+            className="upload-card"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onClick={(e) => { if (e.target.tagName !== 'BUTTON') filePickerRef.current?.click(); }}
+          >
+            <input
+              ref={filePickerRef}
+              type="file"
+              onChange={handleFileInput}
+              className="file-input"
+              accept=".pdf,.docx,.txt"
+              multiple
+            />
+            <div className="upload-title">Upload Source Material (Optional)</div>
+            <div className="upload-subtitle">Click to upload or drag and drop</div>
+            <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+            <button
+              type="button"
+              className="generator-button paste-text"
+              onClick={handlePasteText}
+            >
+              Paste Text
+            </button>
+            {sourceMaterials.length > 0 && (
+              <ul className="file-list">
+                {sourceMaterials.map((f, idx) => (
+                  <li key={idx}>
+                    {f.name}
+                    <button
+                      type="button"
+                      className="remove-file"
+                      onClick={() => removeFile(idx)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div className="button-row">
             <button
@@ -458,6 +584,12 @@ const ProjectSetup = () => {
           {error && <p className="generator-error">{error}</p>}
         </form>
       </div>
+      {/* global datalist for contact suggestions */}
+      <datalist id="contact-suggestions">
+        {Object.keys(contactsIndex).map((k) => (
+          <option key={k} value={k} />
+        ))}
+      </datalist>
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
