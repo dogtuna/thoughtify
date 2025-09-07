@@ -365,25 +365,38 @@ const ProjectSetup = () => {
         <form onSubmit={handleSubmit} className="generator-form">
           <h3>Project Intake</h3>
           <p>Tell us about your project. The more detail, the better.</p>
-          {/* Single-column layout */}
-          <label>
-            Project Name
+          {/* Condensed rows: label + input inline */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ minWidth: 160, fontWeight: 600 }}>Project Name</div>
             <input
               type="text"
               value={projectName}
               placeholder="e.g., 'Q3 Sales Onboarding'"
               onChange={(e) => setProjectName(e.target.value)}
               className="generator-input"
+              style={{ flex: 1, margin: 0 }}
             />
-          </label>
-          <label>
-            Primary Business Goal
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ minWidth: 160, fontWeight: 600 }}>Primary Goal</div>
             <input
               type="text"
               value={businessGoal}
               placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
               onChange={(e) => setBusinessGoal(e.target.value)}
               className="generator-input"
+              style={{ flex: 1, margin: 0 }}
+            />
+          </div>
+
+          {/* Move Project Constraints right after Primary Goal */}
+          <label>
+            Project Constraints or Limitations
+            <textarea
+              value={projectConstraints}
+              onChange={(e) => setProjectConstraints(e.target.value)}
+              className="generator-input"
+              rows={3}
             />
           </label>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -393,8 +406,8 @@ const ProjectSetup = () => {
           </div>
           {projectScope === "external" && (
             <div>
-              <label>
-                Primary Company (External)
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Primary Company</div>
                 <input
                   type="text"
                   value={companyName}
@@ -402,18 +415,11 @@ const ProjectSetup = () => {
                   list="company-suggestions"
                   onChange={(e) => setCompanyName(e.target.value)}
                   className="generator-input"
+                  style={{ flex: 1, margin: 0 }}
                 />
-              </label>
-              <label>
-                Other Companies (Optional)
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  {selectedCompanies.map((c) => (
-                    <span key={c} className="glass-card" style={{ padding: "4px 8px", borderRadius: 9999 }}>
-                      {c}
-                      <button type="button" className="remove-file" onClick={() => setSelectedCompanies((prev) => prev.filter((x) => x !== c))} style={{ marginLeft: 6 }}>×</button>
-                    </span>
-                  ))}
-                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Other Companies</div>
                 <input
                   type="text"
                   value={companyInput}
@@ -431,77 +437,99 @@ const ProjectSetup = () => {
                     }
                   }}
                   className="generator-input"
+                  style={{ flex: 1, margin: 0 }}
                 />
-                <datalist id="company-suggestions">
-                  {companiesList.map((c) => (
-                    <option key={c.id} value={c.name} />
-                  ))}
-                </datalist>
-              </label>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+                {selectedCompanies.map((c) => (
+                  <span key={c} className="glass-card" style={{ padding: "4px 8px", borderRadius: 9999 }}>
+                    {c}
+                    <button type="button" className="remove-file" onClick={() => setSelectedCompanies((prev) => prev.filter((x) => x !== c))} style={{ marginLeft: 6 }}>×</button>
+                  </span>
+                ))}
+              </div>
+              <datalist id="company-suggestions">
+                {companiesList.map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
             </div>
           )}
           {/* Audience removed from project setup */}
           <div className="contacts-section">
             <p>Key Contacts</p>
             {keyContacts.map((c, idx) => (
-              <div key={idx} className="contact-row" style={{ flexWrap: "wrap" }}>
-                <input
-                  type="text"
-                  value={c.name}
-                  placeholder="Name"
-                  list="contact-suggestions"
-                  onChange={(e) => handleContactChange(idx, "name", e.target.value)}
-                  onBlur={(e) => {
-                    const val = e.target.value;
-                    const key = val.includes(" — ") ? val : null;
-                    if (key && contactsIndex[key]) {
-                      const s = contactsIndex[key];
-                      handleContactChange(idx, "name", s.name);
-                      handleContactChange(idx, "jobTitle", s.jobTitle || "");
-                      handleContactChange(idx, "info.email", s.email || "");
-                      handleContactChange(idx, "company", s.company || "");
-                      handleContactChange(idx, "scope", "external");
-                    }
-                  }}
-                  className="generator-input"
-                />
-                <input
-                  type="text"
-                  value={c.jobTitle}
-                  placeholder="Job Title"
-                  onChange={(e) => handleContactChange(idx, "jobTitle", e.target.value)}
-                  className="generator-input"
-                />
-                <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
-                  <label><input type="radio" name={`contact-scope-${c.id}`} value="internal" checked={c.scope === "internal"} onChange={() => handleContactChange(idx, "scope", "internal")} /> Internal</label>
-                  <label><input type="radio" name={`contact-scope-${c.id}`} value="external" checked={c.scope === "external"} onChange={() => handleContactChange(idx, "scope", "external")} /> External</label>
-                  {c.scope === "external" && (
+              <div key={idx} className="contact-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8, width: "100%" }}>
+                {/* Row 1: Name + Job Title */}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    value={c.name}
+                    placeholder="Name"
+                    list="contact-suggestions"
+                    onChange={(e) => handleContactChange(idx, "name", e.target.value)}
+                    onBlur={(e) => {
+                      const val = e.target.value;
+                      const key = val.includes(" — ") ? val : null;
+                      if (key && contactsIndex[key]) {
+                        const s = contactsIndex[key];
+                        handleContactChange(idx, "name", s.name);
+                        handleContactChange(idx, "jobTitle", s.jobTitle || "");
+                        handleContactChange(idx, "info.email", s.email || "");
+                        handleContactChange(idx, "company", s.company || "");
+                        handleContactChange(idx, "scope", "external");
+                      }
+                    }}
+                    className="generator-input"
+                    style={{ flex: 1, margin: 0 }}
+                  />
+                  <input
+                    type="text"
+                    value={c.jobTitle}
+                    placeholder="Job Title"
+                    onChange={(e) => handleContactChange(idx, "jobTitle", e.target.value)}
+                    className="generator-input"
+                    style={{ flex: 1, margin: 0 }}
+                  />
+                </div>
+                {/* Row 2: Email + Company (Company only if external). Email width equals Name; Company width equals Job Title */}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="email"
+                    value={c.info.email}
+                    placeholder="Email"
+                    onChange={(e) => handleContactChange(idx, "info.email", e.target.value)}
+                    className="generator-input"
+                    style={{ flex: 1, margin: 0 }}
+                  />
+                  {c.scope === "external" ? (
                     <input
                       type="text"
                       value={c.company}
                       placeholder="Company"
                       onChange={(e) => handleContactChange(idx, "company", e.target.value)}
                       className="generator-input"
-                      style={{ maxWidth: 300 }}
+                      style={{ flex: 1, margin: 0 }}
                     />
+                  ) : (
+                    <div style={{ flex: 1 }} />
                   )}
                 </div>
-                <input
-                  type="email"
-                  value={c.info.email}
-                  placeholder="Email"
-                  onChange={(e) => handleContactChange(idx, "info.email", e.target.value)}
-                  className="generator-input"
-                />
-                {keyContacts.length > 1 && (
-                  <button
-                    type="button"
-                    className="remove-file"
-                    onClick={() => removeKeyContact(idx)}
-                  >
-                    Remove
-                  </button>
-                )}
+                {/* Row 3: Internal/External selector */}
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <label><input type="radio" name={`contact-scope-${c.id}`} value="internal" checked={c.scope === "internal"} onChange={() => handleContactChange(idx, "scope", "internal")} /> Internal</label>
+                  <label><input type="radio" name={`contact-scope-${c.id}`} value="external" checked={c.scope === "external"} onChange={() => handleContactChange(idx, "scope", "external")} /> External</label>
+                  {keyContacts.length > 1 && (
+                    <button
+                      type="button"
+                      className="remove-file"
+                      onClick={() => removeKeyContact(idx)}
+                      style={{ marginLeft: "auto" }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             <button
@@ -509,18 +537,9 @@ const ProjectSetup = () => {
               className="generator-button add-contact-button"
               onClick={addKeyContact}
             >
-              +
+              Add Contact
             </button>
           </div>
-          <label>
-            Project Constraints or Limitations
-            <textarea
-              value={projectConstraints}
-              onChange={(e) => setProjectConstraints(e.target.value)}
-              className="generator-input"
-              rows={3}
-            />
-          </label>
 
           <div
             className="upload-card"
