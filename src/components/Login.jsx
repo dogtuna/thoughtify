@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { app } from "../firebase";
+import "./AIToolsGenerators.css";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -83,60 +84,77 @@ const Login = () => {
   };
 
   return (
-    <div className="login-container">
-      <h2>{isSignup ? "Sign Up" : "Login"}</h2>
-      <form onSubmit={handleSubmit} className="login-form">
-        <input 
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <button
-          type="button"
-          className="link-button"
-          onClick={handleResetPassword}
-          disabled={resetLoading}
-          style={{ alignSelf: "flex-start", marginTop: 4, marginBottom: 8 }}
-        >
-          {resetLoading ? "Sending…" : "Forgot password? Email me a reset link"}
-        </button>
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {isSignup && (
+    <div className="initiative-card" style={{ maxWidth: 520 }}>
+      <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: "1.75rem", fontWeight: 700 }}>
+        {isSignup ? "Sign Up" : "Login"}
+      </h2>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <label style={{ display: "block" }}>
+          <div style={{ marginBottom: 4, fontWeight: 600 }}>Email</div>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="generator-input"
+          />
+        </label>
+        <label style={{ display: "block" }}>
+          <div style={{ marginBottom: 4, fontWeight: 600 }}>Password</div>
           <input
             type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
+            className="generator-input"
           />
+        </label>
+        {isSignup && (
+          <label style={{ display: "block" }}>
+            <div style={{ marginBottom: 4, fontWeight: 600 }}>Confirm Password</div>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              className="generator-input"
+            />
+          </label>
         )}
-        {error && <p className="error-message">{error}</p>}
-        {resetMessage && <p className="success-message">{resetMessage}</p>}
-        <button type="submit" className="login-button">
-          {isSignup ? "Sign Up" : "Login"}
-        </button>
+        {error && <p className="generator-error" style={{ margin: 0 }}>{error}</p>}
+        {resetMessage && <p style={{ margin: 0 }}>{resetMessage}</p>}
+        <div style={{ marginTop: 6 }}>
+          <button type="submit" className="generator-button">
+            {isSignup ? "Sign Up" : "Login"}
+          </button>
+        </div>
       </form>
-      <p className="toggle-message">
-        {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+      <div style={{ display: "flex", justifyContent: isSignup ? "flex-end" : "space-between", marginTop: 10 }}>
+        {!isSignup && (
+          <button
+            type="button"
+            onClick={handleResetPassword}
+            disabled={resetLoading}
+            style={{ background: "none", border: "none", color: "#fff", textDecoration: "underline", cursor: "pointer", padding: 0 }}
+          >
+            {resetLoading ? "Sending…" : "Forgot password?"}
+          </button>
+        )}
         <button
           type="button"
-          className="toggle-button"
           onClick={() => {
             setError("");
+            setResetMessage("");
             setIsSignup(!isSignup);
           }}
+          style={{ background: "none", border: "none", color: "#fff", textDecoration: "underline", cursor: "pointer", padding: 0 }}
         >
-          {isSignup ? "Login" : "Sign Up"}
+          {isSignup ? "Already have an account?" : "Don't have an account?"}
         </button>
-      </p>
+      </div>
     </div>
   );
 };
