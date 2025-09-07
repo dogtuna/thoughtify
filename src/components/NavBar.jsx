@@ -19,11 +19,20 @@ export default function NavBar() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoggedIn(!!user);
       if (user) {
-        const data = await loadInitiatives(user.uid);
-        setProjects(data);
+        try {
+          // Ensure the session is valid before rendering signed-in UI
+          await user.getIdToken();
+          setLoggedIn(true);
+          const data = await loadInitiatives(user.uid);
+          setProjects(data);
+        } catch (e) {
+          console.warn("Auth token check failed; treating as logged out.", e);
+          setLoggedIn(false);
+          setProjects([]);
+        }
       } else {
+        setLoggedIn(false);
         setProjects([]);
       }
     });
