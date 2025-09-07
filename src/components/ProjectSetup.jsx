@@ -539,23 +539,37 @@ const ProjectSetup = () => {
                     value={c.name}
                     placeholder="Name"
                     list="contact-suggestions"
-                    onChange={(e) => handleContactChange(idx, "name", e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      // If user picked a suggestion ("Name — Company"), populate fields immediately
+                      if (contactsIndex[val]) {
+                        const s = contactsIndex[val];
+                        handleContactChange(idx, "name", s.name);
+                        handleContactChange(idx, "jobTitle", s.jobTitle || "");
+                        handleContactChange(idx, "info.email", s.email || "");
+                        handleContactChange(idx, "company", s.company || "");
+                        const isInternal = (s.company || "").toLowerCase() === "internal";
+                        handleContactChange(idx, "scope", isInternal ? "internal" : "external");
+                      } else {
+                        handleContactChange(idx, "name", val);
+                      }
+                    }}
                     onBlur={(e) => {
                       const val = e.target.value;
                       const key = val.includes(" — ") ? val : null;
-                    if (key && contactsIndex[key]) {
-                      const s = contactsIndex[key];
-                      handleContactChange(idx, "name", s.name);
-                      handleContactChange(idx, "jobTitle", s.jobTitle || "");
-                      handleContactChange(idx, "info.email", s.email || "");
-                      handleContactChange(idx, "company", s.company || "");
-                      const isInternal = (s.company || "").toLowerCase() === "internal";
-                      handleContactChange(idx, "scope", isInternal ? "internal" : "external");
-                    }
-                  }}
-                  className="generator-input"
-                  style={{ flex: 1, margin: 0 }}
-                />
+                      if (key && contactsIndex[key]) {
+                        const s = contactsIndex[key];
+                        handleContactChange(idx, "name", s.name);
+                        handleContactChange(idx, "jobTitle", s.jobTitle || "");
+                        handleContactChange(idx, "info.email", s.email || "");
+                        handleContactChange(idx, "company", s.company || "");
+                        const isInternal = (s.company || "").toLowerCase() === "internal";
+                        handleContactChange(idx, "scope", isInternal ? "internal" : "external");
+                      }
+                    }}
+                    className="generator-input"
+                    style={{ flex: 1, margin: 0 }}
+                  />
                   <input
                     type="text"
                     value={c.jobTitle}
