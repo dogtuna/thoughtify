@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { onAuthStateChanged, updateProfile, signOut } from "firebase/auth";
+import { onAuthStateChanged, updateProfile, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { auth, db, app, functions, appCheck } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -29,6 +29,9 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [imapSmtpPort, setImapSmtpPort] = useState("");
   const [imapUser, setImapUser] = useState("");
   const [imapPass, setImapPass] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
+  const [resetErr, setResetErr] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
   const [popHost, setPopHost] = useState("");
   const [popPort, setPopPort] = useState("");
   const [popSmtpHost, setPopSmtpHost] = useState("");
@@ -83,6 +86,26 @@ export default function UserSettingsSlideOver({ onClose }) {
     const url = await getDownloadURL(ref);
     await updateProfile(auth.currentUser, { photoURL: url });
     setAvatarUrl(url);
+  };
+
+  const handleSendReset = async () => {
+    setResetMsg("");
+    setResetErr("");
+    const email = auth.currentUser?.email;
+    if (!email) {
+      setResetErr("No email associated with this account.");
+      return;
+    }
+    try {
+      setResetBusy(true);
+      await sendPasswordResetEmail(auth, email);
+      setResetMsg("Password reset email sent.");
+    } catch (e) {
+      console.error("Reset email error:", e);
+      setResetErr(e.message || "Could not send reset email.");
+    } finally {
+      setResetBusy(false);
+    }
   };
 
   const connectGmail = () => {
@@ -304,7 +327,14 @@ export default function UserSettingsSlideOver({ onClose }) {
         </section>
         <section className="settings-section">
           <h3>Account</h3>
-          <button onClick={handleSignOut}>Sign Out</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={handleSendReset} disabled={resetBusy}>
+              {resetBusy ? "Sending…" : "Email Password Reset"}
+            </button>
+            <button onClick={handleSignOut}>Sign Out</button>
+          </div>
+          {resetMsg && <p style={{ marginTop: 8 }}>{resetMsg}</p>}
+          {resetErr && <p style={{ marginTop: 8, color: "#c0392b" }}>{resetErr}</p>}
         </section>
         <div>
           <button onClick={onClose}>Close</button>
