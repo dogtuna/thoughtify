@@ -662,6 +662,31 @@ const ProjectSetup = () => {
               </button>
             )}
           </div>
+          {loading && (
+            <div className="glass-card" style={{ marginTop: 16 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>Analyzing your project…</div>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
+                {[
+                  { k: "save", label: "Saving project data" },
+                  { k: "questions", label: "Generating discovery questions" },
+                  { k: "hypotheses", label: "Creating hypotheses" },
+                  { k: "map", label: "Building inquiry map" },
+                  { k: "dashboard", label: "Finalizing project dashboard" },
+                ].map(({ k, label }) => (
+                  <li key={k} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {progress[k] === "done" ? (
+                      <span aria-hidden>✓</span>
+                    ) : progress[k] === "in_progress" ? (
+                      <span className="spinner" style={{ width: 18, height: 18 }} />
+                    ) : (
+                      <span aria-hidden>○</span>
+                    )}
+                    <span>{label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* <div
             className="upload-card"
