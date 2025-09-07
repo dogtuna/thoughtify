@@ -178,7 +178,10 @@ export default function UserSettingsSlideOver({ onClose }) {
     <div className="slide-over-overlay" onClick={onClose}>
       <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
         <h2>User Settings</h2>
-        <section className="settings-section" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <section
+          className="settings-section"
+          style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 16 }}
+        >
           <img src={computedAvatar} alt="User Avatar" className="settings-avatar" />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <button type="button" onClick={() => fileInput.current?.click()}>
