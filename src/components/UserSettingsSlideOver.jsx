@@ -1,16 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged, updateProfile, signOut, sendPasswordResetEmail } from "firebase/auth";
-import { auth, db, app, functions, appCheck } from "../firebase";
+import { auth, db, app, functions, appCheck, storage } from "../firebase";
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { getToken } from "firebase/app-check";
-import {
-  getStorage,
-  ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import "./UserSettingsSlideOver.css";
 
 const functionsBaseUrl =
@@ -19,7 +14,7 @@ const functionsBaseUrl =
 
 export default function UserSettingsSlideOver({ onClose }) {
   const [uid, setUid] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("https://placehold.co/80x80/764ba2/FFFFFF?text=ID");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [gmailConnected, setGmailConnected] = useState(false);
   const [imapConnected, setImapConnected] = useState(false);
   const [popConnected, setPopConnected] = useState(false);
@@ -45,7 +40,7 @@ export default function UserSettingsSlideOver({ onClose }) {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUid(user.uid);
-        setAvatarUrl(user.photoURL || avatarUrl);
+        setAvatarUrl(user.photoURL || "");
         const gmailSnap = await getDoc(doc(db, "users", user.uid, "emailTokens", "gmail"));
         setGmailConnected(gmailSnap.exists());
         const imapSnap = await getDoc(
@@ -83,12 +78,14 @@ export default function UserSettingsSlideOver({ onClose }) {
     if (!file || !uid) return;
     setAvatarError("");
     try {
-      const storage = getStorage(app);
       const ref = storageRef(storage, `avatars/${uid}`);
       await uploadBytes(ref, file);
       const url = await getDownloadURL(ref);
       await updateProfile(auth.currentUser, { photoURL: url });
+      try { await auth.currentUser?.reload(); } catch {}
       setAvatarUrl(url);
+      // Notify other components (e.g., NavBar) to refresh avatar
+      window.dispatchEvent(new Event("userProfileUpdated"));
     } catch (err) {
       console.error("Avatar upload error:", err);
       setAvatarError(
@@ -98,6 +95,19 @@ export default function UserSettingsSlideOver({ onClose }) {
       );
     }
   };
+
+  const initials = useMemo(() => {
+    const name = auth.currentUser?.displayName || "";
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0];
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : (auth.currentUser?.email?.[0] || "");
+    const letters = ((first || "").toUpperCase() + (last || "").toUpperCase()).slice(0, 2) || "U";
+    return letters;
+  }, [auth.currentUser?.displayName, auth.currentUser?.email]);
+
+  const computedAvatar = useMemo(() => {
+    return avatarUrl || `https://placehold.co/80x80/764ba2/FFFFFF?text=${encodeURIComponent(initials)}`;
+  }, [avatarUrl, initials]);
 
   const handleSendReset = async () => {
     setResetMsg("");
@@ -209,7 +219,7 @@ export default function UserSettingsSlideOver({ onClose }) {
       <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
         <h2>User Settings</h2>
         <section className="settings-section">
-          <img src={avatarUrl} alt="User Avatar" className="settings-avatar" />
+          <img src={computedAvatar} alt="User Avatar" className="settings-avatar" />
           <button type="button" onClick={() => fileInput.current?.click()}>
             Edit Avatar
           </button>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { auth } from "../firebase";
@@ -7,6 +7,7 @@ import UserSettingsSlideOver from "./UserSettingsSlideOver";
 
 export default function NavBar() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
   const [projectMenu, setProjectMenu] = useState(false);
   const [addMenu, setAddMenu] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -18,21 +19,24 @@ export default function NavBar() {
   const activeProject = projects.find((p) => p.id === initiativeId);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (u) {
         try {
           // Ensure the session is valid before rendering signed-in UI
-          await user.getIdToken();
+          await u.getIdToken();
           setLoggedIn(true);
-          const data = await loadInitiatives(user.uid);
+          setUser(u);
+          const data = await loadInitiatives(u.uid);
           setProjects(data);
         } catch (e) {
           console.warn("Auth token check failed; treating as logged out.", e);
           setLoggedIn(false);
+          setUser(null);
           setProjects([]);
         }
       } else {
         setLoggedIn(false);
+        setUser(null);
         setProjects([]);
       }
     });
@@ -44,6 +48,34 @@ export default function NavBar() {
     window.addEventListener("openUserSettings", handler);
     return () => window.removeEventListener("openUserSettings", handler);
   }, []);
+
+  useEffect(() => {
+    const handleProfileUpdated = async () => {
+      try {
+        // Reload current user to pick up latest photoURL/displayName
+        if (auth.currentUser) {
+          await auth.currentUser.reload();
+          setUser({ ...auth.currentUser });
+        }
+      } catch {}
+    };
+    window.addEventListener("userProfileUpdated", handleProfileUpdated);
+    return () => window.removeEventListener("userProfileUpdated", handleProfileUpdated);
+  }, []);
+
+  const initials = useMemo(() => {
+    const name = user?.displayName || "";
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0];
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : (user?.email?.[0] || "");
+    const letters = ((first || "").toUpperCase() + (last || "").toUpperCase()).slice(0, 2) || "U";
+    return letters;
+  }, [user]);
+
+  const avatarSrc = useMemo(() => {
+    if (user?.photoURL) return user.photoURL;
+    return `https://placehold.co/40x40/764ba2/FFFFFF?text=${encodeURIComponent(initials)}`;
+  }, [user, initials]);
 
   const handleAddProject = () => {
     const newId = crypto.randomUUID();
@@ -143,7 +175,7 @@ export default function NavBar() {
           {loggedIn && (
             <>
               <img
-                src="https://placehold.co/40x40/764ba2/FFFFFF?text=ID"
+                src={avatarSrc}
                 alt="User Avatar"
                 className="user-avatar"
                 onClick={() => setSettingsOpen(true)}

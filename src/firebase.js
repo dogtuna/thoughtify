@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
+import { getStorage } from "firebase/storage";
 import {
   initializeAppCheck,
   ReCaptchaV3Provider,
@@ -53,4 +54,17 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app, "us-central1");
 
-export { app, auth, db, functions, appCheck };
+// Configure Storage with a normalized bucket URL to avoid domain mixups
+function normalizeBucket(bucket) {
+  if (!bucket) return null;
+  // Strip protocol if someone put a URL
+  bucket = bucket.replace(/^gs:\/\//, "").replace(/^https?:\/\//, "");
+  // If someone set the new REST domain as the bucket, convert to canonical bucket name
+  bucket = bucket.replace(/\.firebasestorage\.app$/, ".appspot.com");
+  return bucket;
+}
+
+const bucket = normalizeBucket(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET);
+const storage = bucket ? getStorage(app, `gs://${bucket}`) : getStorage(app);
+
+export { app, auth, db, functions, appCheck, storage };
