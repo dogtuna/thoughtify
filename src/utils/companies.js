@@ -57,12 +57,15 @@ export async function upsertCompaniesAndContacts(uid, companies, contacts) {
     );
   }
   for (const c of contacts || []) {
-    const companyName = (c.company || "").trim();
-    if (!companyName || !c.name) continue;
-    const companyId = slug(companyName);
+    if (!c || !c.name) continue;
+    // Default internal contacts to a virtual company "Internal"
+    const isExternal = (c.scope || "").toLowerCase() === "external";
+    const companyName = ((c.company && c.company.trim()) || (isExternal ? "" : "Internal")).trim();
+    const finalCompany = companyName || "Internal";
+    const companyId = slug(finalCompany);
     await setDoc(
       doc(db, "profiles", uid, "companies", companyId),
-      { name: companyName, updatedAt: now },
+      { name: finalCompany, updatedAt: now },
       { merge: true }
     );
     const contactId = (c.email && c.email.toLowerCase()) || slug(`${c.name}-${Date.now()}`);
@@ -78,4 +81,3 @@ export async function upsertCompaniesAndContacts(uid, companies, contacts) {
     );
   }
 }
-

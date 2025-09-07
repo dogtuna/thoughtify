@@ -55,11 +55,28 @@ const ProjectSetup = () => {
   const isStep1Valid = () => projectName.trim() && businessGoal.trim();
   const isStep2Valid = () => projectScope === "internal" || (projectScope === "external" && companyName.trim());
 
+  // Analysis progress indicator
+  const initialProgress = {
+    save: "pending",
+    questions: "pending",
+    hypotheses: "pending",
+    map: "pending",
+    dashboard: "pending",
+  };
+  const [progress, setProgress] = useState(initialProgress);
+  const setProg = (k, status) => setProgress((p) => ({ ...p, [k]: status }));
+
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Pulse the background while analyzing
+  useEffect(() => {
+    document.body.classList.toggle("pulsing", loading);
+    return () => document.body.classList.remove("pulsing");
+  }, [loading]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -262,10 +279,32 @@ const ProjectSetup = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setProgress(initialProgress);
     try {
       const filteredContacts = keyContacts.filter(
         (c) => c.name && c.jobTitle
       );
+      const uid = auth.currentUser?.uid;
+
+      // 1) Save initial project data
+      if (uid) {
+        setProg("save", "in_progress");
+        await saveInitiative(uid, initiativeId, {
+          projectName,
+          businessGoal,
+          // audienceProfile removed
+          projectScope,
+          company: companyName,
+          companies: Array.from(new Set([companyName, ...selectedCompanies].filter(Boolean))),
+          sourceMaterials,
+          projectConstraints,
+          keyContacts: filteredContacts,
+        });
+        setProg("save", "done");
+      }
+
+      // 2) Generate discovery questions
+      setProg("questions", "in_progress");
       const { data } = await generateProjectQuestions(
         omitEmptyStrings({
           businessGoal,
@@ -308,20 +347,9 @@ const ProjectSetup = () => {
           contactStatus: statusArr,
         };
       });
-      const uid = auth.currentUser?.uid;
+      setProg("questions", "done");
       if (uid) {
-        await saveInitiative(uid, initiativeId, {
-          projectName,
-          businessGoal,
-          // audienceProfile removed
-          projectScope,
-          company: companyName,
-          companies: Array.from(new Set([companyName, ...selectedCompanies].filter(Boolean))),
-          sourceMaterials,
-          projectConstraints,
-          keyContacts: filteredContacts,
-          projectQuestions: qs,
-        });
+        await saveInitiative(uid, initiativeId, { projectQuestions: qs });
 
         // Persist companies and contacts to profile for future suggestions
         try {
@@ -335,6 +363,8 @@ const ProjectSetup = () => {
 
         const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nConstraints:${projectConstraints}`;
         try {
+          setProg("hypotheses", "in_progress");
+          setProg("map", "in_progress");
           // Ensure App Check token is attached if enabled
           try { if (appCheck) { await getToken(appCheck); } } catch {}
           try { if (auth.currentUser) { await auth.currentUser.getIdToken(true); } } catch {}
@@ -349,11 +379,16 @@ const ProjectSetup = () => {
           );
           const hypotheses = mapResp?.data?.hypotheses || [];
           setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
+          setProg("hypotheses", "done");
+          setProg("map", "done");
           await new Promise((res) => setTimeout(res, 1000));
         } catch (mapErr) {
           console.error("Error generating inquiry map:", mapErr);
         }
       }
+      setProg("dashboard", "in_progress");
+      await new Promise((res) => setTimeout(res, 250));
+      setProg("dashboard", "done");
       navigate(`/discovery?initiativeId=${initiativeId}`);
     } catch (err) {
       console.error("Error generating project questions:", err);
@@ -508,18 +543,19 @@ const ProjectSetup = () => {
                     onBlur={(e) => {
                       const val = e.target.value;
                       const key = val.includes(" — ") ? val : null;
-                      if (key && contactsIndex[key]) {
-                        const s = contactsIndex[key];
-                        handleContactChange(idx, "name", s.name);
-                        handleContactChange(idx, "jobTitle", s.jobTitle || "");
-                        handleContactChange(idx, "info.email", s.email || "");
-                        handleContactChange(idx, "company", s.company || "");
-                        handleContactChange(idx, "scope", "external");
-                      }
-                    }}
-                    className="generator-input"
-                    style={{ flex: 1, margin: 0 }}
-                  />
+                    if (key && contactsIndex[key]) {
+                      const s = contactsIndex[key];
+                      handleContactChange(idx, "name", s.name);
+                      handleContactChange(idx, "jobTitle", s.jobTitle || "");
+                      handleContactChange(idx, "info.email", s.email || "");
+                      handleContactChange(idx, "company", s.company || "");
+                      const isInternal = (s.company || "").toLowerCase() === "internal";
+                      handleContactChange(idx, "scope", isInternal ? "internal" : "external");
+                    }
+                  }}
+                  className="generator-input"
+                  style={{ flex: 1, margin: 0 }}
+                />
                   <input
                     type="text"
                     value={c.jobTitle}
