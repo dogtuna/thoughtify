@@ -50,6 +50,10 @@ const ProjectSetup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
+  const [step, setStep] = useState(1); // 1: Project Info, 2: Partners, 3: Source Material
+
+  const isStep1Valid = () => projectName.trim() && businessGoal.trim();
+  const isStep2Valid = () => projectScope === "internal" || (projectScope === "external" && companyName.trim());
 
   useEffect(() => {
     if (!toast) return;
@@ -365,99 +369,132 @@ const ProjectSetup = () => {
         <form onSubmit={handleSubmit} className="generator-form">
           <h3>Project Intake</h3>
           <p>Tell us about your project. The more detail, the better.</p>
-          {/* Condensed rows: label + input inline */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ minWidth: 160, fontWeight: 600 }}>Project Name</div>
-            <input
-              type="text"
-              value={projectName}
-              placeholder="e.g., 'Q3 Sales Onboarding'"
-              onChange={(e) => setProjectName(e.target.value)}
-              className="generator-input"
-              style={{ flex: 1, margin: 0 }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ minWidth: 160, fontWeight: 600 }}>Primary Goal</div>
-            <input
-              type="text"
-              value={businessGoal}
-              placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
-              onChange={(e) => setBusinessGoal(e.target.value)}
-              className="generator-input"
-              style={{ flex: 1, margin: 0 }}
-            />
-          </div>
-
-          {/* Move Project Constraints right after Primary Goal */}
-          <label>
-            Project Constraints or Limitations
-            <textarea
-              value={projectConstraints}
-              onChange={(e) => setProjectConstraints(e.target.value)}
-              className="generator-input"
-              rows={3}
-            />
-          </label>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span>Project Type:</span>
-            <label><input type="radio" name="scope" value="internal" checked={projectScope === "internal"} onChange={() => setProjectScope("internal")} /> Internal</label>
-            <label><input type="radio" name="scope" value="external" checked={projectScope === "external"} onChange={() => setProjectScope("external")} /> External</label>
-          </div>
-          {projectScope === "external" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ minWidth: 160, fontWeight: 600 }}>Primary Company</div>
-                <input
-                  type="text"
-                  value={companyName}
-                  placeholder="e.g., Acme Corp"
-                  list="company-suggestions"
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="generator-input"
-                  style={{ flex: 1, margin: 0 }}
-                />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
-                <div style={{ minWidth: 160, fontWeight: 600 }}>Other Companies</div>
-                <input
-                  type="text"
-                  value={companyInput}
-                  list="company-suggestions"
-                  placeholder="Type to add company and press Enter"
-                  onChange={(e) => setCompanyInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      const val = companyInput.trim();
-                      if (val && !selectedCompanies.includes(val)) {
-                        setSelectedCompanies((prev) => [...prev, val]);
-                      }
-                      setCompanyInput("");
-                    }
+          {/* Step indicator */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginBottom: 12 }}>
+            {[
+              { key: 1, label: "Project Info", complete: step > 1 && isStep1Valid() },
+              { key: 2, label: "Partners", complete: step > 2 && isStep2Valid() },
+              { key: 3, label: "Source Material", complete: false },
+            ].map((s) => (
+              <div key={s.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    border: "2px solid #fff",
+                    background: s.complete ? "#8C259E" : step === s.key ? "rgba(255,255,255,0.6)" : "transparent",
                   }}
+                  title={s.label}
+                />
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Step 1: Project Information */}
+          {step === 1 && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Project Name</div>
+                <input
+                  type="text"
+                  value={projectName}
+                  placeholder="e.g., 'Q3 Sales Onboarding'"
+                  onChange={(e) => setProjectName(e.target.value)}
                   className="generator-input"
                   style={{ flex: 1, margin: 0 }}
                 />
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
-                {selectedCompanies.map((c) => (
-                  <span key={c} className="glass-card" style={{ padding: "4px 8px", borderRadius: 9999 }}>
-                    {c}
-                    <button type="button" className="remove-file" onClick={() => setSelectedCompanies((prev) => prev.filter((x) => x !== c))} style={{ marginLeft: 6 }}>×</button>
-                  </span>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Primary Goal</div>
+                <input
+                  type="text"
+                  value={businessGoal}
+                  placeholder="e.g., 'Reduce support tickets for Product X by 20%'"
+                  onChange={(e) => setBusinessGoal(e.target.value)}
+                  className="generator-input"
+                  style={{ flex: 1, margin: 0 }}
+                />
               </div>
-              <datalist id="company-suggestions">
-                {companiesList.map((c) => (
-                  <option key={c.id} value={c.name} />
-                ))}
-              </datalist>
-            </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Project Constraints</div>
+                <textarea
+                  value={projectConstraints}
+                  onChange={(e) => setProjectConstraints(e.target.value)}
+                  className="generator-input"
+                  rows={3}
+                  style={{ flex: 1, margin: 0 }}
+                />
+              </div>
+            </>
           )}
-          {/* Audience removed from project setup */}
-          <div className="contacts-section">
-            <p>Key Contacts</p>
+          {/* Step 2: Partners */}
+          {step === 2 && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Project Type</div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <label><input type="radio" name="scope" value="internal" checked={projectScope === "internal"} onChange={() => setProjectScope("internal")} /> Internal</label>
+                  <label><input type="radio" name="scope" value="external" checked={projectScope === "external"} onChange={() => setProjectScope("external")} /> External</label>
+                </div>
+              </div>
+              {projectScope === "external" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ minWidth: 160, fontWeight: 600 }}>Primary Company</div>
+                    <input
+                      type="text"
+                      value={companyName}
+                      placeholder="e.g., Acme Corp"
+                      list="company-suggestions"
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="generator-input"
+                      style={{ flex: 1, margin: 0 }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+                    <div style={{ minWidth: 160, fontWeight: 600 }}>Other Companies</div>
+                    <input
+                      type="text"
+                      value={companyInput}
+                      list="company-suggestions"
+                      placeholder="Type to add company and press Enter"
+                      onChange={(e) => setCompanyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const val = companyInput.trim();
+                          if (val && !selectedCompanies.includes(val)) {
+                            setSelectedCompanies((prev) => [...prev, val]);
+                          }
+                          setCompanyInput("");
+                        }
+                      }}
+                      className="generator-input"
+                      style={{ flex: 1, margin: 0 }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+                    {selectedCompanies.map((c) => (
+                      <span key={c} className="glass-card" style={{ padding: "4px 8px", borderRadius: 9999 }}>
+                        {c}
+                        <button type="button" className="remove-file" onClick={() => setSelectedCompanies((prev) => prev.filter((x) => x !== c))} style={{ marginLeft: 6 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <datalist id="company-suggestions">
+                    {companiesList.map((c) => (
+                      <option key={c.id} value={c.name} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
+              {/* Key Contacts */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ minWidth: 160, fontWeight: 600 }}>Key Contacts</div>
+                <div style={{ flex: 1 }} />
+              </div>
+              <div className="contacts-section">
             {keyContacts.map((c, idx) => (
               <div key={idx} className="contact-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8, width: "100%" }}>
                 {/* Row 1: Name + Job Title */}
@@ -539,6 +576,91 @@ const ProjectSetup = () => {
             >
               Add Contact
             </button>
+              </div>
+            </>
+          )}
+          {/* Step 3: Source Material */}
+          {step === 3 && (
+            <>
+              <div
+                className="upload-card"
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={(e) => { if (e.target.tagName !== 'BUTTON') filePickerRef.current?.click(); }}
+              >
+                <input
+                  ref={filePickerRef}
+                  type="file"
+                  onChange={handleFileInput}
+                  className="file-input"
+                  accept=".pdf,.docx,.txt"
+                  multiple
+                />
+                <div className="upload-title">Upload Source Material (Optional)</div>
+                <div className="upload-subtitle">Click to upload or drag and drop</div>
+                <div className="upload-hint">PDF, DOCX, TXT (MAX. 10MB)</div>
+                <button
+                  type="button"
+                  className="generator-button paste-text"
+                  onClick={handlePasteText}
+                >
+                  Paste Text
+                </button>
+                {sourceMaterials.length > 0 && (
+                  <ul className="file-list">
+                    {sourceMaterials.map((f, idx) => (
+                      <li key={idx}>
+                        {f.name}
+                        <button
+                          type="button"
+                          className="remove-file"
+                          onClick={() => removeFile(idx)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
+          {/* Navigation */}
+          <div className="button-row">
+            {step > 1 && (
+              <button
+                type="button"
+                className="generator-button back-button"
+                onClick={() => setStep((s) => Math.max(1, s - 1))}
+                disabled={loading}
+              >
+                Back
+              </button>
+            )}
+            {step < 3 && (
+              <button
+                type="button"
+                className="generator-button next-button"
+                onClick={() => {
+                  if (step === 1 && !isStep1Valid()) { setError("Please enter Project Name and Primary Goal."); return; }
+                  if (step === 2 && !isStep2Valid()) { setError("Please provide a Primary Company for External projects."); return; }
+                  setError("");
+                  setStep((s) => Math.min(3, s + 1));
+                }}
+                disabled={loading}
+              >
+                Next
+              </button>
+            )}
+            {step === 3 && (
+              <button
+                type="submit"
+                disabled={loading || !isStep1Valid() || !isStep2Valid()}
+                className="generator-button next-button"
+              >
+                {loading ? "Analyzing..." : "Save and Analyze"}
+              </button>
+            )}
           </div>
 
           <div
