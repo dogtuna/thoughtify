@@ -39,6 +39,7 @@ export default function UserSettingsSlideOver({ onClose }) {
   const [popUser, setPopUser] = useState("");
   const [popPass, setPopPass] = useState("");
   const fileInput = useRef(null);
+  const [avatarError, setAvatarError] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -80,12 +81,22 @@ export default function UserSettingsSlideOver({ onClose }) {
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !uid) return;
-    const storage = getStorage(app);
-    const ref = storageRef(storage, `avatars/${uid}`);
-    await uploadBytes(ref, file);
-    const url = await getDownloadURL(ref);
-    await updateProfile(auth.currentUser, { photoURL: url });
-    setAvatarUrl(url);
+    setAvatarError("");
+    try {
+      const storage = getStorage(app);
+      const ref = storageRef(storage, `avatars/${uid}`);
+      await uploadBytes(ref, file);
+      const url = await getDownloadURL(ref);
+      await updateProfile(auth.currentUser, { photoURL: url });
+      setAvatarUrl(url);
+    } catch (err) {
+      console.error("Avatar upload error:", err);
+      setAvatarError(
+        err?.code === "storage/unauthorized"
+          ? "Permission denied. Please make sure you’re signed in and storage rules allow avatar uploads."
+          : (err?.message || "Failed to upload avatar.")
+      );
+    }
   };
 
   const handleSendReset = async () => {
@@ -209,6 +220,9 @@ export default function UserSettingsSlideOver({ onClose }) {
             style={{ display: "none" }}
             onChange={handleAvatarChange}
           />
+          {avatarError && (
+            <p style={{ color: "#E64A78", marginTop: 8 }}>{avatarError}</p>
+          )}
         </section>
         <section className="settings-section">
           <h3>Email Accounts</h3>
