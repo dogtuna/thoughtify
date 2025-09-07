@@ -7,13 +7,18 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { app } from "../firebase";
+import { app, db } from "../firebase";
 import "./AIToolsGenerators.css";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { updateProfile } from "firebase/auth";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [company, setCompany] = useState("");
   const [error, setError] = useState("");
   const [resetMessage, setResetMessage] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
@@ -37,6 +42,27 @@ const Login = () => {
         );
         const user = userCredential.user;
         console.log("Signed up:", user);
+        // Update display name and create/update profile document
+        try {
+          const displayName = `${firstName} ${lastName}`.trim();
+          if (displayName) {
+            await updateProfile(user, { displayName });
+          }
+          await setDoc(
+            doc(db, "profiles", user.uid),
+            {
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              company: company.trim() || "",
+              name: displayName,
+              email: email.trim(),
+              createdAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } catch (profileErr) {
+          console.warn("Profile setup error:", profileErr);
+        }
         navigate("/dashboard");
       } else {
         const userCredential = await signInWithEmailAndPassword(
@@ -84,11 +110,47 @@ const Login = () => {
   };
 
   return (
-    <div className="initiative-card" style={{ maxWidth: 520 }}>
+    <div className="initiative-card" style={{ maxWidth: 520, marginTop: 100 }}>
       <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: "1.75rem", fontWeight: 700 }}>
         {isSignup ? "Sign Up" : "Login"}
       </h2>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {isSignup && (
+          <>
+            <label style={{ display: "block" }}>
+              <div style={{ marginBottom: 4, fontWeight: 600 }}>First Name</div>
+              <input
+                type="text"
+                placeholder="First Name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                className="generator-input"
+              />
+            </label>
+            <label style={{ display: "block" }}>
+              <div style={{ marginBottom: 4, fontWeight: 600 }}>Last Name</div>
+              <input
+                type="text"
+                placeholder="Last Name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                className="generator-input"
+              />
+            </label>
+            <label style={{ display: "block" }}>
+              <div style={{ marginBottom: 4, fontWeight: 600 }}>Company (optional)</div>
+              <input
+                type="text"
+                placeholder="Company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="generator-input"
+              />
+            </label>
+          </>
+        )}
         <label style={{ display: "block" }}>
           <div style={{ marginBottom: 4, fontWeight: 600 }}>Email</div>
           <input
