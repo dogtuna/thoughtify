@@ -14,9 +14,11 @@ const InquiryMapContent = () => {
     isAnalyzing,
     approveSuggestedHypothesis,
     rejectSuggestedHypothesis,
+    addHypothesis,
   } = useInquiryMap();
   const [searchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
+  const wantsNew = searchParams.get("new") === "hypothesis";
 
   const [user, setUser] = useState(() => auth.currentUser);
 
@@ -59,6 +61,15 @@ const InquiryMapContent = () => {
     [suggestedHypotheses]
   );
 
+  const [newHyp, setNewHyp] = useState("");
+
+  const submitHypothesis = async () => {
+    const text = (newHyp || "").trim();
+    if (!text) return;
+    await addHypothesis(text);
+    setNewHyp("");
+  };
+
   return (
     <main className="min-h-screen pb-40">
       <div className="flex items-center gap-4 mb-4">
@@ -67,6 +78,24 @@ const InquiryMapContent = () => {
           Use Zapier
         </Link>
       </div>
+      <section className="mx-auto mb-6 w-[90%]">
+        <div className="initiative-card p-4">
+          <h3 className="mb-2 font-semibold">Add Hypothesis</h3>
+          <div className="flex gap-2 items-start">
+            <textarea
+              className="generator-input flex-1"
+              rows={wantsNew ? 4 : 2}
+              placeholder="State a clear, testable hypothesis"
+              value={newHyp}
+              autoFocus={wantsNew}
+              onChange={(e) => setNewHyp(e.target.value)}
+            />
+            <button className="generator-button" onClick={submitHypothesis} disabled={!newHyp.trim()}>
+              Add
+            </button>
+          </div>
+        </div>
+      </section>
       {suggestions.length > 0 && (
         <section className="mx-auto mb-6 w-[90%]">
           <h3 className="mb-2 font-semibold">Suggested Hypotheses</h3>

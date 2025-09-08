@@ -88,6 +88,49 @@ export default function NavBar() {
     setProjectMenu(false);
   };
 
+  const goToDiscoverySection = (section) => {
+    // If we have an initiative, go straight to the desired section in Discovery
+    if (initiativeId) {
+      const base = `/discovery?initiativeId=${initiativeId}`;
+      const url = section ? `${base}&section=${section}` : base;
+      navigate(url);
+      setAddMenu(false);
+      return;
+    }
+    // Otherwise, guide user to create/select a project first
+    handleAddProject();
+    setAddMenu(false);
+  };
+
+  const handleAddQuestion = () => {
+    if (initiativeId) {
+      navigate(`/discovery?initiativeId=${initiativeId}&section=questions&new=question`);
+      setAddMenu(false);
+    } else {
+      handleAddProject();
+      setAddMenu(false);
+    }
+  };
+  const handleAddDocument = () => goToDiscoverySection("documents");
+  const handleAddTask = () => {
+    if (initiativeId) {
+      navigate(`/discovery?initiativeId=${initiativeId}&section=tasks&new=task`);
+      setAddMenu(false);
+    } else {
+      handleAddProject();
+      setAddMenu(false);
+    }
+  };
+  const handleAddHypothesis = () => {
+    if (initiativeId) {
+      navigate(`/inquiry-map?initiativeId=${initiativeId}&new=hypothesis`);
+      setAddMenu(false);
+    } else {
+      handleAddProject();
+      setAddMenu(false);
+    }
+  };
+
   return (
     <header className="glass-header" data-header>
       <nav className="nav-container">
@@ -160,11 +203,18 @@ export default function NavBar() {
                 </button>
                 {addMenu && (
                   <ul className="dropdown">
-                    <li>Question</li>
-                    <li>Document</li>
-                    <li>Hypothesis</li>
-                    <li>Task</li>
-                    <li>Update</li>
+                    <li>
+                      <button type="button" onClick={handleAddQuestion}>Question</button>
+                    </li>
+                    <li>
+                      <button type="button" onClick={handleAddDocument}>Document</button>
+                    </li>
+                    <li>
+                      <button type="button" onClick={handleAddHypothesis}>Hypothesis</button>
+                    </li>
+                    <li>
+                      <button type="button" onClick={handleAddTask}>Task</button>
+                    </li>
                   </ul>
                 )}
               </div>

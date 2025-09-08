@@ -156,6 +156,12 @@ const DiscoveryHub = () => {
   const [recipientModal, setRecipientModal] = useState(null);
   const [analysisModal, setAnalysisModal] = useState(null);
   const [answerPanel, setAnswerPanel] = useState(null);
+  const [showNewQuestion, setShowNewQuestion] = useState(false);
+  const [newQuestionText, setNewQuestionText] = useState("");
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskType, setNewTaskType] = useState("general");
+  const [newTaskHypothesis, setNewTaskHypothesis] = useState("");
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [activeComposer, setActiveComposer] = useState(null);
   const [restoredDraftKey, setRestoredDraftKey] = useState(null);
@@ -210,6 +216,12 @@ const DiscoveryHub = () => {
     const status = searchParams.get("status");
     if (status) {
       setStatusFilter(status);
+    }
+    const pending = searchParams.get("new");
+    if (pending === "question") {
+      setShowNewQuestion(true);
+    } else if (pending === "task") {
+      setShowNewTask(true);
     }
   }, [searchParams]);
 
@@ -2594,6 +2606,70 @@ const DiscoveryHub = () => {
     setMenu({ x: e.clientX, y: e.clientY, name, idx });
   };
 
+  const createManualQuestion = async () => {
+    const text = (newQuestionText || "").trim();
+    if (!uid || !initiativeId || !text) return;
+    try {
+      const newQ = {
+        id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        phase: "General",
+        question: text,
+        contacts: [],
+        contactStatus: [],
+      };
+      await saveInitiative(uid, initiativeId, { projectQuestions: [newQ] });
+      setQuestions((prev) => [
+        ...prev,
+        {
+          ...newQ,
+          idx: prev.length,
+          contacts: [],
+          contactIds: [],
+          asked: {},
+          answers: {},
+        },
+      ]);
+      setToast("Question added.");
+      setShowNewQuestion(false);
+      setNewQuestionText("");
+      setActive("questions");
+    } catch (err) {
+      console.error("createManualQuestion error", err);
+    }
+  };
+
+  const createManualTask = async () => {
+    const text = (newTaskText || "").trim();
+    if (!uid || !initiativeId || !text) return;
+    try {
+      const tasksCol = collection(db, "users", uid, "initiatives", initiativeId, "tasks");
+      const subType = newTaskType || "general";
+      const hypothesisId = newTaskHypothesis || null;
+      const priority = getPriority("explore", 0);
+      await addDoc(tasksCol, {
+        name: currentUserName,
+        message: text,
+        assignees: [currentUserName],
+        assignee: currentUserName,
+        subType,
+        status: "open",
+        createdAt: serverTimestamp(),
+        tag: subType,
+        hypothesisId,
+        taskType: "explore",
+        priority,
+      });
+      setToast("Task added.");
+      setShowNewTask(false);
+      setNewTaskText("");
+      setNewTaskType("general");
+      setNewTaskHypothesis("");
+      setActive("tasks");
+    } catch (err) {
+      console.error("createManualTask error", err);
+    }
+  };
+
   useEffect(() => {
     const close = () => setMenu(null);
     window.addEventListener("click", close);
@@ -3223,6 +3299,70 @@ const DiscoveryHub = () => {
           setToast={setToast}
           setAnalyzing={setAnalyzing}
         />,
+        document.body
+      )}
+    {showNewQuestion &&
+      createPortal(
+        <div className="modal-overlay" onClick={() => setShowNewQuestion(false)}>
+          <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Add Question</h3>
+            <textarea
+              className="generator-input"
+              rows={4}
+              placeholder="What do you need to ask?"
+              value={newQuestionText}
+              onChange={(e) => setNewQuestionText(e.target.value)}
+            />
+            <div className="modal-actions">
+              <button className="generator-button" onClick={() => setShowNewQuestion(false)}>Cancel</button>
+              <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    {showNewTask &&
+      createPortal(
+        <div className="modal-overlay" onClick={() => setShowNewTask(false)}>
+          <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Add Task</h3>
+            <textarea
+              className="generator-input"
+              rows={4}
+              placeholder="Describe the task to add"
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+            />
+            <div className="flex gap-2 mt-2">
+              <label className="text-sm">
+                Type:
+                <select className="ml-2 generator-input" value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)}>
+                  <option value="general">general</option>
+                  <option value="meeting">meeting</option>
+                  <option value="email">email</option>
+                  <option value="research">research</option>
+                  <option value="instructional-design">instructional-design</option>
+                  <option value="other">other</option>
+                </select>
+              </label>
+              <label className="text-sm">
+                Hypothesis:
+                <select className="ml-2 generator-input" value={newTaskHypothesis} onChange={(e) => setNewTaskHypothesis(e.target.value)}>
+                  <option value="">None</option>
+                  {hypotheses.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.statement || h.hypothesis || h.label || h.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="modal-actions mt-2">
+              <button className="generator-button" onClick={() => setShowNewTask(false)}>Cancel</button>
+              <button className="generator-button" onClick={createManualTask} disabled={!newTaskText.trim()}>Add</button>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
     {qaModal &&
