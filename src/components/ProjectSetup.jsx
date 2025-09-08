@@ -583,9 +583,12 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                     list="contact-suggestions"
                     onChange={(e) => {
                       const val = e.target.value;
-                      // If user picked a suggestion ("Name — Company"), populate fields immediately
-                      if (contactsIndex[val]) {
-                        const s = contactsIndex[val];
+                      // If user picked a suggestion, populate fields immediately
+                      const normalized = contactsIndex[val]
+                        ? val
+                        : val.replace(/\s*[–—-]\s*internal$/i, "").trim();
+                      if (contactsIndex[normalized]) {
+                        const s = contactsIndex[normalized];
                         handleContactChange(idx, "name", s.name);
                         handleContactChange(idx, "jobTitle", s.jobTitle || "");
                         handleContactChange(idx, "info.email", s.email || "");
@@ -598,8 +601,11 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                     }}
                     onBlur={(e) => {
                       const val = e.target.value;
-                      const key = val.includes(" — ") ? val : null;
-                      if (key && contactsIndex[key]) {
+                      // Normalize suggestion format variations ("Name — Company", "Name - internal", or name only)
+                      const key = contactsIndex[val]
+                        ? val
+                        : val.replace(/\s*[–—-]\s*internal$/i, "").trim();
+                      if (contactsIndex[key]) {
                         const s = contactsIndex[key];
                         handleContactChange(idx, "name", s.name);
                         handleContactChange(idx, "jobTitle", s.jobTitle || "");
@@ -835,7 +841,7 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
       </div>
       {/* global datalist for contact suggestions */}
       <datalist id="contact-suggestions">
-        {Object.keys(contactsIndex).map((k) => (
+        {Array.from(new Set(Object.values(contactsIndex).map((v) => `${v.name} — ${v.company || 'Internal'}`))).map((k) => (
           <option key={k} value={k} />
         ))}
       </datalist>
