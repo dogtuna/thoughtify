@@ -179,13 +179,13 @@ export default function NavBar() {
                 {projectMenu && (
                   <ul className="dropdown">
                     <li>
-                      <button type="button" onClick={handleAddProject}>
+                      <button type="button" onClick={handleAddProject} style={{ color: '#000' }}>
                         Add New Project
                       </button>
                     </li>
                     {projects.map((p) => (
                       <li key={p.id}>
-                        <button type="button" onClick={() => handleSelectProject(p.id)}>
+                        <button type="button" onClick={() => handleSelectProject(p.id)} style={{ color: '#000' }}>
                           {p.projectName || p.businessGoal || p.id}
                         </button>
                       </li>
@@ -204,16 +204,16 @@ export default function NavBar() {
                 {addMenu && (
                   <ul className="dropdown">
                     <li>
-                      <button type="button" onClick={handleAddQuestion}>Question</button>
+                      <button type="button" onClick={handleAddQuestion} style={{ color: '#000' }}>Question</button>
                     </li>
                     <li>
-                      <button type="button" onClick={handleAddDocument}>Document</button>
+                      <button type="button" onClick={handleAddDocument} style={{ color: '#000' }}>Document</button>
                     </li>
                     <li>
-                      <button type="button" onClick={handleAddHypothesis}>Hypothesis</button>
+                      <button type="button" onClick={handleAddHypothesis} style={{ color: '#000' }}>Hypothesis</button>
                     </li>
                     <li>
-                      <button type="button" onClick={handleAddTask}>Task</button>
+                      <button type="button" onClick={handleAddTask} style={{ color: '#000' }}>Task</button>
                     </li>
                   </ul>
                 )}

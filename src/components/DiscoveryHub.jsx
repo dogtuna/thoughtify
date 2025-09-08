@@ -2983,6 +2983,13 @@ const DiscoveryHub = () => {
       <div className="task-actions">
     <button
       type="button"
+      className="generator-button"
+      onClick={() => setShowNewTask(true)}
+    >
+      Add Task
+    </button>
+    <button
+      type="button"
       className="appearance-none flex w-36 items-center justify-center gap-2 rounded-lg px-4 py-2 font-semibold text-white shadow
                  !bg-gradient-to-r !from-indigo-500 !to-purple-600 hover:brightness-110 disabled:opacity-60"
       disabled={isPrioritizing}

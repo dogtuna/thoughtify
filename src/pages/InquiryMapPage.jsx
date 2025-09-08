@@ -62,12 +62,14 @@ const InquiryMapContent = () => {
   );
 
   const [newHyp, setNewHyp] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
 
   const submitHypothesis = async () => {
     const text = (newHyp || "").trim();
     if (!text) return;
     await addHypothesis(text);
     setNewHyp("");
+    setShowAdd(false);
   };
 
   return (
@@ -80,20 +82,31 @@ const InquiryMapContent = () => {
       </div>
       <section className="mx-auto mb-6 w-[90%]">
         <div className="initiative-card p-4">
-          <h3 className="mb-2 font-semibold">Add Hypothesis</h3>
-          <div className="flex gap-2 items-start">
-            <textarea
-              className="generator-input flex-1"
-              rows={wantsNew ? 4 : 2}
-              placeholder="State a clear, testable hypothesis"
-              value={newHyp}
-              autoFocus={wantsNew}
-              onChange={(e) => setNewHyp(e.target.value)}
-            />
-            <button className="generator-button" onClick={submitHypothesis} disabled={!newHyp.trim()}>
-              Add
-            </button>
-          </div>
+          {!showAdd && !wantsNew ? (
+            <button className="generator-button" onClick={() => setShowAdd(true)}>Add Hypothesis</button>
+          ) : (
+            <>
+              <h3 className="mb-2 font-semibold">Add Hypothesis</h3>
+              <div className="flex gap-2 items-start">
+                <textarea
+                  className="generator-input flex-1"
+                  rows={4}
+                  placeholder="State a clear, testable hypothesis"
+                  value={newHyp}
+                  autoFocus
+                  onChange={(e) => setNewHyp(e.target.value)}
+                />
+                <div className="flex flex-col gap-2">
+                  <button className="generator-button" onClick={submitHypothesis} disabled={!newHyp.trim()}>
+                    Add
+                  </button>
+                  <button className="generator-button" onClick={() => { setShowAdd(false); setNewHyp(""); }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </section>
       {suggestions.length > 0 && (
