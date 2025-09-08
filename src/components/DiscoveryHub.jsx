@@ -3324,9 +3324,13 @@ const DiscoveryHub = () => {
       )}
     {showNewQuestion &&
       createPortal(
-        <div className="modal-overlay" onClick={() => setShowNewQuestion(false)}>
-          <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Add Question</h3>
+        <div className="slide-over-overlay" onClick={() => setShowNewQuestion(false)}>
+          <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center mb-2">
+              <div className="font-semibold">Add Question</div>
+              <div className="flex-1" />
+              <button className="text-white" type="button" onClick={() => setShowNewQuestion(false)}>Close</button>
+            </div>
             <textarea
               className="generator-input w-full"
               rows={4}
@@ -3350,7 +3354,7 @@ const DiscoveryHub = () => {
                 ))}
               </select>
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions mt-2">
               <button className="generator-button" onClick={() => setShowNewQuestion(false)}>Cancel</button>
               <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
             </div>
@@ -3360,9 +3364,13 @@ const DiscoveryHub = () => {
       )}
     {showNewTask &&
       createPortal(
-        <div className="modal-overlay" onClick={() => setShowNewTask(false)}>
-          <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Add Task</h3>
+        <div className="slide-over-overlay" onClick={() => setShowNewTask(false)}>
+          <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center mb-2">
+              <div className="font-semibold">Add Task</div>
+              <div className="flex-1" />
+              <button className="text-white" type="button" onClick={() => setShowNewTask(false)}>Close</button>
+            </div>
             <textarea
               className="generator-input w-full"
               rows={4}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { useMemo } from "react";
@@ -81,34 +82,34 @@ const InquiryMapContent = () => {
         </Link>
       </div>
       <section className="mx-auto mb-6 w-[90%]">
-        <div className="initiative-card p-4">
-          {!showAdd && !wantsNew ? (
-            <button className="generator-button" onClick={() => setShowAdd(true)}>Add Hypothesis</button>
-          ) : (
-            <>
-              <h3 className="mb-2 font-semibold">Add Hypothesis</h3>
-              <div className="flex gap-2 items-start">
-                <textarea
-                  className="generator-input flex-1"
-                  rows={4}
-                  placeholder="State a clear, testable hypothesis"
-                  value={newHyp}
-                  autoFocus
-                  onChange={(e) => setNewHyp(e.target.value)}
-                />
-                <div className="flex flex-col gap-2">
-                  <button className="generator-button" onClick={submitHypothesis} disabled={!newHyp.trim()}>
-                    Add
-                  </button>
-                  <button className="generator-button" onClick={() => { setShowAdd(false); setNewHyp(""); }}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {!showAdd && !wantsNew ? (
+          <button className="generator-button" onClick={() => setShowAdd(true)}>Add Hypothesis</button>
+        ) : null}
       </section>
+      {(showAdd || wantsNew) && createPortal(
+        <div className="slide-over-overlay" onClick={() => { setShowAdd(false); }}>
+          <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center mb-2">
+              <div className="font-semibold">Add Hypothesis</div>
+              <div className="flex-1" />
+              <button className="text-white" type="button" onClick={() => { setShowAdd(false); }}>Close</button>
+            </div>
+            <textarea
+              className="generator-input w-full"
+              rows={4}
+              placeholder="State a clear, testable hypothesis"
+              value={newHyp}
+              autoFocus
+              onChange={(e) => setNewHyp(e.target.value)}
+            />
+            <div className="modal-actions mt-2">
+              <button className="generator-button" onClick={() => { setShowAdd(false); setNewHyp(""); }}>Cancel</button>
+              <button className="generator-button" onClick={submitHypothesis} disabled={!newHyp.trim()}>Add</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
       {suggestions.length > 0 && (
         <section className="mx-auto mb-6 w-[90%]">
           <h3 className="mb-2 font-semibold">Suggested Hypotheses</h3>
