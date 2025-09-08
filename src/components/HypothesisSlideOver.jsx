@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { auth, db } from "../firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
@@ -31,6 +31,15 @@ const HypothesisSlideOver = ({
   const [view, setView] = useState(initialView);
   const [backView, setBackView] = useState(initialView);
   const [selectedEvidence, setSelectedEvidence] = useState(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   const evidenceCount =
     (hypothesis.evidence?.supporting?.length || hypothesis.supportingEvidence?.length || 0) +
@@ -314,4 +323,3 @@ HypothesisSlideOver.propTypes = {
 };
 
 export default HypothesisSlideOver;
-

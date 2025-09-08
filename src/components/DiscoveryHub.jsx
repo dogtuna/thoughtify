@@ -242,6 +242,23 @@ const DiscoveryHub = () => {
     clearNewParam();
   };
 
+  // Close any open slide-over with Escape
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        if (showNewQuestion) {
+          closeNewQuestion();
+        } else if (showNewTask) {
+          closeNewTask();
+        } else if (answerPanel) {
+          setAnswerPanel(null);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showNewQuestion, showNewTask, answerPanel]);
+
   const normalizeAssignee = useCallback(
     (a) => normalizeAssigneeName(a, currentUserName),
     [currentUserName],

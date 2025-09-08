@@ -88,6 +88,17 @@ const InquiryMapContent = () => {
     }
   };
 
+  // Close slide-over on Escape
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" && (showAdd || wantsNew)) {
+        closeAddHypothesis();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showAdd, wantsNew, closeAddHypothesis]);
+
   return (
     <main className="min-h-screen pb-40">
       <div className="flex items-center gap-4 mb-4">
