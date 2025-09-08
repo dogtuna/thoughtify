@@ -8,7 +8,7 @@ import {
 } from "react";
 import PropTypes from "prop-types";
 import { db } from "../firebase";
-import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
 import { generate } from "../ai";
 import { parseJsonFromText } from "../utils/json";
 import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLogic";
@@ -242,6 +242,39 @@ export const InquiryMapProvider = ({ children }) => {
             }
           }
         }
+
+        // Also scan existing tasks as potential evidence
+        try {
+          const tasksRef = collection(db, "users", currentUser, "initiatives", currentInitiative, "tasks");
+          const tSnap = await getDocs(tasksRef);
+          for (const d of tSnap.docs) {
+            const t = d.data();
+            const msg = t?.message || t?.text || "";
+            if (!msg || !msg.trim()) continue;
+            const text = `Task: ${msg}`;
+            let analysis = null;
+            if (!existingEvidence.has(text)) {
+              analysis = await triageEvidence(text);
+            }
+            try {
+              // If AI linked this task to hypotheses, persist the linkage on the task
+              const links = analysis?.hypothesisLinks || [];
+              const ids = [...new Set(links.map((l) => l.hypothesisId).filter(Boolean))];
+              if (ids.length) {
+                const currentIds = Array.isArray(t.hypothesisIds) ? t.hypothesisIds : (t.hypothesisId ? [t.hypothesisId] : []);
+                const merged = [...new Set([...currentIds, ...ids])];
+                await updateDoc(d.ref, {
+                  hypothesisIds: merged,
+                  hypothesisId: t.hypothesisId || merged[0] || null,
+                });
+              }
+            } catch (linkErr) {
+              console.warn("Failed to link task to hypotheses", linkErr);
+            }
+          }
+        } catch (e) {
+          console.warn("Unable to scan tasks for evidence", e);
+        }
       } catch (err) {
         console.error("Error refreshing inquiry map:", err);
       }
@@ -270,11 +303,17 @@ export const InquiryMapProvider = ({ children }) => {
           "inquiryMap.hypotheses": updated,
           hypotheses: updated,
         });
+        // After adding, scan project data to connect relevant evidence
+        try {
+          await refreshInquiryMap();
+        } catch (e) {
+          console.warn("Post-add hypothesis refresh failed", e);
+        }
       } catch (err) {
         console.error("Error adding hypothesis:", err);
       }
     },
-    [currentUser, currentInitiative]
+    [currentUser, currentInitiative, refreshInquiryMap]
   );
 
   const addQuestion = useCallback(

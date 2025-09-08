@@ -161,7 +161,7 @@ const DiscoveryHub = () => {
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskType, setNewTaskType] = useState("general");
-  const [newTaskHypothesis, setNewTaskHypothesis] = useState("");
+  const [newTaskHypotheses, setNewTaskHypotheses] = useState([]);
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [activeComposer, setActiveComposer] = useState(null);
   const [restoredDraftKey, setRestoredDraftKey] = useState(null);
@@ -1873,7 +1873,7 @@ const DiscoveryHub = () => {
         if (prev[h.id] !== conf) {
           prev[h.id] = conf;
           const related = projectTasksRef.current.filter(
-            (t) => t.hypothesisId === h.id,
+            (t) => t.hypothesisId === h.id || (Array.isArray(t.hypothesisIds) && t.hypothesisIds.includes(h.id)),
           );
           const updates = [];
           related.forEach((task) => {
@@ -2606,6 +2606,8 @@ const DiscoveryHub = () => {
     setMenu({ x: e.clientX, y: e.clientY, name, idx });
   };
 
+  const [newQuestionHypotheses, setNewQuestionHypotheses] = useState([]);
+
   const createManualQuestion = async () => {
     const text = (newQuestionText || "").trim();
     if (!uid || !initiativeId || !text) return;
@@ -2616,6 +2618,8 @@ const DiscoveryHub = () => {
         question: text,
         contacts: [],
         contactStatus: [],
+        hypothesisId: newQuestionHypotheses[0] || null,
+        hypothesisIds: newQuestionHypotheses,
       };
       await saveInitiative(uid, initiativeId, { projectQuestions: [newQ] });
       setQuestions((prev) => [
@@ -2632,6 +2636,7 @@ const DiscoveryHub = () => {
       setToast("Question added.");
       setShowNewQuestion(false);
       setNewQuestionText("");
+      setNewQuestionHypotheses([]);
       setActive("questions");
     } catch (err) {
       console.error("createManualQuestion error", err);
@@ -2644,7 +2649,8 @@ const DiscoveryHub = () => {
     try {
       const tasksCol = collection(db, "users", uid, "initiatives", initiativeId, "tasks");
       const subType = newTaskType || "general";
-      const hypothesisId = newTaskHypothesis || null;
+      const hypothesisIds = Array.isArray(newTaskHypotheses) ? newTaskHypotheses : [];
+      const hypothesisId = hypothesisIds[0] || null;
       const priority = getPriority("explore", 0);
       await addDoc(tasksCol, {
         name: currentUserName,
@@ -2656,6 +2662,7 @@ const DiscoveryHub = () => {
         createdAt: serverTimestamp(),
         tag: subType,
         hypothesisId,
+        hypothesisIds,
         taskType: "explore",
         priority,
       });
@@ -2663,7 +2670,7 @@ const DiscoveryHub = () => {
       setShowNewTask(false);
       setNewTaskText("");
       setNewTaskType("general");
-      setNewTaskHypothesis("");
+      setNewTaskHypotheses([]);
       setActive("tasks");
     } catch (err) {
       console.error("createManualTask error", err);
@@ -3198,7 +3205,14 @@ const DiscoveryHub = () => {
           <div key={t.id} className="flex items-center justify-between border-b border-gray-700 py-2">
             <div>
               <div className="font-medium">{t.message}</div>
-              <div className="text-sm text-gray-400">{t.subType} {t.hypothesisId ? `• Hypothesis ${t.hypothesisId}` : ""}</div>
+              <div className="text-sm text-gray-400">
+                {t.subType}
+                {t.hypothesisIds && t.hypothesisIds.length
+                  ? ` • Hypotheses ${t.hypothesisIds.join(", ")}`
+                  : t.hypothesisId
+                  ? ` • Hypothesis ${t.hypothesisId}`
+                  : ""}
+              </div>
             </div>
             <div className="flex gap-2">
               <button className="generator-button" onClick={() => acceptSuggestedTask(t)}>Accept</button>
@@ -3307,12 +3321,28 @@ const DiscoveryHub = () => {
           <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Add Question</h3>
             <textarea
-              className="generator-input"
+              className="generator-input w-full"
               rows={4}
               placeholder="What do you need to ask?"
               value={newQuestionText}
               onChange={(e) => setNewQuestionText(e.target.value)}
+              autoFocus
             />
+            <div className="mt-2">
+              <label className="block text-sm font-medium">Link to hypotheses (optional)</label>
+              <select
+                multiple
+                className="generator-input w-full"
+                value={newQuestionHypotheses}
+                onChange={(e) => setNewQuestionHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
+              >
+                {hypotheses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.statement || h.hypothesis || h.label || h.id}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="modal-actions">
               <button className="generator-button" onClick={() => setShowNewQuestion(false)}>Cancel</button>
               <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
@@ -3327,16 +3357,16 @@ const DiscoveryHub = () => {
           <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Add Task</h3>
             <textarea
-              className="generator-input"
+              className="generator-input w-full"
               rows={4}
               placeholder="Describe the task to add"
               value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
+              autoFocus
             />
-            <div className="flex gap-2 mt-2">
-              <label className="text-sm">
-                Type:
-                <select className="ml-2 generator-input" value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)}>
+            <div className="mt-2 w-full">
+              <label className="block text-sm font-medium mb-1">Type</label>
+              <select className="generator-input w-full" value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)}>
                   <option value="general">general</option>
                   <option value="meeting">meeting</option>
                   <option value="email">email</option>
@@ -3344,18 +3374,22 @@ const DiscoveryHub = () => {
                   <option value="instructional-design">instructional-design</option>
                   <option value="other">other</option>
                 </select>
-              </label>
-              <label className="text-sm">
-                Hypothesis:
-                <select className="ml-2 generator-input" value={newTaskHypothesis} onChange={(e) => setNewTaskHypothesis(e.target.value)}>
-                  <option value="">None</option>
-                  {hypotheses.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.statement || h.hypothesis || h.label || h.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            </div>
+            <div className="mt-2 w-full">
+              <label className="block text-sm font-medium mb-1">Link to hypotheses (optional)</label>
+              <select
+                multiple
+                className="generator-input w-full"
+                value={newTaskHypotheses}
+                onChange={(e) => setNewTaskHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
+              >
+                {hypotheses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.statement || h.hypothesis || h.label || h.id}
+                  </option>
+                ))}
+              </select>
+            </div>
             </div>
             <div className="modal-actions mt-2">
               <button className="generator-button" onClick={() => setShowNewTask(false)}>Cancel</button>
@@ -3503,10 +3537,13 @@ const DiscoveryHub = () => {
           <ActionDashboard />
         ) : (
           <>
-            <p className="mb-4 text-sm text-gray-500">
-              Click the <strong>Ask</strong> button, choose the responder, and enter
-              answer text to receive analysis and suggested tasks.
-            </p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="mb-0 text-sm text-gray-500">
+                Click the <strong>Ask</strong> button, choose the responder, and enter
+                answer text to receive analysis and suggested tasks.
+              </p>
+              <button className="generator-button" onClick={() => setShowNewQuestion(true)}>Add Question</button>
+            </div>
             <div className="filter-bar">
               <label>
                 Contact:
