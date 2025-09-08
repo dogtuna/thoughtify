@@ -3397,7 +3397,6 @@ const DiscoveryHub = () => {
                 ))}
               </select>
             </div>
-            </div>
             <div className="modal-actions mt-2">
               <button className="generator-button" onClick={() => setShowNewTask(false)}>Cancel</button>
               <button className="generator-button" onClick={createManualTask} disabled={!newTaskText.trim()}>Add</button>
