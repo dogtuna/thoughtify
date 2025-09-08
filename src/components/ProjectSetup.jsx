@@ -576,6 +576,7 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
               <div key={idx} className="contact-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8, width: "100%" }}>
                 {/* Row 1: Name + Job Title */}
                 <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1 }}>
                   <input
                     type="text"
                     value={c.name}
@@ -584,11 +585,13 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                     onChange={(e) => {
                       const val = e.target.value;
                       // If user picked a suggestion, populate fields immediately
-                      const normalized = contactsIndex[val]
-                        ? val
-                        : val.replace(/\s*[–—-]\s*internal$/i, "").trim();
-                      if (contactsIndex[normalized]) {
-                        const s = contactsIndex[normalized];
+                      const normalized = contactsIndex[val] ? val : val.replace(/\s*[–—-]\s*internal$/i, "").trim();
+                      const s = contactsIndex[normalized] || Object.values(contactsIndex).find((d) => {
+                        const byName = (d.name || "").toLowerCase() === normalized.toLowerCase();
+                        const byPair = (`${d.name} — ${d.company || 'Internal'}`).toLowerCase() === val.toLowerCase();
+                        return byName || byPair;
+                      });
+                      if (s) {
                         handleContactChange(idx, "name", s.name);
                         handleContactChange(idx, "jobTitle", s.jobTitle || "");
                         handleContactChange(idx, "info.email", s.email || "");
@@ -602,11 +605,13 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                     onBlur={(e) => {
                       const val = e.target.value;
                       // Normalize suggestion format variations ("Name — Company", "Name - internal", or name only)
-                      const key = contactsIndex[val]
-                        ? val
-                        : val.replace(/\s*[–—-]\s*internal$/i, "").trim();
-                      if (contactsIndex[key]) {
-                        const s = contactsIndex[key];
+                      const key = contactsIndex[val] ? val : val.replace(/\s*[–—-]\s*internal$/i, "").trim();
+                      const s = contactsIndex[key] || Object.values(contactsIndex).find((d) => {
+                        const byName = (d.name || "").toLowerCase() === key.toLowerCase();
+                        const byPair = (`${d.name} — ${d.company || 'Internal'}`).toLowerCase() === val.toLowerCase();
+                        return byName || byPair;
+                      });
+                      if (s) {
                         handleContactChange(idx, "name", s.name);
                         handleContactChange(idx, "jobTitle", s.jobTitle || "");
                         handleContactChange(idx, "info.email", s.email || "");
@@ -618,6 +623,32 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                     className="generator-input"
                     style={{ flex: 1, margin: 0 }}
                   />
+                  <button
+                    type="button"
+                    className="generator-button"
+                    title="Browse suggestions"
+                    onClick={(ev) => {
+                      ev.preventDefault();
+                      try {
+                        const input = ev.currentTarget.previousElementSibling;
+                        if (input) {
+                          const prev = input.value;
+                          input.value = ""; // clear to force datalist to open fully
+                          input.focus();
+                          // Restore previous text if user doesn't pick from suggestions within a short time
+                          setTimeout(() => {
+                            if (document.activeElement === input && !input.value) {
+                              input.value = prev;
+                            }
+                          }, 1500);
+                        }
+                      } catch {}
+                    }}
+                    style={{ padding: "4px 8px" }}
+                  >
+                    Browse
+                  </button>
+                  </div>
                   <input
                     type="text"
                     value={c.jobTitle}
