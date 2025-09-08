@@ -122,8 +122,11 @@ const ProjectSetup = () => {
           const contacts = await loadAllContacts(user.uid);
           const idx = {};
           contacts.forEach((c) => {
-            const key = `${c.name} — ${c.company}`;
-            idx[key] = { name: c.name, company: c.company, email: c.email || "", jobTitle: c.jobTitle || "" };
+            const details = { name: c.name, company: c.company, email: c.email || "", jobTitle: c.jobTitle || "" };
+            const keyed = `${c.name} — ${c.company}`;
+            idx[keyed] = details;
+            // Also index by bare name to populate fields even if the user selects a name-only suggestion
+            if (c.name && !idx[c.name]) idx[c.name] = details;
           });
           setContactsIndex(idx);
         } catch {}
