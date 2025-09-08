@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
@@ -49,6 +50,9 @@ const ProjectSetup = () => {
   });
   const [keyContacts, setKeyContacts] = useState([emptyContact()]);
   const [sourceMaterials, setSourceMaterials] = useState([]);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteTitle, setPasteTitle] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -241,13 +245,19 @@ const ProjectSetup = () => {
   };
 
   const handlePasteText = () => {
-    const text = window.prompt("Paste your text:");
-    if (text && text.trim()) {
-      const defaultName = `pasted-${sourceMaterials.length + 1}.txt`;
-      const name =
-        window.prompt("Enter a filename", defaultName) || defaultName;
-      setSourceMaterials((prev) => [...prev, { name, content: text }]);
-    }
+    setShowPaste(true);
+    setPasteText("");
+    setPasteTitle("");
+  };
+
+  const addPastedDocument = () => {
+    const text = (pasteText || "").trim();
+    const name = (pasteTitle || `pasted-${sourceMaterials.length + 1}.txt`).trim();
+    if (!text) return;
+    setSourceMaterials((prev) => [...prev, { name, content: text }]);
+    setShowPaste(false);
+    setPasteText("");
+    setPasteTitle("");
   };
 
   const removeFile = (index) => {
@@ -723,6 +733,29 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                 >
                   Paste Text
                 </button>
+                {showPaste && (
+                  <div className="glass-card" style={{ marginTop: 12 }}>
+                    <label className="block text-sm font-medium" style={{ marginBottom: 6 }}>Pasted Content</label>
+                    <textarea
+                      className="generator-input"
+                      rows={10}
+                      placeholder="Paste or type your document text here"
+                      value={pasteText}
+                      onChange={(e) => setPasteText(e.target.value)}
+                    />
+                    <label className="block text-sm font-medium" style={{ marginTop: 8 }}>Document Title</label>
+                    <input
+                      className="generator-input"
+                      placeholder="Enter a title"
+                      value={pasteTitle}
+                      onChange={(e) => setPasteTitle(e.target.value)}
+                    />
+                    <div className="button-row" style={{ marginTop: 8 }}>
+                      <button type="button" className="generator-button" onClick={() => { setShowPaste(false); setPasteText(""); setPasteTitle(""); }}>Cancel</button>
+                      <button type="button" className="generator-button next-button" onClick={addPastedDocument} disabled={!pasteText.trim()}>Add Document</button>
+                    </div>
+                  </div>
+                )}
                 {sourceMaterials.length > 0 && (
                   <ul className="file-list">
                     {sourceMaterials.map((f, idx) => (
@@ -779,8 +812,8 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
               </button>
             )}
           </div>
-          {loading && (
-            <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          {loading && createPortal((
+            <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 92vw)' }}>
                 <h3 style={{ marginBottom: 12 }}>Setting up your project…</h3>
                 {(() => {
@@ -805,7 +838,7 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                 })()}
               </div>
             </div>
-          )}
+          ), document.body)}
 
           {/* <div
             className="upload-card"
