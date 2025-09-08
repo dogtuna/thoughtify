@@ -5,6 +5,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { functions, auth, appCheck } from "../firebase";
 import { getToken } from "firebase/app-check";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
+import { generate as aiGenerate } from "../ai";
+import { parseJsonFromText } from "../utils/json";
 import { loadCompanies, loadAllContacts, upsertCompaniesAndContacts } from "../utils/companies";
 import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import { generateQuestionId } from "../utils/questions.js";
@@ -303,52 +305,111 @@ const ProjectSetup = () => {
         setProg("save", "done");
       }
 
-      // 2) Generate discovery questions
-      setProg("questions", "in_progress");
-      const { data } = await generateProjectQuestions(
-        omitEmptyStrings({
-          businessGoal,
-          // audienceProfile removed
-          sourceMaterial: getCombinedSource(),
-          projectConstraints,
-          keyContacts: filteredContacts.map(
-            ({ id, name, jobTitle, profile, scope, company, info }) => ({
-              id,
-              name,
-              jobTitle,
-              profile,
-              scope,
-              company,
-              info,
-            })
-          ),
-        })
-      );
-      const qsRaw = (data.projectQuestions || []).slice(0, 9);
-      const qs = qsRaw.map((q) => {
-        const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
-          const match = keyContacts.find(
-            (c) => c.name === name || c.id === name
-          );
-          return match ? match.id : name;
+      // 2) Generate initial hypotheses first (Inquiry Map)
+      const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nConstraints:${projectConstraints}`;
+      try {
+        setProg("hypotheses", "in_progress");
+        setProg("map", "in_progress");
+        // Ensure App Check token is attached if enabled
+        try { if (appCheck) { await getToken(appCheck); } } catch {}
+        try { if (auth.currentUser) { await auth.currentUser.getIdToken(true); } } catch {}
+        const mapResp = await generateInitialInquiryMap(
+          omitEmptyStrings({
+            uid,
+            initiativeId,
+            brief,
+            documents: getCombinedSource(),
+            answers: "",
+          })
+        );
+        const hypotheses = mapResp?.data?.hypotheses || [];
+        setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
+        setProg("hypotheses", "done");
+        setProg("map", "done");
+
+        // 3) Generate discovery questions, then tag with hypotheses or general categories
+        setProg("questions", "in_progress");
+        const { data } = await generateProjectQuestions(
+          omitEmptyStrings({
+            businessGoal,
+            // audienceProfile removed
+            sourceMaterial: getCombinedSource(),
+            projectConstraints,
+            keyContacts: filteredContacts.map(
+              ({ id, name, jobTitle, profile, scope, company, info }) => ({
+                id,
+                name,
+                jobTitle,
+                profile,
+                scope,
+                company,
+                info,
+              })
+            ),
+          })
+        );
+        const qsRaw = (data.projectQuestions || []).slice(0, 9);
+        let qs = qsRaw.map((q) => {
+          const contactIds = (q.stakeholders || q.contacts || []).map((name) => {
+            const match = keyContacts.find(
+              (c) => c.name === name || c.id === name
+            );
+            return match ? match.id : name;
+          });
+          const statusArr = contactIds.map((cid) => ({
+            contactId: cid,
+            currentStatus: "Ask",
+            askedAt: new Date().toISOString(),
+            askedBy: auth.currentUser?.uid || null,
+            answers: [],
+          }));
+          return {
+            id: generateQuestionId(),
+            question: typeof q === "string" ? q : q.question,
+            phase: q.phase || "General",
+            contacts: contactIds,
+            contactStatus: statusArr,
+          };
         });
-        const statusArr = contactIds.map((cid) => ({
-          contactId: cid,
-          currentStatus: "Ask",
-          askedAt: new Date().toISOString(),
-          askedBy: auth.currentUser?.uid || null,
-          answers: [],
-        }));
-        return {
-          id: generateQuestionId(),
-          question: typeof q === "string" ? q : q.question,
-          phase: q.phase || "General",
-          contacts: contactIds,
-          contactStatus: statusArr,
-        };
-      });
-      setProg("questions", "done");
-      if (uid) {
+
+        // Categorize/link questions using hypotheses
+        try {
+          if (hypotheses && hypotheses.length && qs.length) {
+            const hypList = hypotheses
+              .map((h) => `${h.id}: ${h.hypothesis || h.statement || ""}`)
+              .join("\n");
+            const qList = qs.map((q) => `${q.id}: ${q.question}`).join("\n");
+            const catPrompt = `You are a strategic analyst. Given the hypotheses and questions below, return JSON mapping each question id to either a list of linked hypothesis ids (if it directly investigates one or more hypotheses) or a general category when it does not. Use categories from this set only: ["Logistics","Scope","Stakeholders","Timeline","Risks","Dependencies","Success Criteria","Budget","Tools/Systems","Compliance","Other"].
+
+Hypotheses:\n${hypList}
+
+Questions:\n${qList}
+
+Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],"category":""}]}`;
+            const { text } = await aiGenerate(catPrompt);
+            const mapping = parseJsonFromText(text);
+            const byId = new Map(
+              (mapping.items || []).map((m) => [m.id, m])
+            );
+            qs = qs.map((q) => {
+              const m = byId.get(q.id);
+              if (!m) return q;
+              const hypothesisIds = Array.isArray(m.hypothesisIds)
+                ? m.hypothesisIds.filter(Boolean)
+                : [];
+              return {
+                ...q,
+                category: hypothesisIds.length ? undefined : (m.category || undefined),
+                hypothesisIds,
+                hypothesisId: hypothesisIds[0] || null,
+              };
+            });
+          }
+        } catch (catErr) {
+          console.warn("Question categorization failed; proceeding without tags", catErr);
+        }
+
+        setProg("questions", "done");
         await saveInitiative(uid, initiativeId, { projectQuestions: qs });
 
         // Persist companies and contacts to profile for future suggestions
@@ -360,31 +421,9 @@ const ProjectSetup = () => {
         } catch (persistErr) {
           console.warn("Failed to upsert companies/contacts index", persistErr);
         }
-
-        const brief = `Project Name: ${projectName}\nBusiness Goal: ${businessGoal}\nConstraints:${projectConstraints}`;
-        try {
-          setProg("hypotheses", "in_progress");
-          setProg("map", "in_progress");
-          // Ensure App Check token is attached if enabled
-          try { if (appCheck) { await getToken(appCheck); } } catch {}
-          try { if (auth.currentUser) { await auth.currentUser.getIdToken(true); } } catch {}
-          const mapResp = await generateInitialInquiryMap(
-            omitEmptyStrings({
-              uid,
-              initiativeId,
-              brief,
-              documents: getCombinedSource(),
-              answers: "",
-            })
-          );
-          const hypotheses = mapResp?.data?.hypotheses || [];
-          setToast(`Inquiry map created with ${hypotheses.length} hypotheses.`);
-          setProg("hypotheses", "done");
-          setProg("map", "done");
-          await new Promise((res) => setTimeout(res, 1000));
-        } catch (mapErr) {
-          console.error("Error generating inquiry map:", mapErr);
-        }
+        await new Promise((res) => setTimeout(res, 1000));
+      } catch (mapErr) {
+        console.error("Error generating inquiry map or questions:", mapErr);
       }
       setProg("dashboard", "in_progress");
       await new Promise((res) => setTimeout(res, 250));

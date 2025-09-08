@@ -19,6 +19,7 @@ import { getToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import { generateQuestionId } from "../utils/questions.js";
 import ai, { generate } from "../ai";
+import { parseJsonFromText } from "../utils/json";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import {
   classifyTask,
@@ -158,6 +159,8 @@ const DiscoveryHub = () => {
   const [answerPanel, setAnswerPanel] = useState(null);
   const [showNewQuestion, setShowNewQuestion] = useState(false);
   const [newQuestionText, setNewQuestionText] = useState("");
+  const [newQuestionContacts, setNewQuestionContacts] = useState([]); // array of contactIds
+  const [whoInput, setWhoInput] = useState("");
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskType, setNewTaskType] = useState("general");
@@ -1872,6 +1875,27 @@ const DiscoveryHub = () => {
         contactStatus: [],
       };
       await saveInitiative(uid, initiativeId, { projectQuestions: [newQ] });
+      // Auto-link to hypotheses or general category
+      try {
+        if (Array.isArray(hypotheses) && hypotheses.length) {
+          const hypList = hypotheses
+            .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.label || ""}`)
+            .join("\n");
+          const catPrompt = `You are a strategic analyst. Given the hypotheses and the question below, return JSON mapping the question id to either a list of linked hypothesis ids (if it directly investigates one or more hypotheses) or a general category when it does not. Use categories from this set only: [\"Logistics\",\"Scope\",\"Stakeholders\",\"Timeline\",\"Risks\",\"Dependencies\",\"Success Criteria\",\"Budget\",\"Tools/Systems\",\"Compliance\",\"Other\"].\n\nHypotheses:\n${hypList}\n\nQuestion:\n${newQ.id}: ${newQ.question}\n\nReturn JSON exactly like:\n{\"items\":[{\"id\":\"${newQ.id}\",\"hypothesisIds\":[\"A\"],\"category\":\"\"}]}`;
+          const { text: resp } = await generate(catPrompt);
+          const mapping = parseJsonFromText(resp);
+          const item = (mapping.items || []).find((m) => m.id === newQ.id);
+          const hypothesisIds = Array.isArray(item?.hypothesisIds) ? item.hypothesisIds.filter(Boolean) : [];
+          const category = hypothesisIds.length ? undefined : (item?.category || undefined);
+          if (hypothesisIds.length || category) {
+            await saveInitiative(uid, initiativeId, {
+              projectQuestions: [{ id: newQ.id, hypothesisIds, hypothesisId: hypothesisIds[0] || null, category }],
+            });
+          }
+        }
+      } catch (linkErr) {
+        console.warn("Auto-linking suggested question to hypotheses failed", linkErr);
+      }
       await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedQuestions", q.id));
     } catch (err) {
       console.error("acceptSuggestedQuestion error", err);
@@ -2649,23 +2673,49 @@ const DiscoveryHub = () => {
     const text = (newQuestionText || "").trim();
     if (!uid || !initiativeId || !text) return;
     try {
+      const contactStatus = (newQuestionContacts || []).map((id) => ({ contactId: id, ...initStatus() }));
       const newQ = {
         id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         phase: "General",
         question: text,
-        contacts: [],
-        contactStatus: [],
-        hypothesisId: newQuestionHypotheses[0] || null,
-        hypothesisIds: newQuestionHypotheses,
+        contacts: newQuestionContacts,
+        contactStatus,
+        hypothesisId: null,
+        hypothesisIds: [],
       };
       await saveInitiative(uid, initiativeId, { projectQuestions: [newQ] });
+      // Auto-link to hypotheses or category behind the scenes
+      try {
+        if (Array.isArray(hypotheses) && hypotheses.length) {
+          const hypList = hypotheses
+            .map((h) => `${h.id}: ${h.statement || h.hypothesis || h.label || ""}`)
+            .join("\n");
+          const catPrompt = `You are a strategic analyst. Given the hypotheses and the question below, return JSON mapping the question id to either a list of linked hypothesis ids (if it directly investigates one or more hypotheses) or a general category when it does not. Use categories from this set only: ["Logistics","Scope","Stakeholders","Timeline","Risks","Dependencies","Success Criteria","Budget","Tools/Systems","Compliance","Other"].\n\nHypotheses:\n${hypList}\n\nQuestion:\n${newQ.id}: ${newQ.question}\n\nReturn JSON exactly like:\n{"items":[{"id":"${newQ.id}","hypothesisIds":["A"],"category":""}]}`;
+          const { text: resp } = await generate(catPrompt);
+          const mapping = parseJsonFromText(resp);
+          const item = (mapping.items || []).find((m) => m.id === newQ.id);
+          const hypothesisIds = Array.isArray(item?.hypothesisIds) ? item.hypothesisIds.filter(Boolean) : [];
+          const category = hypothesisIds.length ? undefined : (item?.category || undefined);
+          if (hypothesisIds.length || category) {
+            await saveInitiative(uid, initiativeId, {
+              projectQuestions: [{ id: newQ.id, hypothesisIds, hypothesisId: hypothesisIds[0] || null, category }],
+            });
+            // Reflect in local state too
+            setQuestions((prev) => prev.map((qq) => (
+              qq.id === newQ.id ? { ...qq, hypothesisIds, hypothesisId: hypothesisIds[0] || null, category } : qq
+            )));
+          }
+        }
+      } catch (linkErr) {
+        console.warn("Auto-linking question to hypotheses failed", linkErr);
+      }
       setQuestions((prev) => [
         ...prev,
         {
           ...newQ,
           idx: prev.length,
-          contacts: [],
-          contactIds: [],
+          contacts: (newQuestionContacts || []).map((cid) => contacts.find((c) => c.id === cid)?.name || cid),
+          contactIds: newQuestionContacts,
           asked: {},
           answers: {},
         },
@@ -2673,11 +2723,42 @@ const DiscoveryHub = () => {
       setToast("Question added.");
       setShowNewQuestion(false);
       setNewQuestionText("");
-      setNewQuestionHypotheses([]);
+      setNewQuestionContacts([]);
+      setWhoInput("");
       setActive("questions");
     } catch (err) {
       console.error("createManualQuestion error", err);
     }
+  };
+
+  const addWho = () => {
+    const name = (whoInput || "").trim();
+    if (!name) return;
+    const existing = contacts.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      if (!newQuestionContacts.includes(existing.id)) {
+        setNewQuestionContacts((prev) => [...prev, existing.id]);
+      }
+      setWhoInput("");
+      return;
+    }
+    // Create a minimal new contact entry
+    const id = crypto.randomUUID();
+    const color = colorPalette[(contacts.length || 0) % colorPalette.length];
+    const newContact = { id, name, jobTitle: "", profile: "", info: { email: "", slack: "", teams: "" }, color };
+    const updated = [...contacts, newContact];
+    setContacts(updated);
+    setNewQuestionContacts((prev) => [...prev, id]);
+    setWhoInput("");
+    if (uid) {
+      saveInitiative(uid, initiativeId, {
+        keyContacts: updated.map(({ id, name, jobTitle, profile, info }) => ({ id, name, jobTitle, profile, info })),
+      });
+    }
+  };
+
+  const removeWho = (id) => {
+    setNewQuestionContacts((prev) => prev.filter((x) => x !== id));
   };
 
   const createManualTask = async () => {
@@ -4171,20 +4252,39 @@ const DiscoveryHub = () => {
                 autoFocus
               />
               <div className="mt-2">
-                <label className="block text-sm font-medium">Link to hypotheses (optional)</label>
-                <select
-                  multiple
-                  className="generator-input w-full"
-                  value={newQuestionHypotheses}
-                  onChange={(e) => setNewQuestionHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
-                >
-                  {hypotheses.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.statement || h.hypothesis || h.label || h.id}
-                    </option>
+                <label className="block text-sm font-medium">Who to ask (optional)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="generator-input"
+                    list="addq-contact-suggestions"
+                    placeholder="Type a name and press Enter"
+                    value={whoInput}
+                    onChange={(e) => setWhoInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); addWho(); }
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <button className="generator-button" type="button" onClick={addWho}>Add</button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {newQuestionContacts.map((cid) => {
+                    const n = contacts.find((c) => c.id === cid)?.name || cid;
+                    return (
+                      <span key={cid} className="glass-card" style={{ padding: '4px 8px', borderRadius: 9999 }}>
+                        {n}
+                        <button type="button" className="remove-file" onClick={() => removeWho(cid)} style={{ marginLeft: 6 }}>×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+                <datalist id="addq-contact-suggestions">
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.name} />
                   ))}
-                </select>
+                </datalist>
               </div>
+              {/* Hypotheses links are auto-detected after creation */}
               <div className="modal-actions mt-2">
                 <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
               </div>
