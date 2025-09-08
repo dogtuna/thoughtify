@@ -216,6 +216,9 @@ const DiscoveryHub = () => {
     const status = searchParams.get("status");
     if (status) {
       setStatusFilter(status);
+    } else {
+      // When navigating back to Questions without a status param, show all
+      setStatusFilter("");
     }
     const pending = searchParams.get("new");
     if (pending === "question") {
@@ -3495,12 +3498,11 @@ const DiscoveryHub = () => {
           <ActionDashboard />
         ) : (
           <>
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3">
               <p className="mb-0 text-sm text-gray-500">
                 Click the <strong>Ask</strong> button, choose the responder, and enter
                 answer text to receive analysis and suggested tasks.
               </p>
-              <button className="generator-button" onClick={() => setShowNewQuestion(true)}>Add Question</button>
             </div>
             <div className="filter-bar">
               <label>
@@ -3552,6 +3554,9 @@ const DiscoveryHub = () => {
               </button>
               <button className="generator-button" onClick={addContact}>
                 Add Contact
+              </button>
+              <button className="generator-button" onClick={() => setShowNewQuestion(true)}>
+                Add Question
               </button>
               {selectMode && selected.length > 0 && (
                 <button
