@@ -3339,95 +3339,7 @@ const DiscoveryHub = () => {
         />,
         document.body
       )}
-    {showNewQuestion &&
-      createPortal(
-        <div className="slide-over-overlay" onClick={closeNewQuestion}>
-          <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center mb-2">
-              <div className="font-semibold">Add Question</div>
-              <div className="flex-1" />
-              <button className="text-white" type="button" onClick={closeNewQuestion}>Close</button>
-            </div>
-            <textarea
-              className="generator-input w-full"
-              rows={4}
-              placeholder="What do you need to ask?"
-              value={newQuestionText}
-              onChange={(e) => setNewQuestionText(e.target.value)}
-              autoFocus
-            />
-            <div className="mt-2">
-              <label className="block text-sm font-medium">Link to hypotheses (optional)</label>
-              <select
-                multiple
-                className="generator-input w-full"
-                value={newQuestionHypotheses}
-                onChange={(e) => setNewQuestionHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
-              >
-                {hypotheses.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.statement || h.hypothesis || h.label || h.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="modal-actions mt-2">
-              <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    {showNewTask &&
-      createPortal(
-        <div className="slide-over-overlay" onClick={closeNewTask}>
-          <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center mb-2">
-              <div className="font-semibold">Add Task</div>
-              <div className="flex-1" />
-              <button className="text-white" type="button" onClick={closeNewTask}>Close</button>
-            </div>
-            <textarea
-              className="generator-input w-full"
-              rows={4}
-              placeholder="Describe the task to add"
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              autoFocus
-            />
-            <div className="mt-2 w-full">
-              <label className="block text-sm font-medium mb-1">Type</label>
-              <select className="generator-input w-full" value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)}>
-                  <option value="general">general</option>
-                  <option value="meeting">meeting</option>
-                  <option value="email">email</option>
-                  <option value="research">research</option>
-                  <option value="instructional-design">instructional-design</option>
-                  <option value="other">other</option>
-                </select>
-            </div>
-            <div className="mt-2 w-full">
-              <label className="block text-sm font-medium mb-1">Link to hypotheses (optional)</label>
-              <select
-                multiple
-                className="generator-input w-full"
-                value={newTaskHypotheses}
-                onChange={(e) => setNewTaskHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
-              >
-                {hypotheses.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.statement || h.hypothesis || h.label || h.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="modal-actions mt-2">
-              <button className="generator-button" onClick={createManualTask} disabled={!newTaskText.trim()}>Add</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+    
     {qaModal &&
       createPortal(
         <div className="modal-overlay" onClick={() => setQaModal(null)}>
@@ -4275,6 +4187,95 @@ const DiscoveryHub = () => {
           </div>
         </div>
       )}
+      {showNewQuestion &&
+        createPortal(
+          <div className="slide-over-overlay" onClick={closeNewQuestion}>
+            <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center mb-2">
+                <div className="font-semibold">Add Question</div>
+                <div className="flex-1" />
+                <button className="text-white" type="button" onClick={closeNewQuestion}>Close</button>
+              </div>
+              <textarea
+                className="generator-input w-full"
+                rows={4}
+                placeholder="What do you need to ask?"
+                value={newQuestionText}
+                onChange={(e) => setNewQuestionText(e.target.value)}
+                autoFocus
+              />
+              <div className="mt-2">
+                <label className="block text-sm font-medium">Link to hypotheses (optional)</label>
+                <select
+                  multiple
+                  className="generator-input w-full"
+                  value={newQuestionHypotheses}
+                  onChange={(e) => setNewQuestionHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
+                >
+                  {hypotheses.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.statement || h.hypothesis || h.label || h.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-actions mt-2">
+                <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+      {showNewTask &&
+        createPortal(
+          <div className="slide-over-overlay" onClick={closeNewTask}>
+            <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center mb-2">
+                <div className="font-semibold">Add Task</div>
+                <div className="flex-1" />
+                <button className="text-white" type="button" onClick={closeNewTask}>Close</button>
+              </div>
+              <textarea
+                className="generator-input w-full"
+                rows={4}
+                placeholder="Describe the task to add"
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                autoFocus
+              />
+              <div className="mt-2 w-full">
+                <label className="block text-sm font-medium mb-1">Type</label>
+                <select className="generator-input w-full" value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)}>
+                    <option value="general">general</option>
+                    <option value="meeting">meeting</option>
+                    <option value="email">email</option>
+                    <option value="research">research</option>
+                    <option value="instructional-design">instructional-design</option>
+                    <option value="other">other</option>
+                  </select>
+              </div>
+              <div className="mt-2 w-full">
+                <label className="block text-sm font-medium mb-1">Link to hypotheses (optional)</label>
+                <select
+                  multiple
+                  className="generator-input w-full"
+                  value={newTaskHypotheses}
+                  onChange={(e) => setNewTaskHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
+                >
+                  {hypotheses.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.statement || h.hypothesis || h.label || h.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-actions mt-2">
+                <button className="generator-button" onClick={createManualTask} disabled={!newTaskText.trim()}>Add</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
