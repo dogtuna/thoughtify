@@ -88,8 +88,52 @@ export const InquiryMapProvider = ({ children }) => {
         }
         const data = snap.data();
         const { hypotheses: hyps, recommendations: recs, suggestedHypotheses: sh } = getInquiryData(data);
-        console.log("Snapshot data", { hyps, recs, businessGoal: data?.businessGoal });
-        setHypotheses(hyps);
+        const normalizeEvidenceArray = (arr = []) => {
+          const list = Array.isArray(arr) ? arr : [];
+          return list
+            .map((e) => {
+              if (!e) return null;
+              if (typeof e === "string") {
+                const text = e.trim();
+                if (!text) return null;
+                return {
+                  text,
+                  analysisSummary: "",
+                  impact: "Low",
+                  delta: 0,
+                  source: "",
+                  sourceAuthority: "Low",
+                  evidenceType: "Qualitative",
+                  directness: "Indirect",
+                  relationship: undefined,
+                  timestamp: null,
+                };
+              }
+              const obj = { ...e };
+              obj.analysisSummary = obj.analysisSummary || obj.text || "";
+              obj.delta = Number.isFinite(obj.delta) ? obj.delta : 0;
+              obj.source = obj.source || "";
+              obj.sourceAuthority = obj.sourceAuthority || "Low";
+              obj.evidenceType = obj.evidenceType || "Qualitative";
+              obj.directness = obj.directness || "Indirect";
+              return obj;
+            })
+            .filter(Boolean);
+        };
+        const normalizeHypotheses = (arr = []) =>
+          (Array.isArray(arr) ? arr : []).map((h) => {
+            const sup = normalizeEvidenceArray(h.evidence?.supporting || h.supportingEvidence || []);
+            const ref = normalizeEvidenceArray(h.evidence?.refuting || h.refutingEvidence || []);
+            const evidence = { supporting: sup, refuting: ref };
+            const confidence = typeof h.confidence === "number" ? h.confidence : (typeof h.confidenceScore === "number" ? Math.max(0, Math.min(1, h.confidenceScore)) : 0);
+            const rest = { ...h };
+            delete rest.supportingEvidence;
+            delete rest.refutingEvidence;
+            return { ...rest, evidence, confidence };
+          });
+        const normalizedHyps = normalizeHypotheses(hyps);
+        console.log("Snapshot data", { hyps: normalizedHyps, recs, businessGoal: data?.businessGoal });
+        setHypotheses(normalizedHyps);
         setBusinessGoal(data?.businessGoal || "");
         setRecommendations(recs);
         setSuggestedHypotheses(sh || []);

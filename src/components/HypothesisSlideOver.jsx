@@ -149,7 +149,13 @@ const HypothesisSlideOver = ({
                     }}
                   >
                     {e.source || "Unknown"}
-                  </button>{" "}• {e.timestamp ? new Date(e.timestamp).toLocaleString() : ""} • {(e.delta * 100).toFixed(1)}%
+                  </button>
+                  {e.timestamp ? (
+                    <>
+                      {" "}• {new Date(e.timestamp).toLocaleString()}
+                    </>
+                  ) : null}
+                  {" "}• {Number.isFinite(e.delta) ? (e.delta * 100).toFixed(1) : "0.0"}%
                 </div>
               </li>
             ))}
