@@ -19,6 +19,7 @@ import { getToken } from "firebase/app-check";
 import { loadInitiative, saveInitiative } from "../utils/initiatives";
 import { generateQuestionId } from "../utils/questions.js";
 import ai, { generate } from "../ai";
+import { saveUserContact } from "../utils/contacts.js";
 import { parseJsonFromText } from "../utils/json";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import {
@@ -2038,13 +2039,10 @@ const DiscoveryHub = () => {
           info,
         })),
       });
-      // Also persist to global user contacts
-      try {
-        const { saveUserContact } = await import("../utils/contacts.js");
-        await saveUserContact(uid, { name, jobTitle, info: { email } });
-      } catch (e) {
-        console.warn("Failed to save global contact", e);
-      }
+      // Also persist to global user contacts (fire-and-forget)
+      saveUserContact(uid, { name, jobTitle, info: { email } }).catch((e) =>
+        console.warn("Failed to save global contact", e)
+      );
     }
     return name;
   };
@@ -2852,14 +2850,10 @@ const DiscoveryHub = () => {
         clarifyingAnswers: updatedQuestions.map((qq) => qq.answers),
         clarifyingAsked: updatedQuestions.map((qq) => qq.asked),
       });
-      // Update global contact record
-      try {
-        import("../utils/contacts.js").then(async (m) => {
-          await m.saveUserContact(uid, { name, jobTitle, info: { email } });
-        });
-      } catch (e) {
-        console.warn("Failed to update global contact", e);
-      }
+      // Update global contact record (fire-and-forget)
+      saveUserContact(uid, { name, jobTitle, info: { email } }).catch((e) =>
+        console.warn("Failed to update global contact", e)
+      );
     }
     setEditData(null);
   };
