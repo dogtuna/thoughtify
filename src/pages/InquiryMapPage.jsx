@@ -17,7 +17,7 @@ const InquiryMapContent = () => {
     rejectSuggestedHypothesis,
     addHypothesis,
   } = useInquiryMap();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
   const wantsNew = searchParams.get("new") === "hypothesis";
 
@@ -71,6 +71,21 @@ const InquiryMapContent = () => {
     await addHypothesis(text);
     setNewHyp("");
     setShowAdd(false);
+    // Clear any new= param once submitted
+    if (searchParams.get("new")) {
+      const sp = new URLSearchParams(searchParams);
+      sp.delete("new");
+      setSearchParams(sp, { replace: true });
+    }
+  };
+
+  const closeAddHypothesis = () => {
+    setShowAdd(false);
+    if (searchParams.get("new")) {
+      const sp = new URLSearchParams(searchParams);
+      sp.delete("new");
+      setSearchParams(sp, { replace: true });
+    }
   };
 
   return (
@@ -87,12 +102,12 @@ const InquiryMapContent = () => {
         ) : null}
       </section>
       {(showAdd || wantsNew) && createPortal(
-        <div className="slide-over-overlay" onClick={() => { setShowAdd(false); }}>
+        <div className="slide-over-overlay" onClick={closeAddHypothesis}>
           <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center mb-2">
               <div className="font-semibold">Add Hypothesis</div>
               <div className="flex-1" />
-              <button className="text-white" type="button" onClick={() => { setShowAdd(false); }}>Close</button>
+              <button className="text-white" type="button" onClick={closeAddHypothesis}>Close</button>
             </div>
             <textarea
               className="generator-input w-full"
@@ -103,7 +118,6 @@ const InquiryMapContent = () => {
               onChange={(e) => setNewHyp(e.target.value)}
             />
             <div className="modal-actions mt-2">
-              <button className="generator-button" onClick={() => { setShowAdd(false); setNewHyp(""); }}>Cancel</button>
               <button className="generator-button" onClick={submitHypothesis} disabled={!newHyp.trim()}>Add</button>
             </div>
           </div>

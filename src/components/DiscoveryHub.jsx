@@ -111,7 +111,7 @@ const parseContactNames = (whoRaw) => {
 };
 
 const DiscoveryHub = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
   const [questions, setQuestions] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -224,6 +224,23 @@ const DiscoveryHub = () => {
       setShowNewTask(true);
     }
   }, [searchParams]);
+
+  const clearNewParam = () => {
+    if (!searchParams.get("new")) return;
+    const sp = new URLSearchParams(searchParams);
+    sp.delete("new");
+    setSearchParams(sp, { replace: true });
+  };
+
+  const closeNewQuestion = () => {
+    setShowNewQuestion(false);
+    clearNewParam();
+  };
+
+  const closeNewTask = () => {
+    setShowNewTask(false);
+    clearNewParam();
+  };
 
   const normalizeAssignee = useCallback(
     (a) => normalizeAssigneeName(a, currentUserName),
@@ -3324,12 +3341,12 @@ const DiscoveryHub = () => {
       )}
     {showNewQuestion &&
       createPortal(
-        <div className="slide-over-overlay" onClick={() => setShowNewQuestion(false)}>
+        <div className="slide-over-overlay" onClick={closeNewQuestion}>
           <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center mb-2">
               <div className="font-semibold">Add Question</div>
               <div className="flex-1" />
-              <button className="text-white" type="button" onClick={() => setShowNewQuestion(false)}>Close</button>
+              <button className="text-white" type="button" onClick={closeNewQuestion}>Close</button>
             </div>
             <textarea
               className="generator-input w-full"
@@ -3355,7 +3372,6 @@ const DiscoveryHub = () => {
               </select>
             </div>
             <div className="modal-actions mt-2">
-              <button className="generator-button" onClick={() => setShowNewQuestion(false)}>Cancel</button>
               <button className="generator-button" onClick={createManualQuestion} disabled={!newQuestionText.trim()}>Add</button>
             </div>
           </div>
@@ -3364,12 +3380,12 @@ const DiscoveryHub = () => {
       )}
     {showNewTask &&
       createPortal(
-        <div className="slide-over-overlay" onClick={() => setShowNewTask(false)}>
+        <div className="slide-over-overlay" onClick={closeNewTask}>
           <div className="slide-over-panel" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center mb-2">
               <div className="font-semibold">Add Task</div>
               <div className="flex-1" />
-              <button className="text-white" type="button" onClick={() => setShowNewTask(false)}>Close</button>
+              <button className="text-white" type="button" onClick={closeNewTask}>Close</button>
             </div>
             <textarea
               className="generator-input w-full"
@@ -3406,7 +3422,6 @@ const DiscoveryHub = () => {
               </select>
             </div>
             <div className="modal-actions mt-2">
-              <button className="generator-button" onClick={() => setShowNewTask(false)}>Cancel</button>
               <button className="generator-button" onClick={createManualTask} disabled={!newTaskText.trim()}>Add</button>
             </div>
           </div>
