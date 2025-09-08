@@ -3644,40 +3644,53 @@ const DiscoveryHub = () => {
                         )}
                         <p>{q.question}</p>
                       </div>
-                      <div className="question-actions">
-                        {q.status === "toask" && (
+                      <div className="question-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <div className="qa-left" style={{ display: 'flex', gap: '8px' }}>
                           <button
                             className="generator-button"
-                            onClick={() => openComposer(q.idx, q.contacts)}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                            onClick={() => markAsked(q.idx)}
                           >
-                            Ask
+                            Mark Asked
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="generator-button"
-                          onClick={(e) => handleAnswerClick(e, q)}
-                        >
-                          Answer
-                        </button>
-                        <button
-                          className="generator-button"
-                          onClick={() => draftEmail(q)}
-                        >
-                          Draft Email
-                        </button>
-                        <button
-                          className="generator-button"
-                          onClick={() => editQuestion(q.idx)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="generator-button"
-                          onClick={() => deleteQuestion(q.idx)}
-                        >
-                          Delete
-                        </button>
+                          <button
+                            type="button"
+                            className="generator-button"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                            onClick={(e) => handleAnswerClick(e, q)}
+                          >
+                            Answer
+                          </button>
+                        </div>
+                        <div className="qa-right" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                          <button
+                            className="icon-button"
+                            title="Draft Email"
+                            aria-label="Draft Email"
+                            onClick={() => draftEmail(q)}
+                            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+                          </button>
+                          <button
+                            className="icon-button"
+                            title="Edit Question"
+                            aria-label="Edit Question"
+                            onClick={() => editQuestion(q.idx)}
+                            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                          </button>
+                          <button
+                            className="icon-button"
+                            title="Delete Question"
+                            aria-label="Delete Question"
+                            onClick={() => deleteQuestion(q.idx)}
+                            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                          </button>
+                        </div>
                       </div>
                       {composerError === q.idx && (
                         <div className="composer-error">
@@ -3693,11 +3706,7 @@ const DiscoveryHub = () => {
                         q.contacts.map((name, idxAns) => {
                           const id = getContactId(q, name);
                           const key = `${q.idx}-${name}`;
-                          const draft = answerDrafts[key];
-                          const isActive =
-                            activeComposer &&
-                            activeComposer.idx === q.idx &&
-                            activeComposer.name === name;
+                          // Show only the latest answer preview here; full answering happens in the slide-over.
                           return (
                             <div
                               key={name}
@@ -3724,66 +3733,7 @@ const DiscoveryHub = () => {
                                   </div>
                                 );
                               })()}
-                              {activeComposer &&
-                                activeComposer.idx === q.idx &&
-                                activeComposer.contacts.length > 1 && (
-                                  <select
-                                    value={activeComposer.name}
-                                    onChange={(e) =>
-                                      handleComposerContactChange(e.target.value)
-                                    }
-                                  >
-                                    {activeComposer.contacts.map((c) => (
-                                      <option key={c} value={c}>
-                                        {c}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              <textarea
-                                className="generator-input"
-                                placeholder="Enter answer or notes here"
-                                value={
-                                  draft !== undefined
-                                    ? draft
-                                    : q.answers[id]?.text || ""
-                                }
-                                onChange={(e) =>
-                                  setAnswerDrafts((prev) => ({
-                                    ...prev,
-                                    [key]: e.target.value,
-                                  }))
-                                }
-                                rows={3}
-                                ref={(el) => {
-                                  if (el && isActive) {
-                                    el.focus();
-                                  }
-                                }}
-                                onKeyDown={(e) =>
-                                  handleComposerKeyDown(e, q.idx, name)
-                                }
-                              />
-                              {restoredDraftKey === key && (
-                                <div className="draft-restored">Draft restored</div>
-                              )}
-                              <div className="composer-actions">
-                                <button
-                                  className="generator-button"
-                                  disabled={
-                                    (answerDrafts[key] || "").trim().length < 2
-                                  }
-                                  onClick={() => handleAnswerSubmit(q.idx, name)}
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  className="generator-button"
-                                  onClick={() => cancelComposer(q.idx, name)}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
+                              {/* Inline answering removed; use Answer slide-over instead. */}
                             </div>
                           );
                         })}
