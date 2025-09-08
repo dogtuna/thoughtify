@@ -7,7 +7,8 @@ import { getToken } from "firebase/app-check";
 import { saveInitiative, loadInitiative } from "../utils/initiatives";
 import { generate as aiGenerate } from "../ai";
 import { parseJsonFromText } from "../utils/json";
-import { loadCompanies, loadAllContacts, upsertCompaniesAndContacts } from "../utils/companies";
+import { loadCompanies, upsertCompaniesAndContacts } from "../utils/companies";
+import { loadUserContacts, upsertUserContacts } from "../utils/contacts";
 import { omitEmptyStrings } from "../utils/omitEmptyStrings.js";
 import { generateQuestionId } from "../utils/questions.js";
 import "./AIToolsGenerators.css";
@@ -119,13 +120,13 @@ const ProjectSetup = () => {
           setCompaniesList(companies);
         } catch {}
         try {
-          const contacts = await loadAllContacts(user.uid);
+          const contacts = await loadUserContacts(user.uid);
           const idx = {};
           contacts.forEach((c) => {
-            const details = { name: c.name, company: c.company, email: c.email || "", jobTitle: c.jobTitle || "" };
-            const keyed = `${c.name} — ${c.company}`;
+            const company = (c.scope || "").toLowerCase() === "external" ? (c.company || "") : "Internal";
+            const details = { name: c.name, company, email: c.email || "", jobTitle: c.jobTitle || "" };
+            const keyed = `${c.name} — ${company || "Internal"}`;
             idx[keyed] = details;
-            // Also index by bare name to populate fields even if the user selects a name-only suggestion
             if (c.name && !idx[c.name]) idx[c.name] = details;
           });
           setContactsIndex(idx);
@@ -415,12 +416,13 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
         setProg("questions", "done");
         await saveInitiative(uid, initiativeId, { projectQuestions: qs });
 
-        // Persist companies and contacts to profile for future suggestions
+        // Persist companies and contacts to profile and global contacts for future suggestions
         try {
           const companiesToSave = projectScope === "external"
             ? Array.from(new Set([companyName, ...selectedCompanies].filter(Boolean)))
             : [];
           await upsertCompaniesAndContacts(uid, companiesToSave, filteredContacts);
+          await upsertUserContacts(uid, filteredContacts);
         } catch (persistErr) {
           console.warn("Failed to upsert companies/contacts index", persistErr);
         }
@@ -582,6 +584,11 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                     value={c.name}
                     placeholder="Name"
                     list="contact-suggestions"
+                    onFocus={(e) => {
+                      // Show full suggestions without manual delete: temporarily clear value
+                      e.target.dataset.prev = e.target.value;
+                      e.target.value = "";
+                    }}
                     onChange={(e) => {
                       const val = e.target.value;
                       // If user picked a suggestion, populate fields immediately
@@ -618,36 +625,17 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                         handleContactChange(idx, "company", s.company || "");
                         const isInternal = (s.company || "").toLowerCase() === "internal";
                         handleContactChange(idx, "scope", isInternal ? "internal" : "external");
+                        e.target.dataset.prev = "";
+                      } else if (!val && e.target.dataset.prev) {
+                        // Restore previous value if user didn't pick anything
+                        handleContactChange(idx, "name", e.target.dataset.prev);
+                        e.target.value = e.target.dataset.prev;
+                        e.target.dataset.prev = "";
                       }
                     }}
                     className="generator-input"
                     style={{ flex: 1, margin: 0 }}
                   />
-                  <button
-                    type="button"
-                    className="generator-button"
-                    title="Browse suggestions"
-                    onClick={(ev) => {
-                      ev.preventDefault();
-                      try {
-                        const input = ev.currentTarget.previousElementSibling;
-                        if (input) {
-                          const prev = input.value;
-                          input.value = ""; // clear to force datalist to open fully
-                          input.focus();
-                          // Restore previous text if user doesn't pick from suggestions within a short time
-                          setTimeout(() => {
-                            if (document.activeElement === input && !input.value) {
-                              input.value = prev;
-                            }
-                          }, 1500);
-                        }
-                      } catch {}
-                    }}
-                    style={{ padding: "4px 8px" }}
-                  >
-                    Browse
-                  </button>
                   </div>
                   <input
                     type="text"
