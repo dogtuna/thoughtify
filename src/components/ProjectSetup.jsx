@@ -780,28 +780,30 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
             )}
           </div>
           {loading && (
-            <div className="glass-card" style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>Analyzing your project…</div>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
-                {[
-                  { k: "save", label: "Saving project data" },
-                  { k: "questions", label: "Generating discovery questions" },
-                  { k: "hypotheses", label: "Creating hypotheses" },
-                  { k: "map", label: "Building inquiry map" },
-                  { k: "dashboard", label: "Finalizing project dashboard" },
-                ].map(({ k, label }) => (
-                  <li key={k} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {progress[k] === "done" ? (
-                      <span aria-hidden>✓</span>
-                    ) : progress[k] === "in_progress" ? (
-                      <span className="spinner" style={{ width: 18, height: 18 }} />
-                    ) : (
-                      <span aria-hidden>○</span>
-                    )}
-                    <span>{label}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="modal-overlay" style={{ zIndex: 9999 }}>
+              <div className="initiative-card modal-content" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 92vw)' }}>
+                <h3 style={{ marginBottom: 12 }}>Setting up your project…</h3>
+                {(() => {
+                  const steps = [
+                    { k: 'save', label: 'Analyzing project data' },
+                    { k: 'hypotheses', label: 'Developing hypotheses' },
+                    { k: 'questions', label: 'Creating discovery questions' },
+                    { k: 'dashboard', label: 'Building project overview' },
+                  ];
+                  const doneCount = steps.filter(s => progress[s.k] === 'done').length;
+                  const total = steps.length;
+                  const percent = Math.max(5, Math.round((doneCount / total) * 100));
+                  const current = steps.find(s => progress[s.k] === 'in_progress') || steps[Math.min(doneCount, total - 1)];
+                  return (
+                    <div>
+                      <div style={{ height: 10, background: 'rgba(255,255,255,0.15)', borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
+                        <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg,#764ba2,#667eea)' }} />
+                      </div>
+                      <div className="text-sm" style={{ opacity: 0.85 }}>{current.label}</div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
 

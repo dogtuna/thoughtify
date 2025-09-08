@@ -118,6 +118,9 @@ const DiscoveryHub = () => {
   const [questions, setQuestions] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [showDocPaste, setShowDocPaste] = useState(false);
+  const [docPasteText, setDocPasteText] = useState("");
+  const [docPasteTitle, setDocPasteTitle] = useState("");
   const [projectTasks, setProjectTasks] = useState([]);
   const [suggestedTasks, setSuggestedTasks] = useState([]);
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
@@ -2487,34 +2490,40 @@ const DiscoveryHub = () => {
   };
 
   const handlePasteText = async () => {
-    const text = window.prompt("Paste your text:");
-    if (text && text.trim()) {
-      const defaultName = `pasted-${documents.length + 1}.txt`;
-      const name =
-        window.prompt("Enter a filename", defaultName) || defaultName;
-      const analysis = await analyzeDocument(name, text);
-      const doc = {
-        name,
-        content: text,
-        addedAt: new Date().toISOString(),
-        analysis: analysis.analysis,
-        suggestions: analysis.suggestions,
-      };
-      if (uid && initiativeId) {
-        try {
-          await triageEvidence(`Title: ${doc.name}\n\n${doc.content}`);
-        } catch (err) {
-          console.error("triageEvidence error", err);
-        }
+    setShowDocPaste(true);
+    setDocPasteText("");
+    setDocPasteTitle("");
+  };
+
+  const addPastedDoc = async () => {
+    const text = (docPasteText || "").trim();
+    const name = (docPasteTitle || `pasted-${documents.length + 1}.txt`).trim();
+    if (!text) return;
+    const analysis = await analyzeDocument(name, text);
+    const doc = {
+      name,
+      content: text,
+      addedAt: new Date().toISOString(),
+      analysis: analysis.analysis,
+      suggestions: analysis.suggestions,
+    };
+    if (uid && initiativeId) {
+      try {
+        await triageEvidence(`Title: ${doc.name}\n\n${doc.content}`);
+      } catch (err) {
+        console.error("triageEvidence error", err);
       }
-      setDocuments((prev) => {
-        const updated = [...prev, doc];
-        if (uid) {
-          saveInitiative(uid, initiativeId, { sourceMaterials: updated });
-        }
-        return updated;
-      });
     }
+    setDocuments((prev) => {
+      const updated = [...prev, doc];
+      if (uid) {
+        saveInitiative(uid, initiativeId, { sourceMaterials: updated });
+      }
+      return updated;
+    });
+    setShowDocPaste(false);
+    setDocPasteText("");
+    setDocPasteTitle("");
   };
 
   const applyDocSuggestions = async (idx) => {
@@ -3033,6 +3042,29 @@ const DiscoveryHub = () => {
             >
               Paste Text
             </button>
+            {showDocPaste && (
+              <div className="glass-card" style={{ marginTop: 12 }}>
+                <label className="block text-sm font-medium" style={{ marginBottom: 6 }}>Pasted Content</label>
+                <textarea
+                  className="generator-input"
+                  rows={10}
+                  placeholder="Paste or type your document text here"
+                  value={docPasteText}
+                  onChange={(e) => setDocPasteText(e.target.value)}
+                />
+                <label className="block text-sm font-medium" style={{ marginTop: 8 }}>Document Title</label>
+                <input
+                  className="generator-input"
+                  placeholder="Enter a title"
+                  value={docPasteTitle}
+                  onChange={(e) => setDocPasteTitle(e.target.value)}
+                />
+                <div className="button-row" style={{ marginTop: 8 }}>
+                  <button className="generator-button" onClick={() => { setShowDocPaste(false); setDocPasteText(""); setDocPasteTitle(""); }}>Cancel</button>
+                  <button className="generator-button next-button" onClick={addPastedDoc} disabled={!docPasteText.trim()}>Add Document</button>
+                </div>
+              </div>
+            )}
             <ul className="document-list">
               {documents.map((doc, idx) => (
                 <li key={idx} className="document-item">
