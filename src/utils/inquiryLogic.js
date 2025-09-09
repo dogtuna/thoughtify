@@ -86,6 +86,15 @@ export const calculateNewConfidence = (
   analysisSummary,
   user
 ) => {
+  const inferSourceFromEvidence = (txt = "") => {
+    const lines = String(txt).split(/\n/);
+    const first = (lines[0] || "").trim();
+    let m = first.match(/^Document:\s*(.+)$/i);
+    if (m && m[1]) return m[1].trim();
+    m = first.match(/^Title:\s*(.+)$/i);
+    if (m && m[1]) return m[1].trim();
+    return "";
+  };
   const baseScore = hypothesis.confidenceScore ?? 0;
   const evidenceCount =
     (hypothesis.evidence?.supporting?.length || hypothesis.supportingEvidence?.length || 0) +
@@ -105,10 +114,10 @@ export const calculateNewConfidence = (
   const timestamp = Date.now();
   const newEvidenceEntry = {
     text: evidenceText,
-    analysisSummary,
+    analysisSummary: analysisSummary || evidenceText,
     impact: link.impact,
     delta,
-    source: link.source,
+    source: link.source || inferSourceFromEvidence(evidenceText),
     sourceAuthority: link.sourceAuthority,
     evidenceType: link.evidenceType,
     directness: link.directness,

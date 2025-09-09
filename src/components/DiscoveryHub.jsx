@@ -2451,7 +2451,7 @@ const DiscoveryHub = () => {
       });
       if (uid && initiativeId) {
         try {
-          await triageEvidence(`Title: ${file.name}\n\n${content}`);
+          await triageEvidence(`Document: ${file.name}\n\n${content}`);
         } catch (err) {
           console.error("triageEvidence error", err);
         }
@@ -2509,7 +2509,7 @@ const DiscoveryHub = () => {
     };
     if (uid && initiativeId) {
       try {
-        await triageEvidence(`Title: ${doc.name}\n\n${doc.content}`);
+        await triageEvidence(`Document: ${doc.name}\n\n${doc.content}`);
       } catch (err) {
         console.error("triageEvidence error", err);
       }
