@@ -209,6 +209,82 @@ export const setCustomClaims = onRequest(async (req, res) => {
   }
 });
 
+// Reconcile a user's notifications with current data.
+// - Zeros out answerReceived notifications that point to missing messages
+// - Recomputes suggestedTasks / suggestedQuestions / suggestedHypotheses counts from active (not archived) initiatives
+export const reconcileUserNotifications = onCall(async (data, context) => {
+  const targetUid = (data && (data.uid || (data.data && data.data.uid))) || context.auth?.uid;
+  if (!targetUid) {
+    throw new HttpsError("unauthenticated", "Must be signed in or provide uid.");
+  }
+  // If caller provides a different uid, require admin
+  if (context.auth?.uid !== targetUid) {
+    const token = await admin.auth().getUser(context.auth.uid).catch(() => null);
+    const isAdmin = Boolean(token?.customClaims?.admin);
+    if (!isAdmin) {
+      throw new HttpsError("permission-denied", "Not allowed to reconcile another user's notifications");
+    }
+  }
+
+  const userRef = db.collection("users").doc(targetUid);
+  const notifsRef = userRef.collection("notifications");
+  const messagesRef = userRef.collection("messages");
+
+  const notifSnap = await notifsRef.get();
+  const updates = [];
+  for (const docSnap of notifSnap.docs) {
+    const n = { id: docSnap.id, ...docSnap.data() };
+    if (n.type === "answerReceived") {
+      const messageId = n.messageId || (() => {
+        try {
+          const href = String(n.href || "");
+          const idx = href.indexOf("messageId=");
+          if (idx === -1) return null;
+          const sub = href.slice(idx + 10);
+          const end = sub.indexOf("&");
+          return end === -1 ? sub : sub.slice(0, end);
+        } catch { return null; }
+      })();
+      if (messageId) {
+        const msgSnap = await messagesRef.doc(String(messageId)).get();
+        if (!msgSnap.exists && (n.count || 0) > 0) {
+          updates.push(notifsRef.doc(docSnap.id).update({ count: 0 }));
+        }
+      }
+    }
+  }
+
+  // Recompute suggested counts from unarchived initiatives
+  const initsSnap = await userRef.collection("initiatives").get();
+  let st = 0, sq = 0, sh = 0;
+  for (const init of initsSnap.docs) {
+    const data = init.data() || {};
+    if (data.archived === true) continue;
+    const stSnap = await init.ref.collection("suggestedTasks").get();
+    const sqSnap = await init.ref.collection("suggestedQuestions").get();
+    st += stSnap.size || 0;
+    sq += sqSnap.size || 0;
+    const shList = Array.isArray(data.suggestedHypotheses) ? data.suggestedHypotheses : [];
+    sh += shList.length;
+  }
+
+  const ensureCount = async (id, type, count) => {
+    const ref = notifsRef.doc(id);
+    if (count > 0) {
+      await ref.set({ type, count, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    } else {
+      const snap = await ref.get();
+      if (snap.exists) await ref.delete();
+    }
+  };
+  updates.push(ensureCount("suggestedTasks", "suggestedTasks", st));
+  updates.push(ensureCount("suggestedQuestions", "suggestedQuestions", sq));
+  updates.push(ensureCount("suggestedHypotheses", "suggestedHypotheses", sh));
+
+  await Promise.all(updates);
+  return { ok: true, adjusted: updates.length, totals: { suggestedTasks: st, suggestedQuestions: sq, suggestedHypotheses: sh } };
+});
+
 export const generateInvitation = functions.https.onCall(async (data, context) => {
   // Extract the payload: check if data is nested
   const payload = data.data || data;

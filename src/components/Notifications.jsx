@@ -1,11 +1,15 @@
 import { useNotifications } from "../context/NotificationsContext.jsx";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { makeIdToDisplayIdMap } from "../utils/hypotheses.js";
+import { functions } from "../firebase";
+import { httpsCallable } from "firebase/functions";
 
 export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
   const { hypotheses = [] } = useInquiryMap() || {};
   const idToLetter = makeIdToDisplayIdMap(hypotheses || []);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
 
   const prettyMessage = (n) => {
     const msg = n.message || "";
@@ -24,6 +28,30 @@ export default function Notifications() {
   return (
     <div className="notifications-page">
       <h1>Notifications</h1>
+      <div style={{ marginBottom: 12 }}>
+        <button
+          className="generator-button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setStatus("");
+            try {
+              const callable = httpsCallable(functions, "reconcileUserNotifications");
+              const res = await callable({});
+              const info = res?.data?.totals || {};
+              setStatus(`Reconciled. Totals — Tasks: ${info.suggestedTasks || 0}, Questions: ${info.suggestedQuestions || 0}, Hypotheses: ${info.suggestedHypotheses || 0}`);
+            } catch (e) {
+              setStatus("Reconcile failed. Check console.");
+              console.error(e);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Reconciling..." : "Reconcile Counts"}
+        </button>
+        {status && <span style={{ marginLeft: 8, opacity: 0.8 }}>{status}</span>}
+      </div>
       {notifications.length === 0 ? (
         <p>No notifications</p>
       ) : (
