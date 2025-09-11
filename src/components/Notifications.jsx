@@ -1,7 +1,8 @@
 import { useNotifications } from "../context/NotificationsContext.jsx";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { makeIdToDisplayIdMap } from "../utils/hypotheses.js";
-import { functions } from "../firebase";
+import { functions, auth, appCheck } from "../firebase";
+import { getToken as getAppCheckToken } from "firebase/app-check";
 import { httpsCallable } from "firebase/functions";
 import { useState } from "react";
 
@@ -37,6 +38,16 @@ export default function Notifications() {
             setBusy(true);
             setStatus("");
             try {
+              // Ensure auth token is fresh (avoids 401 if token expired)
+              if (!auth.currentUser) {
+                alert("Please sign in to reconcile notifications.");
+                setBusy(false);
+                return;
+              }
+              if (appCheck) {
+                try { await getAppCheckToken(appCheck); } catch {}
+              }
+              try { await auth.currentUser.getIdToken(true); } catch {}
               const callable = httpsCallable(functions, "reconcileUserNotifications");
               const res = await callable({});
               const info = res?.data?.totals || {};
