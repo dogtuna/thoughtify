@@ -149,6 +149,16 @@ const CustomDashboard = () => {
     navigate(`/project-setup?initiativeId=${id}`);
   };
 
+  const handleArchive = async (id) => {
+    if (!uid) return;
+    try {
+      await setDoc(doc(db, "users", uid, "initiatives", id), { archived: true, updatedAt: new Date().toISOString() }, { merge: true });
+      setInitiatives((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error("Failed to archive initiative", err);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!uid) return;
     if (!window.confirm("Delete this project?")) return;
@@ -166,14 +176,22 @@ const CustomDashboard = () => {
     <div className="dashboard-container">
       <div className="initiative-card projects-card">
         <h2>Projects</h2>
-        {initiatives.length > 0 ? (
+        {initiatives.filter((i) => !i.archived).length > 0 ? (
           <ul className="project-list">
-            {initiatives.map((init) => (
+            {initiatives.filter((i) => !i.archived).map((init) => (
               <li key={init.id} className="project-item">
                 <Link to={`/discovery?initiativeId=${init.id}`}>
                   {init.projectName || init.businessGoal || init.id}
                 </Link>
                 <span className="project-actions">
+                  <button title="Archive" onClick={() => handleArchive(init.id)} aria-label="Archive project">
+                    {/* Cardboard box icon */}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M21 8L12 12L3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M3 8L12 4L21 8V18C21 18.5304 20.7893 19.0391 20.4142 19.4142C20.0391 19.7893 19.5304 20 19 20H5C4.46957 20 3.96086 19.7893 3.58579 19.4142C3.21071 19.0391 3 18.5304 3 18V8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M12 12V20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
                   <button onClick={() => handleEdit(init.id)}>Edit</button>
                   <button onClick={() => handleDelete(init.id)}>Delete</button>
                 </span>

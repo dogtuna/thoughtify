@@ -5,9 +5,11 @@ import {
   getDocs,
   getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
   serverTimestamp,
   writeBatch,
+  where,
 } from "firebase/firestore";
 
 // Ensure initiatives always expose the latest schema fields
@@ -136,21 +138,62 @@ export async function deleteInitiative(uid, initiativeId) {
     ...(init.suggestedHypotheses || []).map((h) => h.id),
   ]);
 
-  const statusRef = collection(ref, "statusUpdates");
-  const snap = await getDocs(statusRef);
-  const batch = writeBatch(db);
-  snap.forEach((d) => batch.delete(d.ref));
+  // Helper to delete all docs in a subcollection
+  const deleteAll = async (colRef) => {
+    const s = await getDocs(colRef);
+    if (!s.empty) {
+      const b = writeBatch(db);
+      s.forEach((d) => b.delete(d.ref));
+      await b.commit();
+    }
+  };
 
-  // Remove notifications that reference this initiative.
-  const notifsRef = collection(db, "users", uid, "notifications");
-  const notifSnap = await getDocs(notifsRef);
+  // Remove status updates, tasks, suggested items under the initiative
+  const batch = writeBatch(db);
+  await deleteAll(collection(ref, "statusUpdates"));
+  await deleteAll(collection(ref, "tasks"));
+  const suggestedTasksRef = collection(ref, "suggestedTasks");
+  const suggestedQuestionsRef = collection(ref, "suggestedQuestions");
+  await deleteAll(suggestedTasksRef);
+  await deleteAll(suggestedQuestionsRef);
+
+  // Decrement global notification counters for initiative-scoped suggestions
+  const [stSnap, sqSnap] = await Promise.all([
+    getDocs(suggestedTasksRef),
+    getDocs(suggestedQuestionsRef),
+  ]);
+  const stCount = stSnap.size || 0;
+  const sqCount = sqSnap.size || 0;
+  const shCount = Array.isArray(init.suggestedHypotheses)
+    ? init.suggestedHypotheses.length
+    : 0;
+
+  const notifsRoot = collection(db, "users", uid, "notifications");
+  const adjustNotificationCount = async (notifId, decrementBy) => {
+    if (!decrementBy || decrementBy <= 0) return;
+    const nRef = doc(notifsRoot, notifId);
+    const nSnap = await getDoc(nRef);
+    if (!nSnap.exists()) return;
+    const data = nSnap.data() || {};
+    const current = Number(data.count || 0);
+    const next = Math.max(0, current - decrementBy);
+    if (next > 0) {
+      await updateDoc(nRef, { count: next });
+    } else {
+      await deleteDoc(nRef);
+    }
+  };
+  await adjustNotificationCount("suggestedTasks", stCount);
+  await adjustNotificationCount("suggestedQuestions", sqCount);
+  await adjustNotificationCount("suggestedHypotheses", shCount);
+
+  // Remove notifications that reference this initiative directly (links, ids)
+  const notifSnap = await getDocs(notifsRoot);
   notifSnap.forEach((n) => {
     const data = n.data() || {};
     const related =
       data.initiativeId === initiativeId ||
       (typeof data.href === "string" && data.href.includes(initiativeId)) ||
-      n.id === "suggestedTasks" ||
-      n.id === "suggestedHypotheses" ||
       (n.id.startsWith("hyp-") && hypothesisIds.has(n.id.slice(4)));
     if (related) {
       batch.delete(n.ref);
@@ -158,5 +201,22 @@ export async function deleteInitiative(uid, initiativeId) {
   });
 
   await batch.commit();
+
+  // Remove messages related to this initiative
+  try {
+    const messagesRef = collection(db, "users", uid, "messages");
+    const msgSnap = await getDocs(
+      // Some environments may not index this; if so, best-effort filter in code
+      messagesRef
+    );
+    const toDelete = msgSnap.docs.filter((d) => (d.data()?.initiativeId || "") === initiativeId);
+    if (toDelete.length) {
+      const b = writeBatch(db);
+      toDelete.forEach((d) => b.delete(d.ref));
+      await b.commit();
+    }
+  } catch (e) {
+    console.warn("Failed to delete initiative messages", e);
+  }
   await deleteDoc(ref);
 }
