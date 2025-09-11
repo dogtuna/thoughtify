@@ -3,6 +3,7 @@ import { useInquiryMap } from "../context/InquiryMapContext.jsx";
 import { makeIdToDisplayIdMap } from "../utils/hypotheses.js";
 import { functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
+import { useState } from "react";
 
 export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
