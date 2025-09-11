@@ -713,7 +713,15 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                 className="upload-card"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                onClick={(e) => { if (e.target.tagName !== 'BUTTON') filePickerRef.current?.click(); }}
+                onClick={(e) => {
+                  // Only trigger file picker when clicking the card/background,
+                  // not when interacting with inputs, textareas, labels, etc.
+                  const tag = (e.target?.tagName || '').toUpperCase();
+                  if (["BUTTON", "INPUT", "TEXTAREA", "LABEL", "SELECT"].includes(tag)) return;
+                  // If clicking inside the paste panel, don't trigger the picker
+                  if (e.target && typeof e.target.closest === 'function' && e.target.closest('.glass-card')) return;
+                  filePickerRef.current?.click();
+                }}
               >
                 <input
                   ref={filePickerRef}
@@ -742,6 +750,7 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                       placeholder="Paste or type your document text here"
                       value={pasteText}
                       onChange={(e) => setPasteText(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <label className="block text-sm font-medium" style={{ marginTop: 8 }}>Document Title</label>
                     <input
@@ -749,6 +758,7 @@ Return JSON exactly like:\n{"items":[{"id":"<questionId>","hypothesisIds":["A"],
                       placeholder="Enter a title"
                       value={pasteTitle}
                       onChange={(e) => setPasteTitle(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="button-row" style={{ marginTop: 8 }}>
                       <button type="button" className="generator-button" onClick={() => { setShowPaste(false); setPasteText(""); setPasteTitle(""); }}>Cancel</button>

@@ -8,10 +8,11 @@ import {
 } from "react";
 import PropTypes from "prop-types";
 import { db } from "../firebase";
-import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { generate } from "../ai";
 import { parseJsonFromText } from "../utils/json";
 import { generateTriagePrompt, calculateNewConfidence } from "../utils/inquiryLogic";
+import { nextDisplayId } from "../utils/hypotheses.js";
 
 const InquiryMapContext = createContext();
 
@@ -88,6 +89,16 @@ export const InquiryMapProvider = ({ children }) => {
         }
         const data = snap.data();
         const { hypotheses: hyps, recommendations: recs, suggestedHypotheses: sh } = getInquiryData(data);
+        const inferSourceFromEvidence = (txt = "") => {
+          try {
+            const firstLine = String(txt).split(/\n/)[0]?.trim() || "";
+            let m = firstLine.match(/^Document:\s*(.+)$/i);
+            if (m && m[1]) return m[1].trim();
+            m = firstLine.match(/^Title:\s*(.+)$/i);
+            if (m && m[1]) return m[1].trim();
+          } catch {}
+          return "";
+        };
         const normalizeEvidenceArray = (arr = []) => {
           const list = Array.isArray(arr) ? arr : [];
           return list
@@ -101,7 +112,7 @@ export const InquiryMapProvider = ({ children }) => {
                   analysisSummary: "",
                   impact: "Low",
                   delta: 0,
-                  source: "",
+                  source: inferSourceFromEvidence(text) || "",
                   sourceAuthority: "Low",
                   evidenceType: "Qualitative",
                   directness: "Indirect",
@@ -112,7 +123,7 @@ export const InquiryMapProvider = ({ children }) => {
               const obj = { ...e };
               obj.analysisSummary = obj.analysisSummary || obj.text || "";
               obj.delta = Number.isFinite(obj.delta) ? obj.delta : 0;
-              obj.source = obj.source || "";
+              obj.source = obj.source || inferSourceFromEvidence(obj.text) || "";
               obj.sourceAuthority = obj.sourceAuthority || "Low";
               obj.evidenceType = obj.evidenceType || "Qualitative";
               obj.directness = obj.directness || "Indirect";
@@ -131,7 +142,36 @@ export const InquiryMapProvider = ({ children }) => {
             delete rest.refutingEvidence;
             return { ...rest, evidence, confidence };
           });
-        const normalizedHyps = normalizeHypotheses(hyps);
+        let normalizedHyps = normalizeHypotheses(hyps);
+
+        // Ensure stable displayId assignment that never changes with confidence order.
+        // If any hypothesis lacks a displayId, assign the next available label (A, B, C, ...).
+        try {
+          const used = new Set(
+            normalizedHyps.map((h) => (h.displayId || "")).filter(Boolean)
+          );
+          let mutated = false;
+          normalizedHyps = normalizedHyps.map((h) => {
+            if (!h.displayId || typeof h.displayId !== "string") {
+              const label = nextDisplayId(used);
+              used.add(label);
+              mutated = true;
+              return { ...h, displayId: label };
+            }
+            return h;
+          });
+          if (mutated && currentUser && currentInitiative) {
+            // Persist assigned displayIds so they remain stable (fire-and-forget in snapshot thread).
+            const refToUpdate = doc(db, "users", currentUser, "initiatives", currentInitiative);
+            updateDoc(refToUpdate, {
+              "inquiryMap.hypotheses": normalizedHyps,
+              hypotheses: normalizedHyps,
+            }).catch((err) => console.warn("Failed to persist displayIds", err));
+          }
+        } catch (e) {
+          console.warn("displayId assignment skipped", e);
+        }
+
         console.log("Snapshot data", { hyps: normalizedHyps, recs, businessGoal: data?.businessGoal });
         setHypotheses(normalizedHyps);
         setBusinessGoal(data?.businessGoal || "");
@@ -334,6 +374,7 @@ export const InquiryMapProvider = ({ children }) => {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
         const currentHypotheses = getInquiryData(snap.data()).hypotheses;
+        const used = new Set(currentHypotheses.map(h => h.displayId).filter(Boolean));
         const newHypothesis = {
           id: `hyp-${Date.now()}`,
           statement,
@@ -341,6 +382,7 @@ export const InquiryMapProvider = ({ children }) => {
           confidence: 0,
           evidence: { supporting: [], refuting: [] },
           sourceContributions: [],
+          displayId: nextDisplayId(used),
         };
         const updated = [...currentHypotheses, newHypothesis];
         await updateDoc(ref, {
@@ -480,6 +522,7 @@ export const InquiryMapProvider = ({ children }) => {
               user: prov.respondent || currentUser,
             }
           : null;
+        const used = new Set((current.hypotheses || []).map(h => h.displayId).filter(Boolean));
         const newHyp = {
           id: `hyp-${Date.now()}`,
           statement: picked.statement || picked.hypothesis,
@@ -490,6 +533,7 @@ export const InquiryMapProvider = ({ children }) => {
             refuting: [],
           },
           sourceContributions: [],
+          displayId: nextDisplayId(used),
         };
         const hyps = [...(current.hypotheses || []), newHyp];
         await updateDoc(ref, {
@@ -497,6 +541,19 @@ export const InquiryMapProvider = ({ children }) => {
           hypotheses: hyps,
           suggestedHypotheses: sh,
         });
+
+        // Update notifications badge for suggested hypotheses
+        try {
+          const notifRef = doc(db, "users", currentUser, "notifications", "suggestedHypotheses");
+          await updateDoc(notifRef, { count: 0, updatedAt: serverTimestamp(), type: "suggestedHypotheses" });
+        } catch (e) {
+          try {
+            const notifRef = doc(db, "users", currentUser, "notifications", "suggestedHypotheses");
+            await setDoc(notifRef, { count: 0, updatedAt: serverTimestamp(), type: "suggestedHypotheses" }, { merge: true });
+          } catch (e2) {
+            console.warn("Failed to set suggestedHypotheses notification count", e2);
+          }
+        }
       } catch (err) {
         console.error("approveSuggestedHypothesis error", err);
       }
@@ -510,6 +567,19 @@ export const InquiryMapProvider = ({ children }) => {
         const data = snap.data();
         const sh = toArray(data?.suggestedHypotheses).filter((h) => h.id !== id);
         await updateDoc(ref, { suggestedHypotheses: sh });
+
+        // Update notifications badge for suggested hypotheses
+        try {
+          const notifRef = doc(db, "users", currentUser, "notifications", "suggestedHypotheses");
+          await updateDoc(notifRef, { count: 0, updatedAt: serverTimestamp(), type: "suggestedHypotheses" });
+        } catch (e) {
+          try {
+            const notifRef = doc(db, "users", currentUser, "notifications", "suggestedHypotheses");
+            await setDoc(notifRef, { count: 0, updatedAt: serverTimestamp(), type: "suggestedHypotheses" }, { merge: true });
+          } catch (e2) {
+            console.warn("Failed to set suggestedHypotheses notification count", e2);
+          }
+        }
       } catch (err) {
         console.error("rejectSuggestedHypothesis error", err);
       }

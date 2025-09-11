@@ -3,6 +3,8 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
+import { useInquiryMap } from "../context/InquiryMapContext.jsx";
+import { makeHypothesisLetterMap } from "../utils/hypotheses.js";
 import { generate } from "../ai";
 import { dedupeByMessage, normalizeAssigneeName } from "../utils/taskUtils";
 import { auth, db } from "../firebase";
@@ -27,6 +29,8 @@ export default function TaskQueue({
   const [synergyIndex, setSynergyIndex] = useState(0);
   const [prioritized, setPrioritized] = useState(null);
   const navigate = useNavigate();
+  const { hypotheses = [] } = useInquiryMap() || {};
+  const idToLetter = useMemo(() => makeHypothesisLetterMap(hypotheses || []), [hypotheses]);
 
   const currentUserName =
     auth.currentUser?.displayName || auth.currentUser?.email || "";
@@ -306,7 +310,7 @@ export default function TaskQueue({
             )
           }
         >
-          {task.hypothesisId}
+          {idToLetter[task.hypothesisId] ? `Hypothesis ${idToLetter[task.hypothesisId]}` : task.hypothesisId}
         </span>
       )}
       {task.taskType && (

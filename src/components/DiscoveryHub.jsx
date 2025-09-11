@@ -4369,11 +4369,15 @@ const DiscoveryHub = () => {
                   value={newTaskHypotheses}
                   onChange={(e) => setNewTaskHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
                 >
-                  {hypotheses.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.statement || h.hypothesis || h.label || h.id}
-                    </option>
-                  ))}
+                  {hypotheses.map((h) => {
+                    const letter = h.displayId || "?";
+                    const text = h.statement || h.hypothesis || h.label || h.id;
+                    return (
+                      <option key={h.id} value={h.id}>
+                        {`Hypothesis ${letter} — ${text}`}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div className="modal-actions mt-2">

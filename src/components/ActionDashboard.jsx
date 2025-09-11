@@ -11,6 +11,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { getPriority } from "../utils/priorityMatrix";
+import { makeIdToDisplayIdMap } from "../utils/hypotheses.js";
 import { useInquiryMap } from "../context/InquiryMapContext";
 
 // --- helpers ---------------------------------------------------------------
@@ -156,6 +157,7 @@ export default function ActionDashboard() {
 
   // --- Grouping with robust confidence lookup ------------------------------
   const groupedTasks = useMemo(() => {
+    const idToLetter = makeIdToDisplayIdMap(hypotheses);
     const priorities = ["critical", "high", "medium", "low"];
     const grouped = priorities.reduce((acc, p) => ({ ...acc, [p]: [] }), {});
 
@@ -169,9 +171,9 @@ export default function ActionDashboard() {
 
       const priority = task.overridePriority || autoPriority;
       if (grouped[priority]) {
-        grouped[priority].push(task);
+        grouped[priority].push({ ...task, _hypLetter: idToLetter[task.hypothesisId] });
       } else {
-        grouped.low.push(task);
+        grouped.low.push({ ...task, _hypLetter: idToLetter[task.hypothesisId] });
       }
     });
 
@@ -219,7 +221,7 @@ export default function ActionDashboard() {
                     {t.hypothesisId && (
                       <span
                         className="tag-badge tag-hypothesis cursor-pointer"
-                        title={`Linked to Hypothesis ${t.hypothesisId}`}
+                        title={`Linked to Hypothesis ${t._hypLetter || t.hypothesisId}`}
                         onClick={() =>
                           navigate(
                             `/inquiry-map?initiativeId=${
@@ -228,7 +230,7 @@ export default function ActionDashboard() {
                           )
                         }
                       >
-                        {t.hypothesisId}
+                        {t._hypLetter ? `Hypothesis ${t._hypLetter}` : t.hypothesisId}
                       </span>
                     )}
                     {t.taskType && (

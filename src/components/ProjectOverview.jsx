@@ -51,9 +51,8 @@ const ProjectOverview = ({
 
   const topHypotheses = useMemo(() => {
     return [...hypotheses]
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 3)
-      .map((h, idx) => ({ ...h, displayId: String.fromCharCode(65 + idx) }));
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+      .slice(0, 3);
   }, [hypotheses]);
 
   const openTasks = useMemo(
@@ -237,4 +236,3 @@ ProjectOverview.propTypes = {
 };
 
 export default ProjectOverview;
-

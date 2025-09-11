@@ -19,6 +19,7 @@ import ai from "../ai";
 import PropTypes from "prop-types";
 import useCanonical from "../utils/useCanonical";
 import { canonicalProjectUrl } from "../utils/canonical";
+import { makeIdToDisplayIdMap } from "../utils/hypotheses.js";
 
 const ProjectStatus = ({
   contacts = [],
@@ -42,6 +43,7 @@ const ProjectStatus = ({
   
   // Get the real-time, analyzed data from our Inquiry Map!
   const { hypotheses, businessGoal, recommendations } = useInquiryMap();
+  const idToLetter = useMemo(() => makeIdToDisplayIdMap(hypotheses || []), [hypotheses]);
   
   const [viewingAudience, setViewingAudience] = useState("client");
   const [selectedUpdate, setSelectedUpdate] = useState(null);
@@ -108,7 +110,7 @@ const ProjectStatus = ({
     };
     const currentSnapshot = {
       hypotheses: (hypotheses || []).map(h => ({
-        id: h.id,
+        label: idToLetter[h.id] || null,
         hypothesis: h.statement || h.hypothesis || h.text || '',
         confidence: normalizeConfidence(h),
         evidenceCounts: {
@@ -127,7 +129,8 @@ const ProjectStatus = ({
       const fresh = [...sup, ...ref].filter(e => typeof e?.timestamp === 'number' ? e.timestamp > since : false);
       fresh.forEach(e => {
         const rel = e.relationship || (sup.includes(e) ? 'Supports' : 'Refutes');
-        newEvidenceLines.push(`H${h.id}: ${rel} • ${e.analysisSummary || e.text || ''}`);
+        const letter = idToLetter[h.id] || '?';
+        newEvidenceLines.push(`Hypothesis ${letter}: ${rel} • ${e.analysisSummary || e.text || ''}`);
       });
     });
 
@@ -169,7 +172,18 @@ Goal: ${businessGoal}
 Sponsor: ${(contacts.find(c => /sponsor/i.test(c.jobTitle)) || {}).name || 'Unknown'}
 
 **Current Recommendations & Outstanding Tasks:**
-${JSON.stringify({recommendations, tasks})}
+${JSON.stringify({
+  recommendations,
+  tasks: (tasks || []).map(t => ({
+    message: t.message,
+    status: t.status || 'open',
+    taskType: t.taskType || 'general',
+    hypothesis: (Array.isArray(t.hypothesisIds) ? t.hypothesisIds : (t.hypothesisId ? [t.hypothesisId] : []))
+      .map(id => idToLetter[id])
+      .filter(Boolean)
+      .join(', ') || undefined,
+  })),
+})}
 `;
 
     try {
