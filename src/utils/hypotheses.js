@@ -30,8 +30,15 @@ export function letterFor(hypotheses = [], id) {
 
 export function makeIdToDisplayIdMap(hypotheses = []) {
   const map = {};
+  const fallback = (id) => {
+    if (typeof id !== "string") return null;
+    // If the id already looks like a human label (A, B, C, ... AA, AB), use it.
+    if (/^[A-Za-z]{1,3}$/.test(id)) return id.toUpperCase();
+    return null;
+  };
   hypotheses.forEach((h) => {
-    if (h && h.id) map[h.id] = h.displayId || null;
+    if (!h || !h.id) return;
+    map[h.id] = h.displayId || fallback(h.id);
   });
   return map;
 }

@@ -270,8 +270,8 @@ const DiscoveryHub = () => {
   }, [showNewQuestion, showNewTask, answerPanel]);
 
   const normalizeAssignee = useCallback(
-    (a) => normalizeAssigneeName(a, currentUserName),
-    [currentUserName],
+    (a) => normalizeAssigneeName(a, currentUserName, uid),
+    [currentUserName, uid],
   );
 
   const focusQuestionCard = useCallback((idx, answerIdx = null) => {
@@ -1839,7 +1839,7 @@ const DiscoveryHub = () => {
         initiativeId,
         "tasks",
       );
-      const assignees = t.who ? [t.who] : [currentUserName];
+      const assignees = t.who ? [normalizeAssignee(t.who)] : [currentUserName];
       await addDoc(tasksCol, {
         name: currentUserName,
         message: t.message,
@@ -1875,8 +1875,8 @@ const DiscoveryHub = () => {
         id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         phase: "General",
         question: q.question,
-        contacts: [],
-        contactStatus: [],
+        contacts: [currentUserName],
+        contactStatus: [{ contactId: currentUserName, currentStatus: "To Ask", answers: [] }],
       };
       await saveInitiative(uid, initiativeId, { projectQuestions: [newQ] });
       // Auto-link to hypotheses or general category
@@ -4370,7 +4370,7 @@ const DiscoveryHub = () => {
                   onChange={(e) => setNewTaskHypotheses(Array.from(e.target.selectedOptions, (o) => o.value))}
                 >
                   {hypotheses.map((h) => {
-                    const letter = h.displayId || "?";
+                    const letter = h.displayId || (typeof h.id === 'string' ? h.id : "?");
                     const text = h.statement || h.hypothesis || h.label || h.id;
                     return (
                       <option key={h.id} value={h.id}>

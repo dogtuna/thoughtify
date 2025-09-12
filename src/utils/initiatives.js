@@ -220,3 +220,51 @@ export async function deleteInitiative(uid, initiativeId) {
   }
   await deleteDoc(ref);
 }
+
+// Remove user messages that are not associated with any existing (unarchived) initiative,
+// and clear any answerReceived notifications that reference missing messages.
+export async function pruneOrphanMessages(uid) {
+  const userRoot = doc(db, "users", uid);
+  const initsSnap = await getDocs(collection(userRoot, "initiatives"));
+  const active = new Set(
+    initsSnap.docs
+      .map((d) => ({ id: d.id, archived: (d.data() || {}).archived }))
+      .filter((r) => !r.archived)
+      .map((r) => r.id)
+  );
+
+  // Delete messages lacking initiativeId or pointing to inactive initiatives
+  const messagesCol = collection(userRoot, "messages");
+  const msgSnap = await getDocs(messagesCol);
+  const toDelete = msgSnap.docs.filter((d) => {
+    const data = d.data() || {};
+    const initId = data.initiativeId || "";
+    return !initId || !active.has(String(initId));
+  });
+  if (toDelete.length) {
+    const b = writeBatch(db);
+    toDelete.forEach((d) => b.delete(d.ref));
+    await b.commit();
+  }
+
+  // Clear notifications that reference deleted/missing messages
+  const notifsCol = collection(userRoot, "notifications");
+  const notifSnap = await getDocs(notifsCol);
+  for (const n of notifSnap.docs) {
+    const data = n.data() || {};
+    if (data.type !== "answerReceived") continue;
+    let messageId = data.messageId || null;
+    if (!messageId && typeof data.href === "string") {
+      try {
+        const u = new URL(data.href, typeof window !== 'undefined' ? window.location.origin : 'https://example.com');
+        messageId = u.searchParams.get("messageId");
+      } catch {}
+    }
+    if (!messageId) continue;
+    const mRef = doc(db, "users", uid, "messages", String(messageId));
+    const mSnap = await getDoc(mRef);
+    if (!mSnap.exists() && (data.count || 0) > 0) {
+      try { await updateDoc(n.ref, { count: 0 }); } catch {}
+    }
+  }
+}

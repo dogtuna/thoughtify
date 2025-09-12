@@ -10,7 +10,9 @@ const InquiryMap = ({ hypotheses = [] }) => {
   const idToLetter = useMemo(() => {
     const map = {};
     hypotheses.forEach((h) => {
-      if (h && h.id) map[h.id] = h.displayId || null;
+      if (!h || !h.id) return;
+      const raw = typeof h.id === 'string' ? h.id.toUpperCase() : null;
+      map[h.id] = h.displayId || (raw && /^[A-Z]{1,3}$/.test(raw) ? raw : null);
     });
     return map;
   }, [hypotheses]);
@@ -30,7 +32,7 @@ const InquiryMap = ({ hypotheses = [] }) => {
     <div className="mx-auto w-[90%]">
       <ul className="space-y-4">
         {sorted.map((h) => {
-          const letter = idToLetter[h.id] || "?";
+          const letter = idToLetter[h.id] || (typeof h.id === 'string' ? h.id : "?");
           const pct = Math.round((h.confidence || 0) * 100);
           const trend = h.trend || 0;
           const up = trend > 0;

@@ -18,6 +18,7 @@ import AccountCreation from "./AccountCreation";
 import {
   loadInitiatives,
   deleteInitiative,
+  pruneOrphanMessages,
 } from "../utils/initiatives";
 import "./AIToolsGenerators.css";
 import "./CustomDashboard.css";
@@ -164,7 +165,12 @@ const CustomDashboard = () => {
     if (!window.confirm("Delete this project?")) return;
     try {
       await deleteInitiative(uid, id);
-      setInitiatives((prev) => prev.filter((p) => p.id !== id));
+      const remaining = await loadInitiatives(uid);
+      setInitiatives(remaining);
+      if (remaining.filter((i) => !i.archived).length === 0) {
+        // With no active projects left, prune any orphan messages and clear message-backed notifications
+        await pruneOrphanMessages(uid);
+      }
       localStorage.removeItem(`projectStatusHistory:${id}`);
       localStorage.removeItem(`projectStatusLast:${id}`);
     } catch (err) {

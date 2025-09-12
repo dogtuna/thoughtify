@@ -128,12 +128,23 @@ export function dedupeByMessage(tasks) {
     .map(withTaskDefaults);
 }
 
-export function normalizeAssigneeName(name, currentUser) {
+export function normalizeAssigneeName(name, currentUser, currentUserUid) {
   const user = currentUser || "";
-  const normalized = (name || "").trim();
-  return /instructional\s*designer|performance\s*consultant/i.test(normalized)
-    ? user
-    : normalized || user;
+  const raw = (name || "").trim();
+  const normalized = raw.replace(/^@/, "");
+  // Map common self-references and current UID to the friendly current user label
+  if (
+    !normalized ||
+    /^(me|myself|current\s*user|owner|self|my\s*tasks)$/i.test(normalized) ||
+    (currentUserUid && normalized === currentUserUid)
+  ) {
+    return user;
+  }
+  // Map generic roles to the current user
+  if (/instructional\s*designer|performance\s*consultant/i.test(normalized)) {
+    return user;
+  }
+  return normalized;
 }
 
 export default {

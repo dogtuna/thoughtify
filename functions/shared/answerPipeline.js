@@ -25,6 +25,19 @@ function normalizeSuggestions(raw, { existingTasks = new Set(), existingQuestion
   const allowedCategories = ["question", "meeting", "email", "research", "instructional-design"];
   const allowedTaskTypes = ["validate", "refute", "explore"];
   const src = Array.isArray(raw) ? raw : [];
+  const verbCategory = (text, cat) => {
+    const t = (text || "").toLowerCase();
+    // Heuristics: many action phrases should be tasks, not questions
+    const toMeeting = [/^interview\b/, /^meet\b/, /^hold\b/, /^schedule\b/, /^set up\b/];
+    const toResearch = [/^conduct\b/, /^run\b/, /^survey\b/, /^analy[sz]e\b/, /^review\b/, /^audit\b/, /^assess\b/];
+    const toEmail = [/^request\b/, /^ask\b/];
+    if (cat === "question") {
+      if (toMeeting.some((r) => r.test(t))) return "meeting";
+      if (toResearch.some((r) => r.test(t))) return "research";
+      if (toEmail.some((r) => r.test(t))) return "email";
+    }
+    return cat;
+  };
   return src
     .filter((s) =>
       s &&
@@ -35,13 +48,17 @@ function normalizeSuggestions(raw, { existingTasks = new Set(), existingQuestion
       !existingTasks.has(s.text.toLowerCase()) &&
       !existingQuestions.has(s.text.toLowerCase())
     )
-    .map((s) => ({
-      text: s.text,
-      category: s.category.toLowerCase(),
-      who: s.who,
-      hypothesisId: typeof s.hypothesisId === "string" && s.hypothesisId.trim() ? s.hypothesisId.trim() : null,
-      taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase()) ? s.taskType.toLowerCase() : "explore",
-    }));
+    .map((s) => {
+      const category = verbCategory(s.text, s.category.toLowerCase());
+      const who = typeof s.who === "string" && s.who.trim() ? s.who.trim() : "me";
+      return ({
+        text: s.text,
+        category,
+        who,
+        hypothesisId: typeof s.hypothesisId === "string" && s.hypothesisId.trim() ? s.hypothesisId.trim() : null,
+        taskType: allowedTaskTypes.includes((s.taskType || "").toLowerCase()) ? s.taskType.toLowerCase() : "explore",
+      });
+    });
 }
 
 export async function processAnswer(db, FieldValue, params) {
