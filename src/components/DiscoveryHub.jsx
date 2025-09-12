@@ -1839,7 +1839,13 @@ const DiscoveryHub = () => {
         initiativeId,
         "tasks",
       );
-      const assignees = t.who ? [normalizeAssignee(t.who)] : [currentUserName];
+      const parseAssignees = (s) =>
+        String(s || "")
+          .split(/\s*(?:,|\band\b|&)\s*/i)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map((name) => normalizeAssignee(name));
+      const assignees = t.who ? parseAssignees(t.who) : [currentUserName];
       await addDoc(tasksCol, {
         name: currentUserName,
         message: t.message,

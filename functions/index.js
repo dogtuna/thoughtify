@@ -1817,16 +1817,31 @@ Project Data:\n${projectData.join("\n\n")}`;
     if (!rawHypotheses) {
       throw new HttpsError("internal", "AI did not return hypotheses array");
     }
-    const hypotheses = rawHypotheses.map((h) => ({
-      id: h.id,
-      type: h.type,
-      hypothesis: h.hypothesis || h.text || "",
-      evidence: {
-        supporting: h.evidence?.supporting || h.supportingEvidence || [],
-        refuting: h.evidence?.refuting || h.refutingEvidence || [],
-      },
-      status: h.status || "Unexplored",
-    }));
+    const toLabel = (index) => {
+      let i = index;
+      let label = "";
+      while (i >= 0) {
+        label = String.fromCharCode(65 + (i % 26)) + label;
+        i = Math.floor(i / 26) - 1;
+      }
+      return label;
+    };
+    const hypotheses = rawHypotheses.map((h, idx) => {
+      const rawId = (h.id || "").toString();
+      const looksLikeLetter = /^[A-Za-z]{1,3}$/.test(rawId);
+      const displayId = looksLikeLetter ? rawId.toUpperCase() : toLabel(idx);
+      return {
+        id: rawId || displayId,
+        displayId,
+        type: h.type,
+        hypothesis: h.hypothesis || h.text || "",
+        evidence: {
+          supporting: h.evidence?.supporting || h.supportingEvidence || [],
+          refuting: h.evidence?.refuting || h.refutingEvidence || [],
+        },
+        status: h.status || "Unexplored",
+      };
+    });
 
     await db
       .collection("users")

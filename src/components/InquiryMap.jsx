@@ -17,7 +17,14 @@ const InquiryMap = ({ hypotheses = [] }) => {
     return map;
   }, [hypotheses]);
 
-  const sorted = [...hypotheses].sort((a, b) => b.confidence - a.confidence);
+  const sorted = [...hypotheses].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+
+  // Fallback: if any item lacks a displayId and its id isn't a simple letter, provide a temporary index label
+  const tempIndexLabel = (i) => {
+    let idx = i, label = "";
+    while (idx >= 0) { label = String.fromCharCode(65 + (idx % 26)) + label; idx = Math.floor(idx / 26) - 1; }
+    return label;
+  };
 
   const handleRowClick = (h) => {
     setSelected({ ...h, displayId: idToLetter[h.id] });
