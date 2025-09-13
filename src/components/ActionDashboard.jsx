@@ -223,17 +223,35 @@ export default function ActionDashboard() {
           <div className="initiative-card">
             <h3 className="mb-2 font-semibold">Quick Wins</h3>
             <div className="flex flex-col gap-2">{quickWins.slice(0, 2).map(renderRowTask)}</div>
-            <button className="generator-button mt-2" onClick={() => goView("quickwins")}>View All</button>
+            <button
+              className="generator-button mt-2"
+              style={{ padding: "6px 10px", fontSize: 12 }}
+              onClick={() => goView("quickwins")}
+            >
+              View All
+            </button>
           </div>
           <div className="initiative-card">
             <h3 className="mb-2 font-semibold">Leadership Conversations</h3>
             <div className="flex flex-col gap-2">{leadershipConvos.slice(0, 2).map(renderRowTask)}</div>
-            <button className="generator-button mt-2" onClick={() => goView("leadership")}>View All</button>
+            <button
+              className="generator-button mt-2"
+              style={{ padding: "6px 10px", fontSize: 12 }}
+              onClick={() => goView("leadership")}
+            >
+              View All
+            </button>
           </div>
           <div className="initiative-card">
             <h3 className="mb-2 font-semibold">Deep Dives</h3>
             <div className="flex flex-col gap-2">{deepDives.slice(0, 2).map(renderRowTask)}</div>
-            <button className="generator-button mt-2" onClick={() => goView("deep")}>View All</button>
+            <button
+              className="generator-button mt-2"
+              style={{ padding: "6px 10px", fontSize: 12 }}
+              onClick={() => goView("deep")}
+            >
+              View All
+            </button>
           </div>
         </>
       )}
