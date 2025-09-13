@@ -374,7 +374,11 @@ export const InquiryMapProvider = ({ children }) => {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error("Initiative not found");
         const currentHypotheses = getInquiryData(snap.data()).hypotheses;
+        // Ensure all existing hypotheses have stable displayIds before assigning next
         const used = new Set(currentHypotheses.map(h => h.displayId).filter(Boolean));
+        const fixedExisting = currentHypotheses.map(h => (
+          h.displayId ? h : { ...h, displayId: nextDisplayId(used) }
+        ));
         const newHypothesis = {
           id: `hyp-${Date.now()}`,
           statement,
@@ -382,9 +386,9 @@ export const InquiryMapProvider = ({ children }) => {
           confidence: 0,
           evidence: { supporting: [], refuting: [] },
           sourceContributions: [],
-          displayId: nextDisplayId(used),
+          displayId: nextDisplayId(new Set(fixedExisting.map(h => h.displayId)))
         };
-        const updated = [...currentHypotheses, newHypothesis];
+        const updated = [...fixedExisting, newHypothesis];
         await updateDoc(ref, {
           "inquiryMap.hypotheses": updated,
           hypotheses: updated,
@@ -522,7 +526,11 @@ export const InquiryMapProvider = ({ children }) => {
               user: prov.respondent || currentUser,
             }
           : null;
-        const used = new Set((current.hypotheses || []).map(h => h.displayId).filter(Boolean));
+        const existing = (current.hypotheses || []).slice();
+        const used = new Set(existing.map(h => h.displayId).filter(Boolean));
+        const fixedExisting = existing.map(h => (
+          h.displayId ? h : { ...h, displayId: nextDisplayId(used) }
+        ));
         const newHyp = {
           id: `hyp-${Date.now()}`,
           statement: picked.statement || picked.hypothesis,
@@ -535,7 +543,7 @@ export const InquiryMapProvider = ({ children }) => {
           sourceContributions: [],
           displayId: nextDisplayId(used),
         };
-        const hyps = [...(current.hypotheses || []), newHyp];
+        const hyps = [...fixedExisting, newHyp];
         await updateDoc(ref, {
           "inquiryMap.hypotheses": hyps,
           hypotheses: hyps,

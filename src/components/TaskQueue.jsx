@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
-import { makeHypothesisLetterMap } from "../utils/hypotheses.js";
+import { makeIdToDisplayIdMap } from "../utils/hypotheses.js";
 import { generate } from "../ai";
 import { dedupeByMessage, normalizeAssigneeName } from "../utils/taskUtils";
 import { auth, db } from "../firebase";
@@ -30,7 +30,7 @@ export default function TaskQueue({
   const [prioritized, setPrioritized] = useState(null);
   const navigate = useNavigate();
   const { hypotheses = [] } = useInquiryMap() || {};
-  const idToLetter = useMemo(() => makeHypothesisLetterMap(hypotheses || []), [hypotheses]);
+  const idToLetter = useMemo(() => makeIdToDisplayIdMap(hypotheses || []), [hypotheses]);
 
   const currentUserName =
     auth.currentUser?.displayName || auth.currentUser?.email || "";

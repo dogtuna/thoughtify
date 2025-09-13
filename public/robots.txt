@@ -1,0 +1,17 @@
+# Allow all search and AI crawlers
+User-agent: *
+Allow: /
+
+# Notable AI crawlers
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-Web
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+
+Sitemap: https://example.com/sitemap.xml

@@ -164,6 +164,9 @@ export default function NavBar() {
                 THOUGHTIFY
               </Link>
             )}
+            <Link to="/blog/" className="logo-text" aria-label="Blog" style={{ marginLeft: 12, fontWeight: 500 }}>
+              Blog
+            </Link>
           </div>
           {loggedIn && (
             <>
