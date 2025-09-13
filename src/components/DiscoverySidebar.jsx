@@ -39,13 +39,20 @@ export default function DiscoverySidebar() {
       <h2 className="sidebar-title">Discovery Hub</h2>
       <nav>
         <ul>
-          <li>
+          {/* Temporarily hide Notifications */}
+          {/* <li>
             <Link to={makeUrl("/notifications")}>
               Notifications {badge(totalUnread)}
             </Link>
-          </li>
+          </li> */}
           <li>
             <Link to={makeUrl("/discovery")}>Overview</Link>
+          </li>
+          {/* Move Inquiry Map here and rename to Hypotheses */}
+          <li>
+            <Link to={makeUrl("/inquiry-map")}>
+              Hypotheses {badge(unreadCounts.inquiry || 0)}
+            </Link>
           </li>
           <li>
             <Link to={makeUrl("/discovery", { section: "tasks" })}>
@@ -103,16 +110,12 @@ export default function DiscoverySidebar() {
               </ul>
             )}
           </li>
-          <li>
+          {/* Temporarily hide Messages */}
+          {/* <li>
             <Link to={makeUrl("/messages")}>
               Messages {badge(unreadCounts.messages || 0)}
             </Link>
-          </li>
-          <li>
-            <Link to={makeUrl("/inquiry-map")}>
-              Inquiry Map {badge(unreadCounts.inquiry || 0)}
-            </Link>
-          </li>
+          </li> */}
           <li>
             <Link to={makeUrl("/project-status")}>Project Status</Link>
             {statusOpen && (
