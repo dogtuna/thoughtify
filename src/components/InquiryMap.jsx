@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import HypothesisSlideOver from "./HypothesisSlideOver";
 import "./AIToolsGenerators.css";
 
-const InquiryMap = ({ hypotheses = [] }) => {
+const InquiryMap = ({ hypotheses = [], initialHypothesisId = null }) => {
   const [selected, setSelected] = useState(null);
   const [conflict, setConflict] = useState(null);
 
@@ -16,6 +16,15 @@ const InquiryMap = ({ hypotheses = [] }) => {
     });
     return map;
   }, [hypotheses]);
+
+  // Open a hypothesis by id if requested
+  useEffect(() => {
+    if (!initialHypothesisId) return;
+    const h = hypotheses.find((x) => String(x.id) === String(initialHypothesisId));
+    if (h) {
+      setSelected({ ...h, displayId: idToLetter[h.id] || h.id });
+    }
+  }, [initialHypothesisId, hypotheses, idToLetter]);
 
   const sorted = [...hypotheses].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
 
@@ -100,6 +109,7 @@ const InquiryMap = ({ hypotheses = [] }) => {
 
 InquiryMap.propTypes = {
   hypotheses: PropTypes.array,
+  initialHypothesisId: PropTypes.string,
 };
 
 export default InquiryMap;

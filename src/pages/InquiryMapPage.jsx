@@ -19,6 +19,7 @@ const InquiryMapContent = () => {
   } = useInquiryMap();
   const [searchParams, setSearchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
+  const initialHypothesisId = searchParams.get("hypothesisId");
   const wantsNew = searchParams.get("new") === "hypothesis";
 
   const [user, setUser] = useState(() => auth.currentUser);
@@ -151,7 +152,7 @@ const InquiryMapContent = () => {
           </ul>
         </section>
       )}
-      <InquiryMap hypotheses={parsedHypotheses} />
+      <InquiryMap hypotheses={parsedHypotheses} initialHypothesisId={initialHypothesisId || null} />
     </main>
   );
 };

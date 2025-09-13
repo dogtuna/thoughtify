@@ -86,7 +86,7 @@ const ProjectOverview = ({
       arr.push({ text: `Status update (${s.audience})`, date: s.date, link: { path: "/project-status" } });
     });
     hypotheses.forEach((h) => {
-      arr.push({ text: `Hypothesis added: ${h.statement || h.hypothesis || h.label}`, date: h.createdAt, link: { path: "/inquiry-map" } });
+      arr.push({ text: `Hypothesis added: ${h.statement || h.hypothesis || h.label}`, date: h.createdAt, link: { path: "/inquiry-map", params: { hypothesisId: h.id } } });
     });
     return arr.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).slice(0, 4);
   }, [documents, questions, tasks, statusUpdates, hypotheses]);
@@ -196,6 +196,14 @@ const ProjectOverview = ({
             <li className="text-sm opacity-70">No recent activity.</li>
           )}
         </ul>
+        <div className="mt-3">
+          <button
+            className="generator-button"
+            onClick={() => navigate({ pathname: "/project-status/history", search: `?${new URLSearchParams({ initiativeId }).toString()}` })}
+          >
+            View All Activity
+          </button>
+        </div>
       </div>
 
       {/* Row 4: Stakeholder Map + Key Documents */}
