@@ -67,11 +67,6 @@ export default function DiscoverySidebar() {
             )}
           </li>
           <li>
-            <Link to={makeUrl("/discovery", { section: "documents" })}>
-              Documents {badge(unreadCounts.documents || 0)}
-            </Link>
-          </li>
-          <li>
             <Link to={makeUrl("/discovery", { section: "questions" })}>
               Questions {badge(unreadCounts.questions || 0)}
             </Link>
@@ -109,6 +104,11 @@ export default function DiscoverySidebar() {
                 </li>
               </ul>
             )}
+          </li>
+          <li>
+            <Link to={makeUrl("/discovery", { section: "documents" })}>
+              Documents {badge(unreadCounts.documents || 0)}
+            </Link>
           </li>
           {/* Temporarily hide Messages */}
           {/* <li>

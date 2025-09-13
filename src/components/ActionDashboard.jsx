@@ -60,8 +60,9 @@ function findConfidenceForTask(task, hypotheses) {
 
 export default function ActionDashboard() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initiativeId = searchParams.get("initiativeId");
+  const view = (searchParams.get("view") || "home").toLowerCase();
   const [user, setUser] = useState(() => auth.currentUser);
   const [tasks, setTasks] = useState([]);
   const { hypotheses = [] } = useInquiryMap() || {};
@@ -155,33 +156,46 @@ export default function ActionDashboard() {
     navigate("/solution-design");
   };
 
-  // --- Grouping with robust confidence lookup ------------------------------
-  const groupedTasks = useMemo(() => {
-    const idToLetter = makeIdToDisplayIdMap(hypotheses);
-    const priorities = ["critical", "high", "medium", "low"];
-    const grouped = priorities.reduce((acc, p) => ({ ...acc, [p]: [] }), {});
-
-    tasks.forEach((task) => {
-      const conf = findConfidenceForTask(task, hypotheses);
-
-      // If we can't resolve a confidence (unlinked/legacy task), don't
-      // accidentally treat it as 0% (which biases to "high" for explore).
-      const autoPriority =
-        conf === undefined ? "medium" : getPriority(task.taskType, conf);
-
-      const priority = task.overridePriority || autoPriority;
-      if (grouped[priority]) {
-        grouped[priority].push({ ...task, _hypLetter: idToLetter[task.hypothesisId] });
-      } else {
-        grouped.low.push({ ...task, _hypLetter: idToLetter[task.hypothesisId] });
-      }
-    });
-
-    return grouped;
-  }, [tasks, hypotheses]);
+  // --- Helpers for category layout -----------------------------------------
+  const idToLetter = useMemo(() => makeIdToDisplayIdMap(hypotheses), [hypotheses]);
+  const categoryOf = (t) => {
+    const k = (t.subType || t.tag || "").toLowerCase();
+    if (k === "email") return "quick";
+    if (k === "meeting" || k === "call") return "leadership";
+    if (k === "research" || k === "instructional-design") return "deep";
+    return "other";
+  };
+  const quickWins = useMemo(() => tasks.filter((t) => categoryOf(t) === "quick").map(t => ({...t, _hypLetter: idToLetter[t.hypothesisId]})), [tasks, idToLetter]);
+  const leadershipConvos = useMemo(() => tasks.filter((t) => categoryOf(t) === "leadership").map(t => ({...t, _hypLetter: idToLetter[t.hypothesisId]})), [tasks, idToLetter]);
+  const deepDives = useMemo(() => tasks.filter((t) => categoryOf(t) === "deep").map(t => ({...t, _hypLetter: idToLetter[t.hypothesisId]})), [tasks, idToLetter]);
+  const goView = (v) => { const sp = new URLSearchParams(searchParams); sp.set("view", v); setSearchParams(sp, { replace: true }); };
+  const renderRowTask = (t) => (
+    <div key={t.id} className="initiative-card task-card p-2">
+      <div className="text-sm font-medium">{t.message}</div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {t.hypothesisId && (
+          <span
+            className="tag-badge tag-hypothesis cursor-pointer"
+            title={`Linked to Hypothesis ${t._hypLetter || t.hypothesisId}`}
+            onClick={() => navigate(`/inquiry-map?initiativeId=${initiativeId || ""}&hypothesisId=${t.hypothesisId}`)}
+          >
+            {t._hypLetter ? `Hypothesis ${t._hypLetter}` : t.hypothesisId}
+          </span>
+        )}
+        {t.taskType && <span className={`tag-badge tag-${t.taskType}`}>{t.taskType}</span>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
+      <h2 className="text-2xl font-bold">Action Dashboard</h2>
+      <div className="flex gap-2">
+        <button className="generator-button" onClick={() => goView("quickwins")}>Quick Wins</button>
+        <button className="generator-button" onClick={() => goView("leadership")}>Leadership Conversations</button>
+        <button className="generator-button" onClick={() => goView("deep")}>Deep Dives</button>
+        <button className="generator-button" onClick={() => navigate(`/discovery?initiativeId=${initiativeId || ""}&section=tasks`)}>All Tasks</button>
+      </div>
       {readyToGraduate && (
         <div className="p-4 mb-4 text-center bg-green-100 border border-green-400 text-green-700 rounded-lg">
           <p className="font-bold">Analysis Complete!</p>
@@ -197,54 +211,32 @@ export default function ActionDashboard() {
           </button>
         </div>
       )}
-      <div className="flex gap-4">
-        {Object.keys(groupedTasks).map((priority) => (
-          <div
-            key={priority}
-            className="flex-1 rounded-lg p-2"
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, priority)}
-          >
-            <h3 className="mb-2 text-center font-semibold capitalize">
-              {priority}
-            </h3>
-            <div className="flex min-h-[200px] flex-col gap-2">
-              {groupedTasks[priority].map((t) => (
-                <div
-                  key={t.id}
-                  className="initiative-card task-card p-2 cursor-grab active:cursor-grabbing"
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, t.id)}
-                >
-                  <div className="text-sm font-medium">{t.message}</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {t.hypothesisId && (
-                      <span
-                        className="tag-badge tag-hypothesis cursor-pointer"
-                        title={`Linked to Hypothesis ${t._hypLetter || t.hypothesisId}`}
-                        onClick={() =>
-                          navigate(
-                            `/inquiry-map?initiativeId=${
-                              t.initiativeId || "General"
-                            }&hypothesisId=${t.hypothesisId}`,
-                          )
-                        }
-                      >
-                        {t._hypLetter ? `Hypothesis ${t._hypLetter}` : t.hypothesisId}
-                      </span>
-                    )}
-                    {t.taskType && (
-                      <span className={`tag-badge tag-${t.taskType}`}>
-                        {t.taskType}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+      {view === "quickwins" || view === "leadership" || view === "deep" ? (
+        <div className="initiative-card">
+          <h3 className="mb-2 font-semibold">{view === "quickwins" ? "Quick Wins" : view === "leadership" ? "Leadership Conversations" : "Deep Dives"}</h3>
+          <div className="flex flex-col gap-2">
+            {(view === "quickwins" ? quickWins : view === "leadership" ? leadershipConvos : deepDives).map(renderRowTask)}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="initiative-card">
+            <h3 className="mb-2 font-semibold">Quick Wins</h3>
+            <div className="flex flex-col gap-2">{quickWins.slice(0, 2).map(renderRowTask)}</div>
+            <button className="generator-button mt-2" onClick={() => goView("quickwins")}>View All</button>
+          </div>
+          <div className="initiative-card">
+            <h3 className="mb-2 font-semibold">Leadership Conversations</h3>
+            <div className="flex flex-col gap-2">{leadershipConvos.slice(0, 2).map(renderRowTask)}</div>
+            <button className="generator-button mt-2" onClick={() => goView("leadership")}>View All</button>
+          </div>
+          <div className="initiative-card">
+            <h3 className="mb-2 font-semibold">Deep Dives</h3>
+            <div className="flex flex-col gap-2">{deepDives.slice(0, 2).map(renderRowTask)}</div>
+            <button className="generator-button mt-2" onClick={() => goView("deep")}>View All</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

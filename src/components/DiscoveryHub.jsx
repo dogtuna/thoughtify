@@ -3142,10 +3142,10 @@ const DiscoveryHub = () => {
           )
         // --- MODIFICATION: Revamped project tasks view with AI features ---
         ) : active === "tasks" ? (
-  <div className="flex w-full flex-col gap-4">
-    {/* Header: Title on the left, buttons on the right */}
-    <div className="tasks-header">
-      <h2 className="tasks-title">Project Tasks</h2>
+    <div className="flex w-full flex-col gap-4">
+      {/* Header: Title on the left, buttons on the right */}
+      <div className="tasks-header">
+        <h2 className="tasks-title">Project Tasks</h2>
 
       <div className="task-actions">
     <button
@@ -3234,6 +3234,15 @@ const DiscoveryHub = () => {
           </option>
         ))}
       </select>
+      {/* Grouping toggle */}
+      <select
+        value={groupBy}
+        onChange={(e) => setGroupBy(e.target.value)}
+        className="rounded-md bg-gray-700 px-3 py-1 text-gray-300"
+      >
+        <option value="assignee">Group by Assignee</option>
+        <option value="priority">Group by Priority</option>
+      </select>
     </div>
 
     {/* Task List */}
@@ -3301,59 +3310,68 @@ const DiscoveryHub = () => {
       </div>
     ) : (
       <div className="space-y-4">
-        {Object.entries(tasksByAssignee)
-          .sort((a, b) =>
-            a[0] === "My Tasks" ? -1 : b[0] === "My Tasks" ? 1 : 0
-          )
-          .map(([assignee, tasks]) => (
-            <div key={assignee} className="initiative-card space-y-2">
-              <h3 className="font-semibold">{assignee}</h3>
-              {tasks.map((t) =>
-                renderTaskCard(
-                  t,
-                  <>
-                    <button
-                      className="generator-button"
-                      onClick={() => openEditModal(t)}
-                    >
-                      Edit
-                    </button>
-                    {(t.subType === "email" || t.tag === "email") && (
-                      <button
-                        className="generator-button"
-                        onClick={() => draftTaskEmail(t)}
-                      >
-                        Draft Email
-                      </button>
-                    )}
-                    {(t.subType === "meeting" || t.tag === "meeting") && (
-                      <button
-                        className="generator-button"
-                        onClick={() => handleScheduleTask(t.id)}
-                      >
-                        Schedule
-                      </button>
-                    )}
-                    <button
-                      className="generator-button"
-                      onClick={() => openCompleteModal(t)}
-                    >
-                      Complete
-                    </button>
-                    <button
-                      className="generator-button"
-                      onClick={() => handleDeleteTask(t.id)}
-                    >
-                      Delete
-                    </button>
-                  </>
-                )
-              )}
-            </div>
-          ))}
-        {displayedTasks.length === 0 && (
-          <p className="text-gray-400">Looks like you are all caught up!</p>
+        {groupBy !== 'priority' ? (
+          <>
+            {Object.entries(tasksByAssignee)
+              .sort((a, b) => (a[0] === "My Tasks" ? -1 : b[0] === "My Tasks" ? 1 : 0))
+              .map(([assignee, tasks]) => (
+                <div key={assignee} className="initiative-card space-y-2">
+                  <h3 className="font-semibold">{assignee}</h3>
+                  {tasks.map((t) =>
+                    renderTaskCard(
+                      t,
+                      <>
+                        <button className="generator-button" onClick={() => openEditModal(t)}>Edit</button>
+                        {(t.subType === "email" || t.tag === "email") && (
+                          <button className="generator-button" onClick={() => draftTaskEmail(t)}>Draft Email</button>
+                        )}
+                        {(t.subType === "meeting" || t.tag === "meeting") && (
+                          <button className="generator-button" onClick={() => handleScheduleTask(t.id)}>Schedule</button>
+                        )}
+                        <button className="generator-button" onClick={() => openCompleteModal(t)}>Complete</button>
+                        <button className="generator-button" onClick={() => handleDeleteTask(t.id)}>Delete</button>
+                      </>
+                    )
+                  )}
+                </div>
+              ))}
+          </>
+        ) : (
+          <>
+            {(() => {
+              const confOf = (h) => (typeof h?.confidence === 'number' ? h.confidence : (typeof h?.confidenceScore === 'number' ? h.confidenceScore : 0));
+              const byPrio = { critical: [], high: [], medium: [], low: [] };
+              displayedTasks.forEach((t) => {
+                const h = hypotheses.find((hh) => hh.id === t.hypothesisId);
+                const pr = getPriority(t.taskType || 'explore', confOf(h));
+                (byPrio[pr] || byPrio.low).push(t);
+              });
+              const order = ['critical','high','medium','low'];
+              return order.map((pkey) => (
+                <div key={pkey} className="initiative-card space-y-2">
+                  <h3 className="font-semibold capitalize">{pkey}</h3>
+                  {(byPrio[pkey] || []).map((t) =>
+                    renderTaskCard(
+                      t,
+                      <>
+                        <button className="generator-button" onClick={() => openEditModal(t)}>Edit</button>
+                        {(t.subType === "email" || t.tag === "email") && (
+                          <button className="generator-button" onClick={() => draftTaskEmail(t)}>Draft Email</button>
+                        )}
+                        {(t.subType === "meeting" || t.tag === "meeting") && (
+                          <button className="generator-button" onClick={() => handleScheduleTask(t.id)}>Schedule</button>
+                        )}
+                        <button className="generator-button" onClick={() => openCompleteModal(t)}>Complete</button>
+                        <button className="generator-button" onClick={() => handleDeleteTask(t.id)}>Delete</button>
+                      </>
+                    )
+                  )}
+                </div>
+              ));
+            })()}
+          </>
         )}
+        {displayedTasks.length === 0 && <p className="text-gray-400">Looks like you are all caught up!</p>}
       </div>
     )}
 
