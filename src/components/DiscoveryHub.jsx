@@ -1689,6 +1689,7 @@ const DiscoveryHub = () => {
             name: c.name || "",
             jobTitle: c.jobTitle || c.role || "",
             profile: c.profile || "",
+            scope: c.scope || "internal",
             info: {
               email: c.info?.email || c.email || "",
               slack: c.info?.slack || "",
@@ -3031,6 +3032,7 @@ const DiscoveryHub = () => {
             questions={questions}
             hypotheses={hypotheses}
             documents={documents}
+            contacts={contacts}
           />
         ) : active === "documents" ? (
           <div className="document-section">
