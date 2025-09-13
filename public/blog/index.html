@@ -9,36 +9,45 @@
     <meta name="robots" content="index,follow" />
     <link rel="alternate" type="application/rss+xml" title="Thoughtify RSS" href="https://example.com/rss.xml" />
     <style>
-      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;line-height:1.7;margin:0;color:#111}
-      header,main,footer{max-width:860px;margin:0 auto;padding:16px}
-      header{padding-top:32px}
+      :root{color-scheme:dark}
+      body{font-family:Inter,system-ui,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;line-height:1.7;margin:0;color:#fff;background:#0b0f1a}
+      main{max-width:1200px;margin:0 auto;padding:100px 16px 24px}
+      footer{max-width:1200px;margin:0 auto;padding:16px}
       h1{line-height:1.2;margin:0 0 0.5rem}
-      ul{list-style:none;padding:0}
-      li{padding:16px 0;border-bottom:1px solid #eee}
-      a{color:#3b82f6;text-decoration:none}
+      ul{list-style:none;padding:0;margin:0}
+      a{color:#a78bfa;text-decoration:none}
       a:hover{text-decoration:underline}
-      .meta{color:#555;margin-top:4px}
-      nav a{margin-right:12px}
+      .meta{color:rgba(255,255,255,0.8);margin-top:4px}
+      .glass-header{width:100%;position:fixed;top:0;left:0;right:0;z-index:50;background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,0.2)}
+      .glass-header .nav-container{display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin:0 auto;padding:1rem 1.5rem}
+      .glass-header .logo-section{display:flex;align-items:center;gap:0.5rem}
+      .glass-header .logo-text{font-size:1.5rem;font-weight:700;color:#fff}
+      .glass-header .logo-icon{color:#fb923c}
+      .initiative-card{background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border:1px solid rgba(255,255,255,0.2);border-radius:1.5rem;box-shadow:0 8px 32px 0 rgba(0,0,0,0.37);padding:24px;margin:20px auto;color:#fff;width:100%;max-width:860px;box-sizing:border-box}
     </style>
   </head>
   <body>
-    <header>
-      <nav>
-        <a href="/">Home</a>
-        <a href="/blog/">Blog</a>
-        <a href="/privacy">Privacy</a>
+    <header class="glass-header">
+      <nav class="nav-container">
+        <div class="logo-section">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon"><path d="m5 3 2.5 4L10 3" /><path d="M14 3s2.5 4 2.5 4L19 3" /><path d="M12 22v-8" /><path d="M8.5 11l-3-3" /><path d="M15.5 11l3-3" /></svg>
+          <a href="/" class="logo-text" aria-label="Thoughtify Home">THOUGHTIFY</a>
+          <a href="/blog/" class="logo-text" aria-label="Blog" style="margin-left:12px;font-weight:500">Blog</a>
+        </div>
       </nav>
-      <h1>Blog</h1>
-      <p>Stories, updates and ideas from Thoughtify.</p>
     </header>
     <main>
-      <ul><li>
-        <a href="/blog/welcome-to-thoughtify-blog/"><strong>Closing the Gap Between Strategy and Reality: Welcome to the Thoughtify Blog</strong></a>
+      <div class="initiative-card">
+        <h1>Blog</h1>
+        <p>Stories, updates and ideas from Thoughtify.</p>
+      </div>
+      <ul><li class="initiative-card">
+        <a href="/blog/welcome-to-thoughtify-blog/" style="text-decoration:none"><strong style="font-size:1.25rem;color:#fff">Closing the Gap Between Strategy and Reality: Welcome to the Thoughtify Blog</strong></a>
         <div class="meta">2025-09-13 • Thoughtify Team • strategy, execution, alignment, strategic-intelligence</div>
         <p>Close the strategy–execution gap with Thoughtify, the Strategic Intelligence Platform that connects projects, tasks, and teams to your core objectives.</p>
       </li>
-<li>
-        <a href="/blog/demo-inquiry-maps-root-cause/"><strong>Demo: Using Inquiry Maps to Find Root Causes</strong></a>
+<li class="initiative-card">
+        <a href="/blog/demo-inquiry-maps-root-cause/" style="text-decoration:none"><strong style="font-size:1.25rem;color:#fff">Demo: Using Inquiry Maps to Find Root Causes</strong></a>
         <div class="meta">2025-02-19 • Thoughtify Team • inquiry, root-cause, demo</div>
         <p>A quick walkthrough of how Thoughtify’s Inquiry Map helps uncover what’s really blocking performance before investing in training.</p>
       </li></ul>
