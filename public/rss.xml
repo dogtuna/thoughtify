@@ -6,19 +6,19 @@
     <description>Thoughtify blog feed</description>
     
       <item>
+        <title>Closing the Gap Between Strategy and Reality: Welcome to the Thoughtify Blog</title>
+        <link>https://example.com/blog/welcome-to-thoughtify-blog/</link>
+        <guid isPermaLink="true">https://example.com/blog/welcome-to-thoughtify-blog/</guid>
+        <pubDate>Sat, 13 Sep 2025 00:00:00 GMT</pubDate>
+        <description>Close the strategy–execution gap with Thoughtify, the Strategic Intelligence Platform that connects projects, tasks, and teams to your core objectives.</description>
+      </item>
+
+      <item>
         <title>Demo: Using Inquiry Maps to Find Root Causes</title>
         <link>https://example.com/blog/demo-inquiry-maps-root-cause/</link>
         <guid isPermaLink="true">https://example.com/blog/demo-inquiry-maps-root-cause/</guid>
         <pubDate>Wed, 19 Feb 2025 00:00:00 GMT</pubDate>
         <description>A quick walkthrough of how Thoughtify’s Inquiry Map helps uncover what’s really blocking performance before investing in training.</description>
-      </item>
-
-      <item>
-        <title>Closing the Gap Between Strategy and Reality: Welcome to the Thoughtify Blog</title>
-        <link>https://example.com/blog/welcome-to-thoughtify-blog/</link>
-        <guid isPermaLink="true">https://example.com/blog/welcome-to-thoughtify-blog/</guid>
-        <pubDate>Tue, 18 Feb 2025 00:00:00 GMT</pubDate>
-        <description>Why we’re starting this blog and what to expect next.</description>
       </item>
   </channel>
   </rss>

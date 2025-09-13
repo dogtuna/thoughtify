@@ -1,9 +1,9 @@
 ---
 title: "Closing the Gap Between Strategy and Reality: Welcome to the Thoughtify Blog"
-description: "Why we’re starting this blog and what to expect next."
-date: 2025-02-18
+description: "Close the strategy–execution gap with Thoughtify, the Strategic Intelligence Platform that connects projects, tasks, and teams to your core objectives."
+date: 2025-09-13
 author: "Thoughtify Team"
-tags: ["product", "learning-design", "ai"]
+tags: ["strategy", "execution", "alignment", "strategic-intelligence"]
 coverImage: "/thtfy.png"
 slug: "welcome-to-thoughtify-blog"
 ---

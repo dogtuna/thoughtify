@@ -3,21 +3,21 @@
   
     <url>
       <loc>https://example.com/blog/</loc>
-      <lastmod>2025-09-13T19:01:21.744Z</lastmod>
+      <lastmod>2025-09-13T19:02:52.730Z</lastmod>
       <changefreq>weekly</changefreq>
       <priority>0.8</priority>
     </url>
   
     <url>
-      <loc>https://example.com/blog/demo-inquiry-maps-root-cause/</loc>
-      <lastmod>2025-02-19T00:00:00.000Z</lastmod>
+      <loc>https://example.com/blog/welcome-to-thoughtify-blog/</loc>
+      <lastmod>2025-09-13T00:00:00.000Z</lastmod>
       <changefreq>monthly</changefreq>
       <priority>0.7</priority>
     </url>
 
     <url>
-      <loc>https://example.com/blog/welcome-to-thoughtify-blog/</loc>
-      <lastmod>2025-02-18T00:00:00.000Z</lastmod>
+      <loc>https://example.com/blog/demo-inquiry-maps-root-cause/</loc>
+      <lastmod>2025-02-19T00:00:00.000Z</lastmod>
       <changefreq>monthly</changefreq>
       <priority>0.7</priority>
     </url>
