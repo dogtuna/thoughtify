@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import InquiryMap from "../components/InquiryMap";
 import { useInquiryMap } from "../context/InquiryMapContext.jsx";
@@ -49,6 +49,7 @@ const InquiryMapContent = () => {
 
   const parsedHypotheses = (Array.isArray(hypotheses) ? hypotheses : []).map((h) => ({
     id: h.id,
+    displayId: h.displayId || (typeof h.id === 'string' ? h.id : ''),
     statement: h.statement || h.hypothesis || h.text || h.label || h.id,
     confidence: typeof h.confidence === "number" ? h.confidence : 0,
     supportingEvidence: h.evidence?.supporting || h.supportingEvidence || [],
@@ -102,12 +103,7 @@ const InquiryMapContent = () => {
 
   return (
     <main className="min-h-screen pb-40">
-      <div className="flex items-center gap-4 mb-4">
-        {isAnalyzing && <span>Analyzing evidence...</span>}
-        <Link to="/zapier-config" className="generator-button">
-          Use Zapier
-        </Link>
-      </div>
+      <div className="flex items-center gap-4 mb-4">{isAnalyzing && <span>Analyzing evidence...</span>}</div>
       <section className="mx-auto mb-6 w-[90%]">
         {!showAdd && !wantsNew ? (
           <button className="generator-button" onClick={() => setShowAdd(true)}>Add Hypothesis</button>

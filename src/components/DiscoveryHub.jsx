@@ -8,6 +8,7 @@ import {
   getDoc,
   collection,
   addDoc,
+  getDocs,
   serverTimestamp,
   Timestamp,
   onSnapshot,
@@ -962,6 +963,77 @@ const DiscoveryHub = () => {
           return updatedQuestions;
         });
       }
+      // After adding questions, clear any matching suggestedQuestions entries
+      try {
+        const qToClear = new Set((questionsToAdd || []).map((q) => (q.question || "").toLowerCase()));
+        if (qToClear.size > 0) {
+          const qref = collection(db, "users", uid, "initiatives", initiativeId, "suggestedQuestions");
+          const qsnap = await getDocs(qref);
+          let clearedQ = 0;
+          await Promise.all(
+            qsnap.docs.map(async (d) => {
+              const qq = (d.data()?.question || "").toLowerCase();
+              if (qToClear.has(qq)) {
+                await deleteDoc(d.ref);
+                clearedQ += 1;
+              }
+            })
+          );
+          // Adjust notifications counter for suggestedQuestions
+          try {
+            if (clearedQ > 0) {
+              const nref = doc(db, "users", uid, "notifications", "suggestedQuestions");
+              const nsnap = await getDoc(nref);
+              if (nsnap.exists()) {
+                const current = Number(nsnap.data()?.count || 0);
+                const next = Math.max(0, current - clearedQ);
+                if (next > 0) await updateDoc(nref, { count: next });
+                else await deleteDoc(nref);
+              }
+            }
+          } catch {}
+        }
+      } catch (clearErr) {
+        console.warn("Unable to clear suggestedQuestions after acceptance", clearErr);
+      }
+      // After adding tasks, clear any matching suggestedTasks entries
+      try {
+        const toClear = new Set(
+          (suggestions || [])
+            .filter((s) => (s.category || "").toLowerCase() !== "question")
+            .map((s) => (s.text || "").toLowerCase())
+        );
+        if (toClear.size > 0) {
+          const sref = collection(db, "users", uid, "initiatives", initiativeId, "suggestedTasks");
+          const snap = await getDocs(sref);
+          let cleared = 0;
+          await Promise.all(
+            snap.docs.map(async (d) => {
+              const msg = (d.data()?.message || "").toLowerCase();
+              if (toClear.has(msg)) {
+                await deleteDoc(d.ref);
+                cleared += 1;
+              }
+            })
+          );
+          // Best-effort adjust notification counter
+          try {
+            if (cleared > 0) {
+              const nref = doc(db, "users", uid, "notifications", "suggestedTasks");
+              const nsnap = await getDoc(nref);
+              if (nsnap.exists()) {
+                const current = Number(nsnap.data()?.count || 0);
+                const next = Math.max(0, current - cleared);
+                if (next > 0) await updateDoc(nref, { count: next });
+                else await deleteDoc(nref);
+              }
+            }
+          } catch {}
+        }
+      } catch (clearErr) {
+        console.warn("Unable to clear suggestedTasks after acceptance", clearErr);
+      }
+
       return addedCount;
     } catch (err) {
       console.error("createTasksFromAnalysis error", err);
@@ -1861,6 +1933,19 @@ const DiscoveryHub = () => {
         taskType: t.taskType || "explore",
       });
       await deleteDoc(doc(db, "users", uid, "initiatives", initiativeId, "suggestedTasks", t.id));
+      // Decrement suggestedTasks notification counter
+      try {
+        const nref = doc(db, "users", uid, "notifications", "suggestedTasks");
+        const nsnap = await getDoc(nref);
+        if (nsnap.exists()) {
+          const current = Number(nsnap.data()?.count || 0);
+          const next = Math.max(0, current - 1);
+          if (next > 0) await updateDoc(nref, { count: next });
+          else await deleteDoc(nref);
+        }
+      } catch (e) {
+        console.warn("Failed to adjust suggestedTasks counter", e);
+      }
     } catch (err) {
       console.error("acceptSuggestedTask error", err);
     }
